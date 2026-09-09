@@ -6,6 +6,9 @@ import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, nativeImage, net, p
 import { openExternalSafely, readWindowState, writeWindowState } from "./util";
 
 const APP_TITLE = "Jorvik";
+// Keep the Linux window identity aligned with the generated desktop entry so
+// taskbars group the window under the Jorvik icon instead of a generic icon.
+app.setName(APP_TITLE);
 const DEFAULT_DEV_URL = "http://127.0.0.1:5173";
 const DEV_URL = process.env.HEOROT_DESKTOP_DEV_URL?.trim()
     || (process.env.HEOROT_DESKTOP_DEV === "1" ? DEFAULT_DEV_URL : undefined);
