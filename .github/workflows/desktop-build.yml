@@ -46,6 +46,9 @@ jobs:
           else
             echo "HEOROT_DESKTOP_VERSION=0.1.0" >> "$GITHUB_ENV"
           fi
+      - name: Apply desktop version
+        shell: bash
+        run: npm --prefix apps/desktop version "$HEOROT_DESKTOP_VERSION" --no-git-tag-version --allow-same-version
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @heorot/desktop run ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
