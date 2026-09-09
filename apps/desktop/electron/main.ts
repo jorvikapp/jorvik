@@ -5,7 +5,7 @@ import { app, BrowserWindow, desktopCapturer, ipcMain, net, protocol, session } 
 
 import { openExternalSafely, readWindowState, writeWindowState } from "./util";
 
-const APP_TITLE = "Heorot";
+const APP_TITLE = "Jorvik";
 const DEFAULT_DEV_URL = "http://127.0.0.1:5173";
 const DEV_URL = process.env.HEOROT_DESKTOP_DEV_URL?.trim()
     || (process.env.HEOROT_DESKTOP_DEV === "1" ? DEFAULT_DEV_URL : undefined);

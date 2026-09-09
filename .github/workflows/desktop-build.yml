@@ -1,0 +1,47 @@
+name: Build Jorvik desktop clients
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            target: dist
+            artifact: windows
+          - name: macOS
+            os: macos-latest
+            target: dist:mac:universal:unsigned
+            artifact: macos
+          - name: Linux
+            os: ubuntu-latest
+            target: dist:linux
+            artifact: linux
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @heorot/desktop run ${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jorvik-${{ matrix.artifact }}
+          path: apps/desktop/dist-electron/*
+          if-no-files-found: error

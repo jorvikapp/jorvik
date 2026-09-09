@@ -1,6 +1,7 @@
 {
-  "appId": "com.heorot.app",
-  "productName": "Heorot",
+  "appId": "app.jorvik.desktop",
+  "productName": "Jorvik",
+  "icon": "build/icon.png",
   "asar": true,
   "asarUnpack": "**/*.node",
   "electronFuses": {
@@ -51,6 +52,6 @@
       "AppImage"
     ],
     "category": "Network",
-    "executableName": "heorot"
+    "executableName": "jorvik"
   }
 }

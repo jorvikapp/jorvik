@@ -2,8 +2,8 @@
   "name": "@heorot/desktop",
   "version": "0.1.0",
   "private": true,
-  "author": "Heorot",
-  "description": "Electron desktop wrapper for Heorot Web",
+  "author": "Jorvik contributors",
+  "description": "Jorvik desktop client, based on Heorot",
   "main": "dist/electron/main.js",
   "scripts": {
     "clean": "node ./scripts/clean.mjs",

@@ -1,6 +1,6 @@
-# Heorot Desktop
+# Jorvik Desktop
 
-Electron desktop wrapper for Heorot Web.
+Electron desktop wrapper for Jorvik Web, based on the Heorot project. Jorvik preserves the upstream AGPLv3 license and attribution.
 
 ## Install
 
