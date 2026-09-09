@@ -44,6 +44,9 @@ const bridge: HeorotDesktopBridge = {
     setPreferredDisplayMediaSource: async (sourceId: string): Promise<void> => {
         await ipcRenderer.invoke("heorot:setPreferredDisplayMediaSource", sourceId);
     },
+    setBadgeCount: async (count: number): Promise<void> => {
+        await ipcRenderer.invoke("heorot:setBadgeCount", count);
+    },
     platform: process.platform,
     versions: {
         electron: process.versions.electron,

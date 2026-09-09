@@ -148,6 +148,7 @@ export function useElementLikeNotifications({
     const activeRoomIdRef = useRef(activeRoomId);
     const hasOpenDialogRef = useRef(hasOpenDialog);
     const pendingEncryptedEventIdsRef = useRef<string[]>([]);
+    const processedEventIdsRef = useRef<Set<string>>(new Set());
     const notifsByRoomRef = useRef<Record<string, Notification[]>>({});
     const isSyncingRef = useRef(client.getSyncState() === SyncState.Syncing);
     const lastActivityTsRef = useRef<number>(Date.now());
@@ -321,6 +322,16 @@ export function useElementLikeNotifications({
 
             const threadRootId = event.threadRootId;
             const eventId = event.getId();
+            if (eventId) {
+                if (processedEventIdsRef.current.has(eventId)) {
+                    return;
+                }
+                processedEventIdsRef.current.add(eventId);
+                if (processedEventIdsRef.current.size > 500) {
+                    const first = processedEventIdsRef.current.values().next().value;
+                    if (typeof first === "string") processedEventIdsRef.current.delete(first);
+                }
+            }
             const threadId = eventId && eventId !== threadRootId ? threadRootId : undefined;
             const isViewingEventTimeline = activeRoomIdRef.current === room.roomId && !threadId;
 

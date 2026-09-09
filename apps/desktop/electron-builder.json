@@ -21,7 +21,8 @@
   "files": [
     "dist/electron/**/*",
     "web/**/*",
-    "package.json"
+    "package.json",
+    "build/**/*"
   ],
   "afterPack": "scripts/electron-builder-after-pack.cjs",
   "win": {

@@ -41,9 +41,12 @@ function makeOscillator(
     oscillator.stop(end + 0.01);
 }
 
-function playDefaultTone(): Promise<void> {
+async function playDefaultTone(): Promise<void> {
     const context = getAudioContext();
     if (!context) return Promise.resolve();
+    if (context.state === "suspended") {
+        await context.resume().catch(() => undefined);
+    }
 
     const oscillator = context.createOscillator();
     const gain = context.createGain();

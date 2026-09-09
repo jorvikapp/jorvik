@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import { pathToFileURL } from "node:url";
-import { app, BrowserWindow, desktopCapturer, ipcMain, net, protocol, session } from "electron";
+import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, nativeImage, net, protocol, session, Tray } from "electron";
 
 import { openExternalSafely, readWindowState, writeWindowState } from "./util";
 
@@ -25,6 +25,26 @@ let appProtocolConfigured = false;
 let closeOnWindowCloseMinimize = true;
 let isAppQuitting = false;
 let preferredDisplayMediaSourceId: string | null = null;
+let tray: Tray | null = null;
+
+function resolveIconPath(): string {
+    return path.join(app.getAppPath(), "build", "icon.png");
+}
+
+function setNativeBadge(count: number): void {
+    const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+    if (process.platform === "darwin") {
+        app.dock?.setBadge(safeCount > 0 ? String(safeCount) : "");
+    } else if (process.platform === "win32") {
+        if (mainWindow && safeCount > 0) {
+            mainWindow.setOverlayIcon(nativeImage.createFromPath(resolveIconPath()), String(safeCount));
+        } else {
+            mainWindow?.setOverlayIcon(null, "");
+        }
+    } else {
+        app.setBadgeCount?.(safeCount);
+    }
+}
 
 protocol.registerSchemesAsPrivileged([
     {
@@ -325,6 +345,7 @@ function createMainWindow(): BrowserWindow {
         minWidth: 960,
         minHeight: 640,
         backgroundColor: WINDOW_BACKGROUND_COLOR,
+        icon: resolveIconPath(),
         show: false,
         titleBarStyle: "hidden",
         titleBarOverlay: {
@@ -419,6 +440,10 @@ function registerIpc(): void {
         preferredDisplayMediaSourceId = typeof sourceId === "string" && sourceId.length > 0 ? sourceId : null;
     });
 
+    ipcMain.handle("heorot:setBadgeCount", (_event, count: unknown) => {
+        setNativeBadge(typeof count === "number" ? count : 0);
+    });
+
     ipcMain.handle("heorot:quitApp", () => {
         isAppQuitting = true;
         app.quit();
@@ -457,6 +482,18 @@ async function bootstrap(): Promise<void> {
     });
 
     await app.whenReady();
+    app.setAppUserModelId("app.jorvik.desktop");
+    if (process.platform === "darwin") {
+        app.dock?.setIcon(resolveIconPath());
+    }
+    tray = new Tray(nativeImage.createFromPath(resolveIconPath()));
+    tray.setToolTip(APP_TITLE);
+    tray.setContextMenu(Menu.buildFromTemplate([
+        { label: "Open Jorvik", click: focusMainWindow },
+        { type: "separator" },
+        { label: "Quit Jorvik", click: () => { isAppQuitting = true; app.quit(); } },
+    ]));
+    tray.on("click", focusMainWindow);
     configureAppProtocol();
     configureMediaAuthInterceptor();
     configureDisplayMediaCapture();
