@@ -32,6 +32,21 @@ if (fs.existsSync(targetIndexPath)) {
 
 if (fs.existsSync(sourceConfigPath)) {
     fs.copyFileSync(sourceConfigPath, targetConfigPath);
+} else {
+    fs.writeFileSync(
+        targetConfigPath,
+        `${JSON.stringify({
+            default_server_config: { "m.homeserver": { base_url: "https://matrix.jorvik.app", server_name: "matrix.jorvik.app" } },
+            brand: "Jorvik",
+            disable_guests: true,
+            disable_custom_urls: true,
+            force_verification: false,
+            voice_enabled: true,
+            voice_service_url: "https://matrix.jorvik.app",
+            enable_presence_by_hs_url: { "https://matrix.jorvik.app": true },
+        }, null, 2)}\n`,
+        "utf8",
+    );
 }
 
 if (fs.existsSync(sourceConfigExamplePath)) {
