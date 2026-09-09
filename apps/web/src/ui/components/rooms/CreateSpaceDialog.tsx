@@ -194,6 +194,9 @@ export function CreateSpaceDialog({
                 const response = await client.publicRooms({
                     limit: 24,
                     since: sinceToken,
+                    // Ask the homeserver for the federated directory as well
+                    // as rooms published locally on matrix.jorvik.app.
+                    include_all_networks: true,
                     filter: {
                         generic_search_term: publicSearchTerm || undefined,
                         ...(supportsPublic ? { room_types: [RoomType.Space] } : {}),
