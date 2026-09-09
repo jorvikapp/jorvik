@@ -4485,7 +4485,7 @@ img.voice-ctrl-icon {
 
 @media (max-width: 1200px) {
     .app-shell {
-        grid-template-columns: 64px 240px minmax(0, 1fr);
+        grid-template-columns: 64px 240px minmax(0, 1fr) !important;
 }
 
     .members-sidebar,
@@ -4496,7 +4496,7 @@ img.voice-ctrl-icon {
 
 @media (max-width: 860px) {
     .app-shell {
-        grid-template-columns: 64px minmax(0, 1fr);
+        grid-template-columns: 64px minmax(0, 1fr) !important;
 }
 
     .channels-pane {
