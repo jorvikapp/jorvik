@@ -10,7 +10,14 @@
   "files": [
     "dist/electron/**/*",
     "web/**/*",
-    "package.json"
+    "package.json",
+    "build/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "build/icon.png",
+      "to": "jorvik.png"
+    }
   ],
   "afterPack": "scripts/electron-builder-after-pack.cjs",
   "mac": {
