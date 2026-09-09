@@ -97,7 +97,15 @@ export async function discoverRegistrationFlow(options: DiscoverRegistrationFlow
         if (candidate && (candidate.type === "m.login.sso" || candidate.type === "m.login.cas")) {
             ssoFlow = candidate as SSOFlow;
         }
-    } catch {
+    } catch (error) {
+        console.warn("[Jorvik registration] login flow discovery failed", {
+            homeserverUrl: options.homeserverUrl,
+            endpoint: `${options.homeserverUrl}/_matrix/client/v3/login` ,
+            httpStatus: error instanceof MatrixError ? error.httpStatus : undefined,
+            errcode: error instanceof MatrixError ? error.errcode : undefined,
+            error: error instanceof MatrixError ? error.data?.error : undefined,
+            beforeHttpResponse: !(error instanceof MatrixError),
+        });
         // SSO discovery is best effort.
     }
 
@@ -109,6 +117,14 @@ export async function discoverRegistrationFlow(options: DiscoverRegistrationFlow
             { client, ssoFlow },
         );
     } catch (error) {
+        console.info("[Jorvik registration] registration probe response", {
+            homeserverUrl: options.homeserverUrl,
+            endpoint: `${options.homeserverUrl}/_matrix/client/v3/register`,
+            httpStatus: error instanceof MatrixError ? error.httpStatus : undefined,
+            errcode: error instanceof MatrixError ? error.errcode : undefined,
+            error: error instanceof MatrixError ? error.data?.error : undefined,
+            beforeHttpResponse: !(error instanceof MatrixError),
+        });
         if (error instanceof MatrixError && error.httpStatus === 401) {
             const flows = normalizeFlows(error.data?.flows);
             return {

@@ -319,6 +319,14 @@ export function RegistrationInteractiveAuth({
                 if (disposed) {
                     return;
                 }
+                console.warn("[Jorvik registration] registration request failed", {
+                    homeserverUrl: client.getHomeserverUrl(),
+                    endpoint: `${client.getHomeserverUrl().replace(/\/$/, "")}/_matrix/client/v3/register`,
+                    httpStatus: authError instanceof MatrixError ? authError.httpStatus : undefined,
+                    errcode: authError instanceof MatrixError ? authError.errcode : undefined,
+                    error: authError instanceof MatrixError ? authError.data?.error : undefined,
+                    beforeHttpResponse: !(authError instanceof MatrixError),
+                });
                 setBusy(false);
                 setError(formatInteractiveAuthError(authError));
             });
