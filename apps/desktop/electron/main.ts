@@ -10,7 +10,7 @@ const APP_TITLE = "Jorvik";
 // taskbars group the window under the Jorvik icon instead of a generic icon.
 app.setName(APP_TITLE);
 if (process.platform === "linux") {
-    app.setDesktopName("jorvik.desktop");
+    (app as typeof app & { setDesktopName?: (name: string) => void }).setDesktopName?.("jorvik.desktop");
 }
 const DEFAULT_DEV_URL = "http://127.0.0.1:5173";
 const DEV_URL = process.env.HEOROT_DESKTOP_DEV_URL?.trim()
