@@ -8,7 +8,7 @@ import { openExternalSafely, readWindowState, writeWindowState } from "./util";
 const APP_TITLE = "Jorvik";
 // Keep the Linux window identity aligned with the generated desktop entry so
 // taskbars group the window under the Jorvik icon instead of a generic icon.
-app.setName(APP_TITLE);
+app.setName(process.platform === "linux" ? "jorvik" : APP_TITLE);
 if (process.platform === "linux") {
     (app as typeof app & { setDesktopName?: (name: string) => void }).setDesktopName?.("jorvik.desktop");
 }
