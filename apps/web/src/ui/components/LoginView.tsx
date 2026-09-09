@@ -263,7 +263,7 @@ export function LoginView({
     return (
         <div className="login-view">
             <div className="login-card login-card-wide">
-                <h1>Heorot</h1>
+                <h1>Jorvik</h1>
                 <div className="login-mode-switch" role="tablist" aria-label="Authentication flow">
                     <button
                         type="button"

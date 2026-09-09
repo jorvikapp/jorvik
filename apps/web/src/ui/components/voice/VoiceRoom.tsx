@@ -2335,5 +2335,3 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
 });
 
 VoiceRoom.displayName = "VoiceRoom";
-
-

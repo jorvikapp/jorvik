@@ -648,7 +648,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
                         identityServerUrl,
                         username,
                         password,
-                        initialDeviceDisplayName: "Heorot Web",
+                        initialDeviceDisplayName: "Jorvik Web",
                     });
                 } catch (loginError) {
                     const shouldFallback =
@@ -665,7 +665,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
                         identityServerUrl,
                         username,
                         password,
-                        initialDeviceDisplayName: "Heorot Web",
+                        initialDeviceDisplayName: "Jorvik Web",
                     });
                 }
 

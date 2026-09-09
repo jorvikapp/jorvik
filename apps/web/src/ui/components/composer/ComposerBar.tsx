@@ -18,7 +18,9 @@ interface ComposerBarProps {
     onDrop: (event: React.DragEvent<HTMLDivElement>) => void;
     onAttach: () => void;
     onToggleEmoji: () => void;
+    onToggleGif: () => void;
     emojiPicker: React.ReactNode;
+    gifPicker: React.ReactNode;
 }
 
 export function ComposerBar({
@@ -39,7 +41,9 @@ export function ComposerBar({
     onDrop,
     onAttach,
     onToggleEmoji,
+    onToggleGif,
     emojiPicker,
+    gifPicker,
 }: ComposerBarProps): React.ReactElement {
     return (
         <div className="composer-bar">
@@ -76,6 +80,10 @@ export function ComposerBar({
                     rows={1}
                 />
                 <div className="composer-input-actions">
+                    <div className="composer-emoji-anchor">
+                        <button type="button" className="composer-action-button composer-gif-button" onClick={onToggleGif} disabled={disabled} aria-label="Open GIF picker" title="GIF">GIF</button>
+                        {gifPicker}
+                    </div>
                     <div className="composer-emoji-anchor">
                         <button
                             ref={emojiButtonRef}

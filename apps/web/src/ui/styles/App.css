@@ -639,8 +639,9 @@ textarea {
 }
 
 .rail-logo {
-    background: var(--primary);
-    color: var(--bg-app);
+    background: transparent;
+    border-radius: 0;
+    object-fit: contain;
 }
 
 .rail-icon {
@@ -3404,6 +3405,15 @@ textarea {
     color: var(--text-main);
 }
 
+.room-dialog-danger-zone {
+    display: grid;
+    gap: 7px;
+    margin-top: 18px;
+    padding: 12px;
+    border: 1px solid rgba(237, 66, 69, 0.45);
+    border-radius: 8px;
+}
+
 .room-dialog-section-title {
     margin: 8px 0 4px;
     font-size: 14px;
@@ -4702,5 +4712,3 @@ select,
 .composer-input-shell {
     -webkit-app-region: no-drag;
 }
-
-

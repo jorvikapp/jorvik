@@ -15,6 +15,7 @@ interface RoomSettingsDialogProps {
     room: Room | null;
     open: boolean;
     onClose: () => void;
+    onDeleted?: (roomId: string) => Promise<void> | void;
 }
 
 function normalizeJoinRule(value: string | undefined): JoinRule {
@@ -51,7 +52,7 @@ function isRoomEncrypted(room: Room): boolean {
     return Boolean(room.currentState.getStateEvents(EventType.RoomEncryption, ""));
 }
 
-export function RoomSettingsDialog({ client, room, open, onClose }: RoomSettingsDialogProps): React.ReactElement | null {
+export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: RoomSettingsDialogProps): React.ReactElement | null {
     const [name, setName] = useState("");
     const [topic, setTopic] = useState("");
     const [joinRule, setJoinRule] = useState<JoinRule>(JoinRule.Invite);
@@ -59,6 +60,7 @@ export function RoomSettingsDialog({ client, room, open, onClose }: RoomSettings
     const [enableEncryption, setEnableEncryption] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     const myUserId = client.getUserId() ?? "";
     const roomLabel = room ? getRoomDisplayName(room) : "room";
@@ -75,6 +77,13 @@ export function RoomSettingsDialog({ client, room, open, onClose }: RoomSettings
     const canEnableEncryption = Boolean(
         room && myUserId && !currentlyEncrypted && room.currentState.maySendStateEvent(EventType.RoomEncryption, myUserId),
     );
+    const powerLevels = room?.currentState.getStateEvents(EventType.RoomPowerLevels, "")?.getContent() as
+        | { ban?: number; users?: Record<string, number>; users_default?: number }
+        | undefined;
+    const myPowerLevel = room && myUserId
+        ? (powerLevels?.users?.[myUserId] ?? powerLevels?.users_default ?? 0)
+        : 0;
+    const canDeleteChannel = Boolean(room && room.getMyMembership() === "join" && myPowerLevel >= (powerLevels?.ban ?? 50));
 
     useEffect(() => {
         if (!open || !room) {
@@ -87,6 +96,7 @@ export function RoomSettingsDialog({ client, room, open, onClose }: RoomSettings
         setHistoryVisibility(getHistoryVisibility(room));
         setEnableEncryption(isRoomEncrypted(room));
         setSaving(false);
+        setDeleting(false);
         setError(null);
     }, [open, room]);
 
@@ -150,6 +160,22 @@ export function RoomSettingsDialog({ client, room, open, onClose }: RoomSettings
         }
     };
 
+    const deleteChannel = async (): Promise<void> => {
+        if (!room || !canDeleteChannel || deleting) return;
+        if (!window.confirm(`Delete “${roomLabel}”? You will leave this channel and lose access to its history.`)) return;
+        setDeleting(true);
+        setError(null);
+        try {
+            await client.leave(room.roomId);
+            await onDeleted?.(room.roomId);
+            onClose();
+        } catch (deleteError) {
+            setError(deleteError instanceof Error ? deleteError.message : "Failed to delete channel.");
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     return (
         <RoomDialog
             open={open}
@@ -157,10 +183,10 @@ export function RoomSettingsDialog({ client, room, open, onClose }: RoomSettings
             onClose={onClose}
             footer={
                 <>
-                    <button type="button" className="room-dialog-button room-dialog-button-secondary" onClick={onClose} disabled={saving}>
+                    <button type="button" className="room-dialog-button room-dialog-button-secondary" onClick={onClose} disabled={saving || deleting}>
                         Cancel
                     </button>
-                    <button type="button" className="room-dialog-button room-dialog-button-primary" onClick={() => void submit()} disabled={saving || !room}>
+                    <button type="button" className="room-dialog-button room-dialog-button-primary" onClick={() => void submit()} disabled={saving || deleting || !room}>
                         {saving ? "Saving..." : "Save"}
                     </button>
                 </>
@@ -234,6 +260,15 @@ export function RoomSettingsDialog({ client, room, open, onClose }: RoomSettings
                 <p className="room-dialog-warning">Some fields are read-only because of your room permissions.</p>
             ) : null}
             {error ? <p className="room-dialog-error">{error}</p> : null}
+            {canDeleteChannel ? (
+                <div className="room-dialog-danger-zone">
+                    <strong>Danger zone</strong>
+                    <p className="room-dialog-warning">Delete this channel by leaving it. This cannot be undone from here.</p>
+                    <button type="button" className="room-dialog-button room-dialog-button-danger" onClick={() => void deleteChannel()} disabled={saving || deleting}>
+                        {deleting ? "Deleting..." : "Delete channel"}
+                    </button>
+                </div>
+            ) : null}
         </RoomDialog>
     );
 }

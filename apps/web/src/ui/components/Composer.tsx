@@ -18,6 +18,7 @@ import { mediaFromMxc } from "../adapters/media";
 import { mxcThumbnailToHttp } from "../utils/mxc";
 import { ComposerBar } from "./composer/ComposerBar";
 import { EmojiPicker } from "./composer/EmojiPicker";
+import { GifPicker } from "./composer/GifPicker";
 import { Toast, type ToastState } from "./Toast";
 import { TypingIndicator } from "./typing/TypingIndicator";
 
@@ -800,6 +801,7 @@ export function Composer({
     const [sendingText, setSendingText] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+    const [gifPickerOpen, setGifPickerOpen] = useState(false);
     const [dragActive, setDragActive] = useState(false);
     const [uploads, setUploads] = useState<ComposerUploadItem[]>([]);
     const [toast, setToast] = useState<ToastState | null>(null);
@@ -1748,6 +1750,16 @@ export function Composer({
         }
     };
 
+    const handleGifSelection = useCallback(async (url: string, title: string): Promise<void> => {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error("Could not download GIF");
+            const blob = await response.blob();
+            enqueueFiles([new File([blob], `${title.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "jorvik-gif"}.gif`, { type: blob.type || "image/gif" })]);
+            setGifPickerOpen(false);
+        } catch { setError("Could not load that GIF. Please try another."); }
+    }, [enqueueFiles]);
+
     const handleTextareaPaste = useCallback(
         (event: React.ClipboardEvent<HTMLTextAreaElement>): void => {
             if (!hasTransferFiles(event.clipboardData)) {
@@ -1980,6 +1992,7 @@ export function Composer({
                 onDrop={handleDrop}
                 onAttach={() => fileInputRef.current?.click()}
                 onToggleEmoji={() => setEmojiPickerOpen((open) => !open)}
+                onToggleGif={() => { setGifPickerOpen((open) => !open); setEmojiPickerOpen(false); }}
                 emojiPicker={
                     emojiPickerOpen && room ? (
                         <div ref={emojiPickerRef} className="composer-emoji-picker-popover">
@@ -1996,6 +2009,7 @@ export function Composer({
                         </div>
                     ) : null
                 }
+                gifPicker={gifPickerOpen && room ? <div className="composer-emoji-picker-popover"><GifPicker onClose={() => setGifPickerOpen(false)} onSelect={(url, title) => void handleGifSelection(url, title)} /></div> : null}
             />
             {composerPreview.hasCustomEmoji ? (
                 <div className="composer-live-preview" role="status" aria-live="polite">

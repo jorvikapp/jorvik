@@ -139,6 +139,14 @@
     z-index: 1200;
 }
 
+.composer-gif-button { font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+.composer-gif-picker { max-height: 420px; overflow: auto; }
+.composer-gif-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+.composer-gif-item { border: 0; border-radius: 7px; padding: 0; overflow: hidden; background: var(--bg-input); cursor: pointer; aspect-ratio: 1.35; }
+.composer-gif-item:hover { outline: 2px solid var(--accent-soft); }
+.composer-gif-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.composer-gif-attribution { color: var(--text-muted); font-size: 10px; margin-top: 8px; text-align: right; }
+
 .composer-mentions-popover {
     margin: 8px 0 2px 50px;
     border: 1px solid var(--border);

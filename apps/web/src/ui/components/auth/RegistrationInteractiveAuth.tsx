@@ -119,7 +119,7 @@ export function RegistrationInteractiveAuth({
     username,
     password,
     emailAddress,
-    initialDeviceDisplayName = "Heorot Web",
+    initialDeviceDisplayName = "Jorvik Web",
     onCompleted,
     onBack,
 }: RegistrationInteractiveAuthProps): React.ReactElement {

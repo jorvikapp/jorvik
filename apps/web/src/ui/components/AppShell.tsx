@@ -1928,7 +1928,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     return (
         <div className={appShellClassName} style={appShellStyle}>
             <aside className="left-rail">
-                <div className="rail-logo">H</div>
+                <img className="rail-logo" src="/branding/jorvik-logo-848bff6b.webp" width="46" height="46" alt="Jorvik" />
                 <button
                     type="button"
                     className={`rail-icon${selectedSpaceId === PEOPLE_SPACE_ID ? " is-active" : ""}`}
@@ -2385,6 +2385,10 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 room={roomSettingsRoom}
                 open={Boolean(roomSettingsRoomId)}
                 onClose={() => setRoomSettingsRoomId(null)}
+                onDeleted={(roomId) => {
+                    if (activeRoomId === roomId) setActiveRoomId(null);
+                    setRooms((current) => current.filter((candidate) => candidate.roomId !== roomId));
+                }}
             />
             <RoomModerationDialog
                 client={client}

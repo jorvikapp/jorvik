@@ -83,7 +83,7 @@ function AppRouter(): React.ReactElement {
 
     return (
         <div className="error-screen">
-            <h1>Unable to start Heorot UI</h1>
+            <h1>Unable to start Jorvik UI</h1>
             <p>{matrix.error ?? "Unknown state"}</p>
         </div>
     );
