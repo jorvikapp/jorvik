@@ -31,6 +31,12 @@ let preferredDisplayMediaSourceId: string | null = null;
 let tray: Tray | null = null;
 
 function resolveIconPath(): string {
+    // electron-builder places Linux icons beside the packaged app.asar. Native
+    // image loading cannot reliably read an image from inside an asar archive.
+    const packagedIcon = path.join(process.resourcesPath, "jorvik.png");
+    if (fs.existsSync(packagedIcon)) {
+        return packagedIcon;
+    }
     return path.join(app.getAppPath(), "build", "icon.png");
 }
 
