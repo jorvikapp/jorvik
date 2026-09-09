@@ -373,6 +373,10 @@ function createMainWindow(): BrowserWindow {
             spellcheck: true,
         },
     });
+    const windowIcon = nativeImage.createFromPath(resolveIconPath());
+    if (!windowIcon.isEmpty()) {
+        window.setIcon(windowIcon);
+    }
 
     configureNavigationSafety(window);
 
