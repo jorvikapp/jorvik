@@ -171,6 +171,14 @@ export class SessionLifecycle {
             idBaseUrl: identityServerUrl,
         });
 
+        // Diagnostic fields only: never include the password or returned tokens.
+        // eslint-disable-next-line no-console
+        console.info("[Jorvik login]", {
+            homeserverUrl,
+            identifier: { type: identifier.type, user: identifier.user },
+            hasIdentityServer: Boolean(identityServerUrl),
+        });
+
         const response = await tempClient.loginRequest({
             type: "m.login.password",
             identifier,
@@ -296,6 +304,5 @@ export class SessionLifecycle {
         await cleanupClient.clearStores();
     }
 }
-
 
 
