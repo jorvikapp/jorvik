@@ -26,7 +26,7 @@
   ],
   "extraResources": [
     {
-      "from": "build/icon.png",
+      "from": "../web/public/jorvik-icon.png",
       "to": "jorvik.png"
     }
   ],

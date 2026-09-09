@@ -51,6 +51,16 @@ jobs:
         run: npm --prefix apps/desktop version "$HEOROT_DESKTOP_VERSION" --no-git-tag-version --allow-same-version
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @heorot/desktop run ${{ matrix.target }}
+      - name: Verify packaged Linux icon
+        if: matrix.artifact == 'linux'
+        working-directory: apps/desktop
+        shell: bash
+        run: |
+          test -f dist-electron/linux-unpacked/resources/jorvik.png
+          appimage=$(find dist-electron -maxdepth 1 -name '*.AppImage' -print -quit)
+          test -n "$appimage"
+          "$appimage" --appimage-extract >/dev/null
+          test -f squashfs-root/resources/jorvik.png
       - uses: actions/upload-artifact@v4
         with:
           name: jorvik-${{ matrix.artifact }}
