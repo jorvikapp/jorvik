@@ -22,6 +22,15 @@ function isValidVersion(value) {
 }
 
 function resolvePackageManagerCommand(action, args) {
+    // On Windows, spawning pnpm's .cjs entrypoint directly can fail with EFTYPE.
+    // Use the native command shim so Electron Builder receives a normal process.
+    if (process.platform === "win32") {
+        return {
+            command: "pnpm.cmd",
+            args: [action, ...args],
+        };
+    }
+
     const npmExecPath = process.env.npm_execpath;
     if (!npmExecPath) {
         return null;
