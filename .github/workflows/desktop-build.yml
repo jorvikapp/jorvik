@@ -38,6 +38,14 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - name: Set desktop version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_NAME" == v* ]]; then
+            echo "HEOROT_DESKTOP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "HEOROT_DESKTOP_VERSION=0.1.0" >> "$GITHUB_ENV"
+          fi
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @heorot/desktop run ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
