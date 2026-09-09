@@ -57,6 +57,7 @@ function runNpmScript(scriptName) {
         ? spawnSync(managerCommand.command, managerCommand.args, {
             cwd: projectRoot,
             stdio: "inherit",
+            shell: process.platform === "win32",
         })
         : spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["run", scriptName], {
             cwd: projectRoot,
@@ -84,6 +85,7 @@ function runElectronBuilder(version, extraArgs) {
         const managerResult = spawnSync(managerCommand.command, managerCommand.args, {
             cwd: projectRoot,
             stdio: "inherit",
+            shell: process.platform === "win32",
         });
 
         if (!managerResult.error && managerResult.status === 0) {
