@@ -975,18 +975,20 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         () => visibleRooms.map((room) => room.roomId).sort().join("\u0000"),
         [visibleRooms],
     );
+    const unreadNotificationTotal = useMemo(
+        () => visibleRooms.reduce((total, room) => {
+            const count = room.getUnreadNotificationCount();
+            return total + (Number.isFinite(count) ? Math.max(0, count) : 0);
+        }, 0),
+        [visibleRooms, visibleRoomIdsKey, rooms],
+    );
     useEffect(() => {
         const desktopBadge = window.heorotDesktop?.setBadgeCount;
         if (!desktopBadge) {
             return;
         }
-
-        const unreadCount = visibleRooms.reduce((total, room) => {
-            const count = room.getUnreadNotificationCount();
-            return total + (Number.isFinite(count) ? Math.max(0, count) : 0);
-        }, 0);
-        void desktopBadge(unreadCount).catch(() => undefined);
-    }, [visibleRooms]);
+        void desktopBadge(unreadNotificationTotal).catch(() => undefined);
+    }, [unreadNotificationTotal]);
     const directRoomIds = useMemo(
         () => getDirectRoomIds(client),
         [client, rooms],
