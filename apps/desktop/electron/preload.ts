@@ -14,6 +14,7 @@ export interface HeorotDesktopBridge {
     quitApp: () => Promise<void>;
     getDesktopCapturerSources: () => Promise<Array<{ id: string; name: string }>>;
     setPreferredDisplayMediaSource: (sourceId: string) => Promise<void>;
+    setBadgeCount: (count: number) => Promise<void>;
     platform: NodeJS.Platform;
     versions: {
         electron: string;
