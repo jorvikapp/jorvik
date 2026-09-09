@@ -1861,7 +1861,9 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         setInviteOpen(true);
     }, []);
 
-    const shouldRenderRightPanel = panelMode.mode === "user" || rightSidebarMode !== "closed";
+    // Do not reserve sidebar space until a room is selected.  The empty-state
+    // panel used to leave a fixed 280px black column beside the chat view.
+    const shouldRenderRightPanel = Boolean(activeRoom) && (panelMode.mode === "user" || rightSidebarMode !== "closed");
 
     const [channelsPaneWidth, setChannelsPaneWidth] = useState<number>(readChannelsPaneWidth);
     const [isResizingPane, setIsResizingPane] = useState(false);
