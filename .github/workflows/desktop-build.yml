@@ -57,9 +57,14 @@ jobs:
           pattern: jorvik-*
           path: release-assets
           merge-multiple: true
+      - name: Collect installers
+        shell: bash
+        run: |
+          mkdir -p release-files
+          find release-assets -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.zip' \) -exec cp {} release-files/ \;
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: Jorvik ${{ github.ref_name }}
           generate_release_notes: true
-          files: release-assets/**
+          files: release-files/*
