@@ -59,12 +59,25 @@ jobs:
           test -f dist-electron/linux-unpacked/resources/jorvik.png
           appimage=$(find dist-electron -maxdepth 1 -name '*.AppImage' -print -quit)
           test -n "$appimage"
+          if [[ "$GITHUB_REF_TYPE" != "tag" ]]; then
+            test -f "$appimage"
+            cp "$appimage" "dist-electron/Jorvik-main-${GITHUB_SHA}.AppImage"
+            echo "Manual Linux AppImage: dist-electron/Jorvik-main-${GITHUB_SHA}.AppImage"
+          fi
           "$appimage" --appimage-extract >/dev/null
           test -f squashfs-root/resources/jorvik.png
+          ls -lh dist-electron/*.AppImage
       - uses: actions/upload-artifact@v4
         with:
           name: jorvik-${{ matrix.artifact }}
           path: apps/desktop/dist-electron/*
+          if-no-files-found: error
+      - name: Upload manual Linux AppImage
+        if: matrix.artifact == 'linux' && !startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: jorvik-linux-appimage-${{ github.sha }}
+          path: apps/desktop/dist-electron/Jorvik-main-${{ github.sha }}.AppImage
           if-no-files-found: error
 
   release:
