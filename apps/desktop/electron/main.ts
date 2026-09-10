@@ -125,7 +125,9 @@ function boundedText(value: unknown, maxLength: number): string {
 }
 
 function showNativeNotification(rawPayload: unknown): void {
-    if (!ElectronNotification.isSupported()) {
+    const supported = ElectronNotification.isSupported();
+    console.log(`[jorvik-notification] isSupported=${supported}`);
+    if (!supported) {
         console.log("[jorvik-notification] native notifications unsupported");
         return;
     }
@@ -139,16 +141,40 @@ function showNativeNotification(rawPayload: unknown): void {
     if (roomId) target.roomId = roomId;
     if (eventId) target.eventId = eventId;
 
-    const notification = new ElectronNotification({ title, body, icon: resolveIconPath() });
+    const options = { title, body, icon: resolveIconPath() };
+    console.log(`[jorvik-notification] options=${JSON.stringify({
+        titleLength: title.length,
+        bodyLength: body.length,
+        icon: options.icon,
+        urgency: process.platform === "linux" ? "normal" : undefined,
+    })}`);
+    let notification: ElectronNotification;
+    try {
+        notification = new ElectronNotification(options);
+        console.log("[jorvik-notification] created");
+    } catch (error) {
+        console.error(`[jorvik-notification] creation-failed error=${error instanceof Error ? error.message : String(error)}`);
+        return;
+    }
+    notification.on("show", () => {
+        console.log("[jorvik-notification] show");
+    });
+    notification.on("failed", (...args) => {
+        console.error(`[jorvik-notification] failed details=${JSON.stringify(args)}`);
+    });
+    notification.on("close", () => {
+        console.log("[jorvik-notification] close");
+    });
     notification.on("click", () => {
+        console.log("[jorvik-notification] click");
         console.log(`[jorvik-notification] clicked room=${target.roomId ? "yes" : "no"} event=${target.eventId ? "yes" : "no"}`);
         focusMainWindow();
         if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send("heorot:notificationClicked", target);
         }
     });
+    console.log("[jorvik-notification] before-show");
     notification.show();
-    console.log(`[jorvik-notification] shown titleLength=${title.length} bodyLength=${body.length}`);
 }
 
 const mediaAuthState: DesktopMediaAuthState = {};
