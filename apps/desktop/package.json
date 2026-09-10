@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "author": "Jorvik contributors",
-  "description": "Jorvik desktop client, based on Heorot",
+  "description": "Jorvik Desktop Client",
   "main": "dist/electron/main.js",
   "scripts": {
     "clean": "node ./scripts/clean.mjs",

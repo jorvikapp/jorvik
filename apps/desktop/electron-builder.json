@@ -56,10 +56,20 @@
   "dmg": {},
   "linux": {
     "icon": "build/icon.png",
+    "desktop": {
+      "entry": {
+        "Name": "Jorvik",
+        "Comment": "Jorvik Desktop Client",
+        "Icon": "jorvik",
+        "Terminal": "false",
+        "Type": "Application",
+        "StartupWMClass": "jorvik"
+      }
+    },
     "target": [
       "AppImage"
     ],
-    "category": "Network",
+    "category": "Network;Chat;",
     "executableName": "jorvik"
   }
 }
