@@ -68,7 +68,10 @@ jobs:
           test -n "$appimage"
           if [[ "$GITHUB_REF_TYPE" != "tag" ]]; then
             test -f "$appimage"
-            cp "$appimage" "dist-electron/Jorvik-${HEOROT_DESKTOP_VERSION}.AppImage"
+            manual_appimage="dist-electron/Jorvik-${HEOROT_DESKTOP_VERSION}.AppImage"
+            if [[ "$appimage" != "$manual_appimage" ]]; then
+              cp "$appimage" "$manual_appimage"
+            fi
             echo "Manual Linux AppImage: dist-electron/Jorvik-${HEOROT_DESKTOP_VERSION}.AppImage"
           fi
           "$appimage" --appimage-extract >/dev/null
