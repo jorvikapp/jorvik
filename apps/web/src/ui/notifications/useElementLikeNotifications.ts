@@ -281,10 +281,12 @@ export function useElementLikeNotifications({
             }
 
             const avatarUrl = buildAvatarUrl(client, event);
-            console.log("[jorvik-notification] renderer new-Notification");
+            const appIconUrl = new URL("/jorvik-icon.png", window.location.href).toString();
+            console.log(`[jorvik-notification] renderer new-Notification icon=${appIconUrl} badge=${avatarUrl ? "avatar" : "app"}`);
             const notification = new Notification(title, {
                 body: message,
-                icon: avatarUrl ?? undefined,
+                icon: appIconUrl,
+                badge: avatarUrl ?? appIconUrl,
                 tag: `${room.roomId}:${event.getId() ?? Date.now()}`,
             });
 
