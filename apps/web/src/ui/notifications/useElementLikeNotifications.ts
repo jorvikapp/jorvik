@@ -282,7 +282,8 @@ export function useElementLikeNotifications({
 
             const avatarUrl = buildAvatarUrl(client, event);
             const appIconUrl = new URL("/jorvik-icon.png", window.location.href).toString();
-            console.log(`[jorvik-notification] renderer new-Notification icon=${appIconUrl} badge=${avatarUrl ? "avatar" : "app"}`);
+            console.log(`[jorvik-notification] renderer icon=${appIconUrl}`);
+            console.log(`[jorvik-notification] renderer titleLength=${title.length} bodyLength=${message.length}`);
             const notification = new Notification(title, {
                 body: message,
                 icon: appIconUrl,

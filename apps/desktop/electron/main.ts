@@ -86,7 +86,16 @@ function setNativeBadge(count: number): void {
             mainWindow?.setOverlayIcon(null, "");
         }
     } else {
-        app.setBadgeCount?.(safeCount);
+        const result = app.setBadgeCount?.(safeCount);
+        if (process.platform === "linux") {
+            console.log(`[jorvik-badge] ${JSON.stringify({
+                electron: process.versions.electron,
+                count: safeCount,
+                apiPresent: typeof app.setBadgeCount === "function",
+                result: result ?? null,
+                desktopName: process.env.CHROME_DESKTOP ?? null,
+            })}`);
+        }
     }
 }
 
