@@ -40,6 +40,14 @@ function resolveIconPath(): string {
     return path.join(app.getAppPath(), "build", "icon.png");
 }
 
+function logWindowState(label: string, window: BrowserWindow | null = mainWindow): void {
+    if (!window) {
+        console.log(`[jorvik-window] ${label} mainWindow=false`);
+        return;
+    }
+    console.log(`[jorvik-window] ${label} destroyed=${window.isDestroyed()} visible=${window.isVisible()} minimized=${window.isMinimized()}`);
+}
+
 function setNativeBadge(count: number): void {
     const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
     if (process.platform === "darwin") {
@@ -371,6 +379,7 @@ function createMainWindow(): BrowserWindow {
         },
     });
     const windowIcon = nativeImage.createFromPath(resolveIconPath());
+    console.log(`[jorvik-icon] path=${resolveIconPath()} exists=${fs.existsSync(resolveIconPath())} empty=${windowIcon.isEmpty()}`);
     if (!windowIcon.isEmpty()) {
         window.setIcon(windowIcon);
     }
@@ -385,9 +394,11 @@ function createMainWindow(): BrowserWindow {
     });
 
     window.on("close", (event) => {
+        logWindowState("close event", window);
         const shouldMinimizeOnClose = !isAppQuitting && closeOnWindowCloseMinimize && process.platform !== "darwin";
         if (shouldMinimizeOnClose && !window.isMinimized()) {
             event.preventDefault();
+            console.log("[jorvik-window] hide called");
             window.hide();
             return;
         }
@@ -405,6 +416,7 @@ function createMainWindow(): BrowserWindow {
 }
 
 function focusMainWindow(): void {
+    logWindowState("showMainWindow called");
     if (!mainWindow) {
         return;
     }
@@ -413,7 +425,12 @@ function focusMainWindow(): void {
         mainWindow.restore();
     }
 
+    if (!mainWindow.isVisible()) {
+        mainWindow.show();
+    }
+
     mainWindow.focus();
+    logWindowState("showMainWindow complete");
 }
 
 function registerIpc(): void {
@@ -507,7 +524,10 @@ async function bootstrap(): Promise<void> {
         { type: "separator" },
         { label: "Quit Jorvik", click: () => { isAppQuitting = true; app.quit(); } },
     ]));
-    tray.on("click", focusMainWindow);
+    tray.on("click", () => {
+        console.log("[jorvik-window] tray click fired");
+        focusMainWindow();
+    });
     configureAppProtocol();
     configureMediaAuthInterceptor();
     configureDisplayMediaCapture();
