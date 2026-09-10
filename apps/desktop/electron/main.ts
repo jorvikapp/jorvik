@@ -388,9 +388,7 @@ function createMainWindow(): BrowserWindow {
         const shouldMinimizeOnClose = !isAppQuitting && closeOnWindowCloseMinimize && process.platform !== "darwin";
         if (shouldMinimizeOnClose && !window.isMinimized()) {
             event.preventDefault();
-            // Keep the app reachable from the taskbar when the tray service
-            // is unavailable (common on Wayland desktops).
-            window.minimize();
+            window.hide();
             return;
         }
 
@@ -501,7 +499,8 @@ async function bootstrap(): Promise<void> {
     if (process.platform === "darwin") {
         app.dock?.setIcon(resolveIconPath());
     }
-    tray = new Tray(nativeImage.createFromPath(resolveIconPath()));
+    const trayImage = nativeImage.createFromPath(resolveIconPath()).resize({ width: 32, height: 32 });
+    tray = new Tray(trayImage);
     tray.setToolTip(APP_TITLE);
     tray.setContextMenu(Menu.buildFromTemplate([
         { label: "Open Jorvik", click: focusMainWindow },
