@@ -247,7 +247,9 @@ export function useElementLikeNotifications({
         };
 
         const displayPopupNotification = (event: MatrixEvent, room: Room): void => {
-            if (!settingsRef.current.notificationsEnabled) {
+            const notificationsEnabled = settingsRef.current.notificationsEnabled;
+            console.log(`[jorvik-notification] renderer enabled=${notificationsEnabled}`);
+            if (!notificationsEnabled) {
                 return;
             }
             if (localNotificationsAreSilenced(client)) {
@@ -258,6 +260,7 @@ export function useElementLikeNotifications({
             if (!message) {
                 return;
             }
+            console.log("[jorvik-notification] renderer event-qualified=true");
 
             const senderName = senderDisplayName(event);
             const roomName = roomDisplayName(room);
@@ -273,22 +276,12 @@ export function useElementLikeNotifications({
                 message = "";
             }
 
-            const desktopNotification = window.heorotDesktop?.showNotification;
-            if (desktopNotification) {
-                void desktopNotification({
-                    title,
-                    body: message,
-                    roomId: room.roomId,
-                    eventId: event.getId() ?? undefined,
-                }).catch(() => undefined);
-                return;
-            }
-
             if (typeof Notification === "undefined" || Notification.permission !== "granted") {
                 return;
             }
 
             const avatarUrl = buildAvatarUrl(client, event);
+            console.log("[jorvik-notification] renderer new-Notification");
             const notification = new Notification(title, {
                 body: message,
                 icon: avatarUrl ?? undefined,
