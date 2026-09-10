@@ -388,7 +388,9 @@ function createMainWindow(): BrowserWindow {
         const shouldMinimizeOnClose = !isAppQuitting && closeOnWindowCloseMinimize && process.platform !== "darwin";
         if (shouldMinimizeOnClose && !window.isMinimized()) {
             event.preventDefault();
-            window.minimize();
+            // Keep the app alive in the system tray instead of leaving a
+            // second taskbar entry in a minimized state.
+            window.hide();
             return;
         }
 
