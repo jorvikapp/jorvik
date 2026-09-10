@@ -352,6 +352,7 @@ export function LoginView({
 
                         <label>
                             Username
+                            <span className="login-inline-note">Lowercase letters, numbers, dots, underscores, and hyphens only.</span>
                             <input
                                 type="text"
                                 value={registerUsername}
