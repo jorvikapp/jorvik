@@ -2,6 +2,11 @@ name: Build Jorvik desktop clients
 
 on:
   workflow_dispatch:
+    inputs:
+      desktop_version:
+        description: "Desktop version for this manual validation build"
+        required: true
+        default: "1.2.8"
   push:
     tags: ["v*.*.*"]
 
@@ -41,7 +46,9 @@ jobs:
       - name: Set desktop version
         shell: bash
         run: |
-          if [[ "$GITHUB_REF_NAME" == v* ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "HEOROT_DESKTOP_VERSION=${{ inputs.desktop_version }}" >> "$GITHUB_ENV"
+          elif [[ "$GITHUB_REF_NAME" == v* ]]; then
             echo "HEOROT_DESKTOP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
           else
             echo "HEOROT_DESKTOP_VERSION=0.1.0" >> "$GITHUB_ENV"
@@ -61,8 +68,8 @@ jobs:
           test -n "$appimage"
           if [[ "$GITHUB_REF_TYPE" != "tag" ]]; then
             test -f "$appimage"
-            cp "$appimage" "dist-electron/Jorvik-main-${GITHUB_SHA}.AppImage"
-            echo "Manual Linux AppImage: dist-electron/Jorvik-main-${GITHUB_SHA}.AppImage"
+            cp "$appimage" "dist-electron/Jorvik-${HEOROT_DESKTOP_VERSION}.AppImage"
+            echo "Manual Linux AppImage: dist-electron/Jorvik-${HEOROT_DESKTOP_VERSION}.AppImage"
           fi
           "$appimage" --appimage-extract >/dev/null
           test -f squashfs-root/resources/jorvik.png
@@ -76,8 +83,8 @@ jobs:
         if: matrix.artifact == 'linux' && !startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v4
         with:
-          name: jorvik-linux-appimage-${{ github.sha }}
-          path: apps/desktop/dist-electron/Jorvik-main-${{ github.sha }}.AppImage
+          name: jorvik-linux-appimage-${{ inputs.desktop_version }}
+          path: apps/desktop/dist-electron/Jorvik-${{ inputs.desktop_version }}.AppImage
           if-no-files-found: error
 
   release:
