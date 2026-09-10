@@ -388,9 +388,9 @@ function createMainWindow(): BrowserWindow {
         const shouldMinimizeOnClose = !isAppQuitting && closeOnWindowCloseMinimize && process.platform !== "darwin";
         if (shouldMinimizeOnClose && !window.isMinimized()) {
             event.preventDefault();
-            // Keep the app alive in the system tray instead of leaving a
-            // second taskbar entry in a minimized state.
-            window.hide();
+            // Keep the app reachable from the taskbar when the tray service
+            // is unavailable (common on Wayland desktops).
+            window.minimize();
             return;
         }
 
