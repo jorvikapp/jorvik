@@ -457,6 +457,13 @@ function createMainWindow(): BrowserWindow {
     }
 
     configureNavigationSafety(window);
+    window.webContents.on("before-input-event", (event, input) => {
+        const modifier = process.platform === "darwin" ? input.meta : input.control;
+        if (modifier && input.shift && input.key.toLowerCase() === "i") {
+            event.preventDefault();
+            window.webContents.toggleDevTools();
+        }
+    });
     window.webContents.on("preload-error", (_event, preloadPath, error) => {
         console.error(`[jorvik-preload] error path=${preloadPath} message=${error.message}`);
     });

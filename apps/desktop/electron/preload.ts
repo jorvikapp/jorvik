@@ -83,3 +83,4 @@ const bridge: HeorotDesktopBridge = {
 };
 
 contextBridge.exposeInMainWorld("heorotDesktop", bridge);
+console.log("[jorvik-notification] bridge-exposed=true");
