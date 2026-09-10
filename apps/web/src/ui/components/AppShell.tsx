@@ -1372,6 +1372,20 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         applyAppearanceTheme(userSettings.appearance);
     }, [userSettings]);
 
+    const handleUserSettingsChange = useCallback((nextSettings: UserLocalSettings): void => {
+        console.log(
+            `[jorvik-notification] settings update before=${userSettings.notifications.notificationsEnabled} after=${nextSettings.notifications.notificationsEnabled}`,
+        );
+        setUserSettings(nextSettings);
+        try {
+            saveUserLocalSettings(nextSettings);
+            const persisted = loadUserLocalSettings();
+            console.log(`[jorvik-notification] settings persisted=${persisted.notifications.notificationsEnabled}`);
+        } catch (error) {
+            console.error(`[jorvik-notification] settings persist failed error=${error instanceof Error ? error.message : String(error)}`);
+        }
+    }, [userSettings]);
+
     useEffect(() => {
         if (typeof window === "undefined") {
             return;
@@ -2454,7 +2468,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 }}
                 onLogout={onLogout}
                 userSettings={userSettings}
-                onUserSettingsChange={setUserSettings}
+                onUserSettingsChange={handleUserSettingsChange}
                 renderReactionImages={renderReactionImages}
                 onToggleRenderReactionImages={setRenderReactionImages}
                 onToast={pushToast}
