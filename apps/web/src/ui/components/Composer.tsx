@@ -401,7 +401,7 @@ function formatBytes(bytes: number): string {
 function getUploadLabel(upload: ComposerUploadItem): string {
     switch (upload.status) {
         case "queued":
-            return "Queued";
+            return "Ready to send";
         case "encrypting":
             return "Encrypting...";
         case "uploading": {
