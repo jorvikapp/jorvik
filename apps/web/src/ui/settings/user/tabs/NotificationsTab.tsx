@@ -13,7 +13,12 @@ export function NotificationsTab({ settings, onChange }: NotificationsTabProps):
     const [testPending, setTestPending] = useState(false);
     const soundUploadRef = useRef<HTMLInputElement | null>(null);
 
-    const desktopPermission = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
+    const nativeDesktopNotifications = typeof window !== "undefined" && Boolean(window.heorotDesktop?.showNotification);
+    const desktopPermission = nativeDesktopNotifications
+        ? "native"
+        : typeof Notification === "undefined"
+          ? "unsupported"
+          : Notification.permission;
     const desktopEnabled = settings.notificationsEnabled;
 
     const setDesktopEnabled = async (enabled: boolean): Promise<void> => {
@@ -21,6 +26,11 @@ export function NotificationsTab({ settings, onChange }: NotificationsTabProps):
 
         if (!enabled) {
             onChange({ ...settings, notificationsEnabled: false });
+            return;
+        }
+
+        if (nativeDesktopNotifications) {
+            onChange({ ...settings, notificationsEnabled: true });
             return;
         }
 
@@ -110,6 +120,8 @@ export function NotificationsTab({ settings, onChange }: NotificationsTabProps):
                 Permission:{" "}
                 {desktopPermission === "unsupported"
                     ? "unsupported"
+                    : desktopPermission === "native"
+                      ? "native Electron"
                     : desktopPermission === "granted"
                       ? "granted"
                       : desktopPermission === "denied"
@@ -190,4 +202,3 @@ export function NotificationsTab({ settings, onChange }: NotificationsTabProps):
         </div>
     );
 }
-

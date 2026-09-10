@@ -1,7 +1,19 @@
 import path from "node:path";
 import fs from "node:fs";
 import { pathToFileURL } from "node:url";
-import { app, BrowserWindow, desktopCapturer, ipcMain, Menu, nativeImage, net, protocol, session, Tray } from "electron";
+import {
+    app,
+    BrowserWindow,
+    desktopCapturer,
+    ipcMain,
+    Menu,
+    nativeImage,
+    net,
+    Notification as ElectronNotification,
+    protocol,
+    session,
+    Tray,
+} from "electron";
 
 import { openExternalSafely, readWindowState, writeWindowState } from "./util";
 
@@ -94,6 +106,49 @@ interface DesktopMediaAuthState {
     accessToken?: string;
     homeserverUrl?: string;
     versions?: string[];
+}
+
+interface NativeNotificationPayload {
+    title?: unknown;
+    body?: unknown;
+    roomId?: unknown;
+    eventId?: unknown;
+}
+
+interface NativeNotificationTarget {
+    roomId?: string;
+    eventId?: string;
+}
+
+function boundedText(value: unknown, maxLength: number): string {
+    return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function showNativeNotification(rawPayload: unknown): void {
+    if (!ElectronNotification.isSupported()) {
+        console.log("[jorvik-notification] native notifications unsupported");
+        return;
+    }
+
+    const payload = (rawPayload && typeof rawPayload === "object" ? rawPayload : {}) as NativeNotificationPayload;
+    const title = boundedText(payload.title, 200) || APP_TITLE;
+    const body = boundedText(payload.body, 1000);
+    const target: NativeNotificationTarget = {};
+    const roomId = boundedText(payload.roomId, 255);
+    const eventId = boundedText(payload.eventId, 255);
+    if (roomId) target.roomId = roomId;
+    if (eventId) target.eventId = eventId;
+
+    const notification = new ElectronNotification({ title, body, icon: resolveIconPath() });
+    notification.on("click", () => {
+        console.log(`[jorvik-notification] clicked room=${target.roomId ? "yes" : "no"} event=${target.eventId ? "yes" : "no"}`);
+        focusMainWindow();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send("heorot:notificationClicked", target);
+        }
+    });
+    notification.show();
+    console.log(`[jorvik-notification] shown titleLength=${title.length} bodyLength=${body.length}`);
 }
 
 const mediaAuthState: DesktopMediaAuthState = {};
@@ -487,6 +542,10 @@ function registerIpc(): void {
 
     ipcMain.handle("heorot:setBadgeCount", (_event, count: unknown) => {
         setNativeBadge(typeof count === "number" ? count : 0);
+    });
+
+    ipcMain.handle("heorot:showNotification", (_event, payload: unknown) => {
+        showNativeNotification(payload);
     });
 
     ipcMain.handle("heorot:quitApp", () => {

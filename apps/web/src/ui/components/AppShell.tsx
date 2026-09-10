@@ -856,6 +856,20 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         setTimelineFocusBottomNonce((value) => value + 1);
     }, []);
 
+    useEffect(() => {
+        const onNotificationClicked = window.heorotDesktop?.onNotificationClicked;
+        if (!onNotificationClicked) {
+            return;
+        }
+
+        return onNotificationClicked(({ roomId }) => {
+            if (!roomId || !client.getRoom(roomId)) {
+                return;
+            }
+            openRoomAtBottom(roomId);
+        });
+    }, [client, openRoomAtBottom]);
+
     const handleLiveParticipantsChange = useCallback(
         ({
             roomId,

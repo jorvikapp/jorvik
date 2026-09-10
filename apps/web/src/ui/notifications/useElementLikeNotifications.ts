@@ -250,9 +250,6 @@ export function useElementLikeNotifications({
             if (!settingsRef.current.notificationsEnabled) {
                 return;
             }
-            if (typeof Notification === "undefined" || Notification.permission !== "granted") {
-                return;
-            }
             if (localNotificationsAreSilenced(client)) {
                 return;
             }
@@ -274,6 +271,21 @@ export function useElementLikeNotifications({
 
             if (!settingsRef.current.notificationBodyEnabled) {
                 message = "";
+            }
+
+            const desktopNotification = window.heorotDesktop?.showNotification;
+            if (desktopNotification) {
+                void desktopNotification({
+                    title,
+                    body: message,
+                    roomId: room.roomId,
+                    eventId: event.getId() ?? undefined,
+                }).catch(() => undefined);
+                return;
+            }
+
+            if (typeof Notification === "undefined" || Notification.permission !== "granted") {
+                return;
             }
 
             const avatarUrl = buildAvatarUrl(client, event);
