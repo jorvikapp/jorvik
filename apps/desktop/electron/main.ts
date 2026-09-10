@@ -10,6 +10,18 @@ const APP_TITLE = "Jorvik";
 // taskbars group the window under the Jorvik icon instead of a generic icon.
 app.setName(process.platform === "linux" ? "jorvik" : APP_TITLE);
 if (process.platform === "linux") {
+    // Keep the profile used by earlier Jorvik builds. Electron otherwise
+    // derives userData from app.getName(), which changed from "Jorvik" to
+    // "jorvik" when the Linux launcher identity was corrected.
+    const appDataPath = app.getPath("appData");
+    const legacyUserDataPath = path.join(appDataPath, APP_TITLE);
+    const lowercaseUserDataPath = path.join(appDataPath, "jorvik");
+    app.setPath(
+        "userData",
+        fs.existsSync(legacyUserDataPath) || !fs.existsSync(lowercaseUserDataPath)
+            ? legacyUserDataPath
+            : lowercaseUserDataPath,
+    );
     (app as typeof app & { setDesktopName?: (name: string) => void }).setDesktopName?.("jorvik.desktop");
 }
 const DEFAULT_DEV_URL = "http://127.0.0.1:5173";
