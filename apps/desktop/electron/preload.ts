@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 
+console.log("[jorvik-preload] loaded");
+
 export interface HeorotDesktopMediaAuthState {
     accessToken?: string;
     homeserverUrl?: string;

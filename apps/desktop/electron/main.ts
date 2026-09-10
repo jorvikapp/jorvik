@@ -422,6 +422,8 @@ function configureNavigationSafety(window: BrowserWindow): void {
 
 function createMainWindow(): BrowserWindow {
     const windowState = readWindowState();
+    const preloadPath = resolvePreloadPath();
+    console.log(`[jorvik-preload] path=${preloadPath} exists=${fs.existsSync(preloadPath)}`);
 
     const window = new BrowserWindow({
         title: APP_TITLE,
@@ -441,7 +443,7 @@ function createMainWindow(): BrowserWindow {
             height: TITLEBAR_OVERLAY_HEIGHT,
         },
         webPreferences: {
-            preload: resolvePreloadPath(),
+            preload: preloadPath,
             contextIsolation: true,
             nodeIntegration: false,
             sandbox: true,
@@ -455,6 +457,9 @@ function createMainWindow(): BrowserWindow {
     }
 
     configureNavigationSafety(window);
+    window.webContents.on("preload-error", (_event, preloadPath, error) => {
+        console.error(`[jorvik-preload] error path=${preloadPath} message=${error.message}`);
+    });
 
     window.once("ready-to-show", () => {
         if (windowState.isMaximized) {
