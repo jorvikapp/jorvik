@@ -56,6 +56,11 @@
   "dmg": {},
   "linux": {
     "icon": "build/icon.png",
+    "desktop": {
+      "entry": {
+        "StartupWMClass": "jorvik"
+      }
+    },
     "target": [
       "AppImage"
     ],
