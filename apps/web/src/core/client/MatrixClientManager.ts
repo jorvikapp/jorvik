@@ -12,6 +12,31 @@ import type { MatrixClientAssignOpts, MatrixCredentials } from "../types/credent
 import { createMatrixClient } from "./createMatrixClient";
 import { coreCryptoCallbacks } from "./cryptoCallbacks";
 
+/**
+ * The store backend talks to its web worker over postMessage and only settles
+ * once the worker replies, so a worker that never loads leaves startup pending
+ * forever instead of throwing. Time it out so the MemoryStore fallback below
+ * can actually run.
+ */
+const STORE_STARTUP_TIMEOUT_MS = 15_000;
+
+async function startupWithTimeout(startup: () => Promise<void>, timeoutMs: number): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        await Promise.race([
+            startup(),
+            new Promise<never>((_resolve, reject) => {
+                timer = setTimeout(() => reject(new Error(`store startup timed out after ${timeoutMs}ms`)), timeoutMs);
+            }),
+        ]);
+    } finally {
+        if (timer !== undefined) {
+            clearTimeout(timer);
+        }
+    }
+}
+
 export interface MatrixClientManagerOptions {
     initialSyncLimit?: number;
     lazyLoadMembers?: boolean;
@@ -74,7 +99,11 @@ export class MatrixClientManager {
 
         for (const dbType of ["indexeddb", "memory"]) {
             try {
-                await this.matrixClient.store.startup();
+                if (dbType === "indexeddb") {
+                    await startupWithTimeout(() => this.matrixClient!.store.startup(), STORE_STARTUP_TIMEOUT_MS);
+                } else {
+                    await this.matrixClient.store.startup();
+                }
                 break;
             } catch (error) {
                 if (dbType === "indexeddb") {

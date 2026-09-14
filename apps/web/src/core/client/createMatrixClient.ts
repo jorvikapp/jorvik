@@ -28,6 +28,22 @@ export function createMatrixClient(opts: ICreateClientOpts): MatrixClient {
             indexedDB: indexedDBFactory,
             dbName: "riot-web-sync",
             localStorage: localStorageRef,
+            // Keeps sync-accumulator serialization off the main thread. See the
+            // comment in indexeddb-worker.ts for why this matters.
+            workerFactory: () => {
+                const worker = new Worker(new URL("./indexeddb-worker.ts", import.meta.url), {
+                    type: "module",
+                    name: "matrix-indexeddb",
+                });
+                worker.onerror = (event): void => {
+                    // The SDK's doCmd() only settles when the worker replies, so
+                    // a worker that never loads would hang startup rather than
+                    // throw. MatrixClientManager guards that with a timeout;
+                    // this just makes the cause visible.
+                    console.error("matrix indexeddb worker failed to load", event.message || event);
+                };
+                return worker;
+            },
         });
     } else if (localStorageRef) {
         storeOpts.store = new MemoryStore({ localStorage: localStorageRef });
