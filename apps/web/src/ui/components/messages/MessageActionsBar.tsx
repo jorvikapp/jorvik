@@ -17,7 +17,6 @@ interface MessageActionsBarProps {
     room: Room;
     event: MatrixEvent;
     activeSpaceId: string | null;
-    visible: boolean;
     contextMenuPosition: Position | null;
     onRequestContextMenu: (position: Position) => void;
     onCloseContextMenu: () => void;
@@ -31,7 +30,6 @@ export function MessageActionsBar({
     room,
     event,
     activeSpaceId,
-    visible,
     contextMenuPosition,
     onRequestContextMenu,
     onCloseContextMenu,
@@ -126,7 +124,9 @@ export function MessageActionsBar({
         };
     }, [menuReactionPickerPosition]);
 
-    const isVisible = visible || isContextMenuOpen || barReactionPickerOpen || Boolean(menuReactionPickerPosition);
+    // Plain hover and keyboard focus are handled by CSS on .timeline-event
+    // (:hover / :focus-within). Only states CSS cannot see need this class.
+    const isVisible = isContextMenuOpen || barReactionPickerOpen || Boolean(menuReactionPickerPosition);
 
     const withToast = async (
         action: () => Promise<void>,

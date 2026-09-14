@@ -147,6 +147,24 @@ const READ_RECEIPT_PUBLIC_TYPE = "m.read";
 const READ_RECEIPT_PRIVATE_TYPE = "m.read.private";
 const READ_MARK_BOTTOM_THRESHOLD_PX = 80;
 
+/**
+ * Whether the user can actually see the timeline right now.
+ *
+ * Electron hides the window to the tray rather than destroying it, so the
+ * renderer keeps running and the timeline stays mounted. Advancing the read
+ * marker in that state marks messages read that the user has never seen, which
+ * clears the unread badge moments after it appears.
+ */
+function isTimelineUserVisible(): boolean {
+    if (typeof document === "undefined") {
+        return true;
+    }
+    if (document.visibilityState === "hidden") {
+        return false;
+    }
+    return document.hasFocus();
+}
+
 interface DecryptTuning {
     concurrency: number;
     fetchTimeoutMs: number;
@@ -1196,7 +1214,6 @@ export function Timeline({
     );
     const [paginating, setPaginating] = useState(false);
     const [lightbox, setLightbox] = useState<LightboxState | null>(null);
-    const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
     const [contextMenuState, setContextMenuState] = useState<{ eventKey: string; x: number; y: number } | null>(null);
     const [toast, setToast] = useState<ToastState | null>(null);
     const [replyJumpTargetEventId, setReplyJumpTargetEventId] = useState<string | null>(null);
@@ -1767,7 +1784,6 @@ export function Timeline({
     useEffect(() => {
         stickToBottomRef.current = true;
         setLightbox(null);
-        setHoveredMessageId(null);
         setContextMenuState(null);
         setToast(null);
         setReplyJumpTargetEventId(null);
@@ -1887,9 +1903,12 @@ export function Timeline({
         }
     }, [client, events, room]);
 
-    useEffect(() => {
+    const markReadIfAtBottom = useCallback((): void => {
         const container = scrollContainerRef.current;
         if (!container || !room || events.length === 0) {
+            return;
+        }
+        if (!isTimelineUserVisible()) {
             return;
         }
 
@@ -1898,6 +1917,25 @@ export function Timeline({
             void markActiveRoomReadToLatest();
         }
     }, [events, markActiveRoomReadToLatest, room]);
+
+    useEffect(() => {
+        markReadIfAtBottom();
+    }, [events, markReadIfAtBottom, room]);
+
+    // Catch up once the window is genuinely shown again, so returning to Jorvik
+    // still marks the open room read without the user having to scroll.
+    useEffect(() => {
+        const onBecameVisible = (): void => {
+            markReadIfAtBottom();
+        };
+
+        window.addEventListener("focus", onBecameVisible);
+        document.addEventListener("visibilitychange", onBecameVisible);
+        return () => {
+            window.removeEventListener("focus", onBecameVisible);
+            document.removeEventListener("visibilitychange", onBecameVisible);
+        };
+    }, [markReadIfAtBottom]);
 
     const handleScroll = async (event: React.UIEvent<HTMLDivElement>): Promise<void> => {
         const container = event.currentTarget;
@@ -2031,14 +2069,6 @@ export function Timeline({
                             data-event-id={eventId ?? undefined}
                             data-encrypted-media={encryptedMediaFile ? "true" : "false"}
                             tabIndex={0}
-                            onMouseEnter={() => setHoveredMessageId(messageKey)}
-                            onMouseLeave={() => {
-                                setHoveredMessageId((current) => (current === messageKey ? null : current));
-                            }}
-                            onFocus={() => setHoveredMessageId(messageKey)}
-                            onBlur={() => {
-                                setHoveredMessageId((current) => (current === messageKey ? null : current));
-                            }}
                             onContextMenu={(contextMenuEvent) => {
                                 contextMenuEvent.preventDefault();
                                 setContextMenuState({
@@ -2053,7 +2083,6 @@ export function Timeline({
                                 room={room}
                                 event={event}
                                 activeSpaceId={activeSpaceId}
-                                visible={hoveredMessageId === messageKey}
                                 contextMenuPosition={contextMenuPosition}
                                 onRequestContextMenu={(position) =>
                                     setContextMenuState({
