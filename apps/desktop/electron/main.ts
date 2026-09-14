@@ -16,6 +16,7 @@ import {
 } from "electron";
 
 import { openExternalSafely, readWindowState, writeWindowState } from "./util";
+import { LinuxTrayBadge } from "./linux-tray-badge";
 
 const APP_TITLE = "Jorvik";
 // Keep the Linux window identity aligned with the generated desktop entry so
@@ -56,6 +57,9 @@ let closeOnWindowCloseMinimize = true;
 let isAppQuitting = false;
 let preferredDisplayMediaSourceId: string | null = null;
 let tray: Tray | null = null;
+let linuxTrayBadge: LinuxTrayBadge | null = null;
+// Remembered so a tray recreated after a badge arrives is restored, not blank.
+let lastBadgeCount = 0;
 
 function resolveIconPath(): string {
     // electron-builder places Linux icons beside the packaged app.asar. Native
@@ -88,6 +92,8 @@ function setNativeBadge(count: number): void {
     } else {
         const result = app.setBadgeCount?.(safeCount);
         if (process.platform === "linux") {
+            lastBadgeCount = safeCount;
+            linuxTrayBadge?.update(safeCount);
             console.log(`[jorvik-badge] ${JSON.stringify({
                 electron: process.versions.electron,
                 count: safeCount,
@@ -639,6 +645,21 @@ async function bootstrap(): Promise<void> {
     }
     const trayImage = nativeImage.createFromPath(resolveIconPath()).resize({ width: 32, height: 32 });
     tray = new Tray(trayImage);
+
+    // --- Linux-only unread indicator ---------------------------------
+    // Badge assets sit beside the base icon, so this follows resolveIconPath()
+    // in both the dev and packaged layouts.
+    if (process.platform === "linux") {
+        linuxTrayBadge?.dispose();
+        linuxTrayBadge = new LinuxTrayBadge({
+            tray,
+            assetDir: path.join(path.dirname(resolveIconPath()), "tray-badges"),
+            baseIconPath: resolveIconPath(),
+            tmpDir: app.getPath("temp"),
+            iconPx: 32,
+        });
+        linuxTrayBadge.update(lastBadgeCount);
+    }
     tray.setToolTip(APP_TITLE);
     tray.setContextMenu(Menu.buildFromTemplate([
         { label: "Open Jorvik", click: focusMainWindow },
@@ -664,3 +685,8 @@ async function bootstrap(): Promise<void> {
 }
 
 void bootstrap();
+
+app.on("before-quit", () => {
+    linuxTrayBadge?.dispose();
+    linuxTrayBadge = null;
+});

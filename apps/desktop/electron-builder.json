@@ -22,7 +22,8 @@
     "dist/electron/**/*",
     "web/**/*",
     "package.json",
-    "build/**/*"
+    "build/**/*",
+    "!build/tray-badges/**"
   ],
   "extraResources": [
     {
@@ -70,6 +71,16 @@
       "AppImage"
     ],
     "category": "Network;Chat;",
-    "executableName": "jorvik"
+    "executableName": "jorvik",
+    "extraResources": [
+      {
+        "from": "../web/public/jorvik-icon.png",
+        "to": "jorvik.png"
+      },
+      {
+        "from": "build/tray-badges",
+        "to": "tray-badges"
+      }
+    ]
   }
 }

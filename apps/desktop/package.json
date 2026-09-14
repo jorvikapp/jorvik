@@ -15,20 +15,22 @@
     "build": "npm run build:web && npm run build:electron",
     "start": "npm run build && electron .",
     "dist": "node ./scripts/dist-with-version.mjs",
-    "dist:linux": "npm run build && electron-builder --config electron-builder.json --linux AppImage",
+    "dist:linux": "npm run build && npm run build:tray-badges && electron-builder --config electron-builder.json --linux AppImage",
     "dist:mac": "npm run dist:mac:universal:unsigned",
     "dist:mac:x64:unsigned": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --config electron-builder.mac-unsigned.json --publish never -m dmg zip --x64",
     "dist:mac:arm64:unsigned": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --config electron-builder.mac-unsigned.json --publish never -m dmg zip --arm64",
     "dist:mac:universal:unsigned": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --config electron-builder.mac-unsigned.json --publish never -m dmg zip --universal",
     "dist:mac:x64:signed": "npm run build && electron-builder --config electron-builder.json --publish never -m dmg zip --x64",
     "dist:mac:arm64:signed": "npm run build && electron-builder --config electron-builder.json --publish never -m dmg zip --arm64",
-    "dist:mac:universal:signed": "npm run build && electron-builder --config electron-builder.json --publish never -m dmg zip --universal"
+    "dist:mac:universal:signed": "npm run build && electron-builder --config electron-builder.json --publish never -m dmg zip --universal",
+    "build:tray-badges": "node scripts/gen-tray-badges.js ../web/public/jorvik-icon.png build/tray-badges"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
     "concurrently": "^9.1.2",
     "electron": "^44.3.0",
     "electron-builder": "^26.0.12",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "sharp": "^0.33.0"
   }
 }
