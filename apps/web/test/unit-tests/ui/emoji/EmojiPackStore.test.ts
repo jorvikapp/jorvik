@@ -8,6 +8,11 @@ async function loadStore() {
 }
 
 describe("EmojiPackStore", () => {
+    // Every test calls loadStore(), which resets and re-imports the whole
+    // module graph to clear the in-module pack cache. That is genuinely slow,
+    // and under parallel load it crosses the 5s default and flakes.
+    vi.setConfig({ testTimeout: 20_000 });
+
     beforeEach(() => {
         window.localStorage.removeItem(REACTION_IMAGE_SETTING_KEY);
     });
