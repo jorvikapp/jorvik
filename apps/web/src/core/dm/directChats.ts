@@ -57,7 +57,9 @@ function assertValidDirectTargets(client: MatrixClient, targetUserIds: string[])
         throw new Error("Matrix client is not ready.");
     }
 
-    const targets = sanitizeTargetUserIds(targetUserIds);
+    // "@alice" is accepted as shorthand for "@alice:<our server>".
+    const domain = client.getDomain();
+    const targets = sanitizeTargetUserIds(targetUserIds).map((userId) => qualifyMatrixUserId(userId, domain));
     if (targets.length === 0) {
         throw new Error("Select at least one user.");
     }
@@ -359,6 +361,29 @@ export function isValidMatrixUserId(userId: string): boolean {
     return MATRIX_USER_ID_PATTERN.test(userId.trim());
 }
 
+/**
+ * Expands a bare local reference into a full Matrix user ID.
+ *
+ * `@alice` becomes `@alice:example.org` for the supplied home server domain, so
+ * users on your own server can be addressed without typing the domain. Input
+ * that already carries a domain, or that does not start with "@", is returned
+ * unchanged - a bare word must keep matching display names rather than being
+ * silently turned into a user ID.
+ */
+export function qualifyMatrixUserId(userId: string, domain: string | null): string {
+    const trimmed = userId.trim();
+    if (!domain || !trimmed.startsWith("@") || trimmed.includes(":")) {
+        return trimmed;
+    }
+
+    const localpart = trimmed.slice(1);
+    if (localpart.length === 0 || /\s/.test(localpart)) {
+        return trimmed;
+    }
+
+    return `${trimmed}:${domain}`;
+}
+
 export function getDirectRoomIds(client: MatrixClient): Set<string> {
     const rawContent = client.getAccountData(EventType.Direct)?.getContent();
     const sanitized = patchSelfMappedDirectRooms(client, sanitizeMDirectContent(rawContent));
@@ -460,7 +485,9 @@ export async function ensureDirectRoomMappings(
         return;
     }
 
-    const normalizedTargets = sanitizeTargetUserIds(targetUserIds).filter(isValidMatrixUserId);
+    const normalizedTargets = sanitizeTargetUserIds(targetUserIds)
+        .map((userId) => qualifyMatrixUserId(userId, client.getDomain()))
+        .filter(isValidMatrixUserId);
     if (normalizedTargets.length === 0) {
         return;
     }

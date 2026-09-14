@@ -18,9 +18,13 @@ interface MockClientOptions {
 
 function makeClient(options: MockClientOptions = {}) {
     const setAccountData = vi.fn(async () => undefined);
+    const ownUserId = options.ownUserId ?? "@me:example.org";
 
     return {
-        getUserId: () => options.ownUserId ?? "@me:example.org",
+        getUserId: () => ownUserId,
+        // Mirrors MatrixClient.getDomain(), which derives the domain from the
+        // logged-in user ID. qualifyMatrixUserId needs it to expand "@alice".
+        getDomain: () => ownUserId.slice(ownUserId.indexOf(":") + 1) || null,
         isGuest: () => options.isGuest === true,
         getAccountData: (eventType: string) => {
             if (eventType !== EventType.Direct) {
@@ -291,6 +295,18 @@ describe("dmAdapter", () => {
 
         await ensureDirectRoomMappings(client as any, "!target:hs", ["@alice:example.org"]);
         expect(client.setAccountData).not.toHaveBeenCalled();
+    });
+
+    it("ensureDirectRoomMappings qualifies a bare localpart against the local domain", async () => {
+        const client = makeClient({ directContent: {} });
+
+        await ensureDirectRoomMappings(client as any, "!target:hs", ["@alice"]);
+        expect(client.setAccountData).toHaveBeenCalledTimes(1);
+
+        const [, content] = client.setAccountData.mock.calls[0] as [string, Record<string, string[]>];
+        expect(content).toEqual({
+            "@alice:example.org": ["!target:hs"],
+        });
     });
 
     it("ensureDirectRoomMapping wraps ensureDirectRoomMappings for single target", async () => {

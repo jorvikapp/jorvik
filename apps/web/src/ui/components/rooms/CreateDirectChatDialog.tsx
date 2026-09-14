@@ -1,7 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type MatrixClient, type RoomMember } from "matrix-js-sdk/src/matrix";
 
-import { createOrReuseDirectChat, createOrReuseDirectGroupChat, isValidMatrixUserId } from "../../adapters/dmAdapter";
+import {
+    createOrReuseDirectChat,
+    createOrReuseDirectGroupChat,
+    isValidMatrixUserId,
+    qualifyMatrixUserId,
+} from "../../adapters/dmAdapter";
 import { mediaFromMxc, thumbnailFromMxc } from "../../adapters/media";
 import { Avatar } from "../Avatar";
 import { RoomDialog } from "./RoomDialog";
@@ -166,6 +171,11 @@ export function CreateDirectChatDialog({
     const debounceTimerRef = useRef<number | null>(null);
     const searchNonceRef = useRef(0);
     const ownUserId = client.getUserId() ?? "";
+    // "@alice" is treated as "@alice:<our server>"; anything else is untouched.
+    const qualify = useCallback(
+        (value: string): string => qualifyMatrixUserId(value, client.getDomain()),
+        [client],
+    );
 
     useEffect(() => {
         if (!open) {
@@ -217,7 +227,7 @@ export function CreateDirectChatDialog({
 
     const buildTargetFromUserId = useCallback(
         async (candidateUserId: string): Promise<UserSuggestion> => {
-            const targetUserId = candidateUserId.trim();
+            const targetUserId = qualify(candidateUserId);
             if (!isValidMatrixUserId(targetUserId)) {
                 throw new Error("Enter a valid Matrix user ID (example: @alice:example.org).");
             }
@@ -253,7 +263,7 @@ export function CreateDirectChatDialog({
                 source: "profile",
             };
         },
-        [client, ownUserId, suggestions, targets],
+        [client, ownUserId, qualify, suggestions, targets],
     );
 
     const updateSuggestions = async (term: string): Promise<void> => {
@@ -303,21 +313,22 @@ export function CreateDirectChatDialog({
         }
 
         let profileSuggestion: UserSuggestion[] = [];
-        if (trimmed.startsWith("@") && trimmed.includes(":")) {
-            const hasKnownCandidate = localSuggestions.some((entry) => entry.userId === trimmed) ||
-                directorySuggestions.some((entry) => entry.userId === trimmed);
+        const qualifiedTerm = qualify(trimmed);
+        if (isValidMatrixUserId(qualifiedTerm)) {
+            const hasKnownCandidate = localSuggestions.some((entry) => entry.userId === qualifiedTerm) ||
+                directorySuggestions.some((entry) => entry.userId === qualifiedTerm);
 
             if (!hasKnownCandidate) {
                 try {
-                    const profile = await client.getProfileInfo(trimmed);
+                    const profile = await client.getProfileInfo(qualifiedTerm);
                     if (searchNonceRef.current !== nonce) {
                         return;
                     }
 
                     profileSuggestion = [
                         {
-                            userId: trimmed,
-                            displayName: toDisplayName(profile.displayname, trimmed),
+                            userId: qualifiedTerm,
+                            displayName: toDisplayName(profile.displayname, qualifiedTerm),
                             avatarMxc: typeof profile.avatar_url === "string" ? profile.avatar_url : null,
                             source: "profile",
                         },
@@ -449,7 +460,7 @@ export function CreateDirectChatDialog({
         let nextTargets = [...targets];
         const typed = queryInput.trim();
 
-        if (typed.length > 0 && isValidMatrixUserId(typed)) {
+        if (typed.length > 0 && isValidMatrixUserId(qualify(typed))) {
             try {
                 const typedTarget = await buildTargetFromUserId(typed);
                 nextTargets = mergeTargets(nextTargets, typedTarget);
@@ -605,7 +616,7 @@ export function CreateDirectChatDialog({
                                 return;
                             }
 
-                            if (queryInput.trim().length > 0 && isValidMatrixUserId(queryInput.trim())) {
+                            if (queryInput.trim().length > 0 && isValidMatrixUserId(qualify(queryInput.trim()))) {
                                 void addTypedTarget();
                                 return;
                             }

@@ -7,5 +7,6 @@ export {
     findExistingDirectRoomId,
     getDirectRoomIds,
     isValidMatrixUserId,
+    qualifyMatrixUserId,
 } from "../../core/dm/directChats";
 export type { DirectChatResult } from "../../core/dm/directChats";

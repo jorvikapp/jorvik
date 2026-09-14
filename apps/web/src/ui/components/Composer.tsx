@@ -12,6 +12,7 @@ import { getDirectRoomIds } from "../adapters/dmAdapter";
 import { loadAvailableEmojis, resolveEmojiShortcode } from "../emoji/EmojiResolver";
 import { subscribeEmojiPackUpdated } from "../emoji/emojiEvents";
 import { normalizeEmojiShortcode } from "../emoji/EmojiPackStore";
+import { replaceEmoticons } from "../emoji/emoticons";
 import { formatMessageWithEmojis } from "../emoji/formatMessageWithEmojis";
 import { useRoomTyping } from "../hooks/useRoomTyping";
 import { mediaFromMxc } from "../adapters/media";
@@ -368,6 +369,58 @@ function isAbortError(error: unknown): boolean {
     }
 
     return false;
+}
+
+/**
+ * Pulls files out of a clipboard or drag payload.
+ *
+ * `dataTransfer.files` is empty for an image pasted from the system clipboard in
+ * some sources - the file is only reachable through `items[].getAsFile()`. Read
+ * both, and give a pasted image a real filename, since the clipboard usually
+ * supplies none and the name becomes the message body.
+ */
+function extractTransferFiles(dataTransfer: DataTransfer | null): File[] {
+    if (!dataTransfer) {
+        return [];
+    }
+
+    const collected: File[] = [];
+    const seen = new Set<string>();
+    const remember = (file: File | null): void => {
+        if (!file || file.size === 0) {
+            return;
+        }
+        const key = `${file.name}:${file.size}:${file.lastModified}`;
+        if (seen.has(key)) {
+            return;
+        }
+        seen.add(key);
+
+        if (file.name && file.name.trim().length > 0) {
+            collected.push(file);
+            return;
+        }
+
+        const extension = (file.type.split("/")[1] ?? "png").replace(/[^a-z0-9]/gi, "") || "png";
+        collected.push(new File([file], `pasted-image-${Date.now()}.${extension}`, {
+            type: file.type || "image/png",
+            lastModified: file.lastModified,
+        }));
+    };
+
+    for (const file of Array.from(dataTransfer.files ?? [])) {
+        remember(file);
+    }
+
+    if (collected.length === 0) {
+        for (const item of Array.from(dataTransfer.items ?? [])) {
+            if (item.kind === "file") {
+                remember(item.getAsFile());
+            }
+        }
+    }
+
+    return collected;
 }
 
 function hasTransferFiles(dataTransfer: DataTransfer | null): boolean {
@@ -1443,7 +1496,7 @@ export function Composer({
             return;
         }
 
-        const rawText = text;
+        const rawText = replaceEmoticons(text);
         const hasTextToSend = rawText.trim().length > 0;
         const queuedUploadsForRoom = uploadsRef.current.filter(
             (upload) => upload.roomId === room.roomId && upload.status === "queued",
@@ -1571,14 +1624,14 @@ export function Composer({
     }, []);
 
     const enqueueFiles = useCallback(
-        (incoming: File[] | FileList | null): void => {
+        (incoming: File[] | FileList | null): string[] => {
             if (!room || !incoming) {
-                return;
+                return [];
             }
 
             const files = Array.from(incoming);
             if (files.length === 0) {
-                return;
+                return [];
             }
 
             const replyToEventId = replyToEvent?.getId() ?? null;
@@ -1595,6 +1648,9 @@ export function Composer({
             }));
 
             setUploads((currentUploads) => [...currentUploads, ...queuedUploads]);
+            // uploadsRef is normally synced by an effect, which lands a render too
+            // late for a caller that wants to process what it just queued.
+            uploadsRef.current = [...uploadsRef.current, ...queuedUploads];
             setError(null);
             setEmojiPickerOpen(false);
 
@@ -1605,6 +1661,8 @@ export function Composer({
             if (editingEvent) {
                 onCancelEdit();
             }
+
+            return queuedUploads.map((upload) => upload.id);
         },
         [editingEvent, onCancelEdit, onCancelReply, replyToEvent, room],
     );
@@ -1751,14 +1809,21 @@ export function Composer({
     };
 
     const handleGifSelection = useCallback(async (url: string, title: string): Promise<void> => {
+        // Picking a GIF sends it immediately. Unlike a file attachment there is
+        // nothing to caption or review, so parking it in the queue just adds a
+        // second step. Any typed text is left alone and sends separately.
+        setGifPickerOpen(false);
         try {
             const response = await fetch(url);
             if (!response.ok) throw new Error("Could not download GIF");
             const blob = await response.blob();
-            enqueueFiles([new File([blob], `${title.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "jorvik-gif"}.gif`, { type: blob.type || "image/gif" })]);
-            setGifPickerOpen(false);
+            const name = `${title.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "jorvik-gif"}.gif`;
+            const queuedIds = enqueueFiles([new File([blob], name, { type: blob.type || "image/gif" })]);
+            for (const uploadId of queuedIds) {
+                await processUpload(uploadId);
+            }
         } catch { setError("Could not load that GIF. Please try another."); }
-    }, [enqueueFiles]);
+    }, [enqueueFiles, processUpload]);
 
     const handleTextareaPaste = useCallback(
         (event: React.ClipboardEvent<HTMLTextAreaElement>): void => {
@@ -1766,8 +1831,15 @@ export function Composer({
                 return;
             }
 
+            const pastedFiles = extractTransferFiles(event.clipboardData);
+            if (pastedFiles.length === 0) {
+                // Nothing usable: let the browser handle the paste normally
+                // rather than swallowing it and doing nothing.
+                return;
+            }
+
             event.preventDefault();
-            enqueueFiles(event.clipboardData.files);
+            enqueueFiles(pastedFiles);
         },
         [enqueueFiles],
     );
@@ -1812,7 +1884,7 @@ export function Composer({
             event.preventDefault();
             dragDepthRef.current = 0;
             setDragActive(false);
-            enqueueFiles(event.dataTransfer.files);
+            enqueueFiles(extractTransferFiles(event.dataTransfer));
         },
         [enqueueFiles],
     );
