@@ -52,13 +52,6 @@ function getConfiguredHomeserverOrigin(config: CoreConfig | null): string | null
     return typeof baseUrl === "string" ? normalizeOrigin(baseUrl) : null;
 }
 
-function isDesktopRuntime(): boolean {
-    if (typeof window === "undefined") {
-        return false;
-    }
-    return Boolean(window.heorotDesktop);
-}
-
 function buildDefaultEnabledOrigins(config: CoreConfig | null, currentHomeserverOrigin: string | null): Set<string> {
     const defaults = new Set<string>();
     for (const origin of LOCAL_DEV_ORIGINS) {
@@ -91,10 +84,6 @@ function getClientHomeserverOrigin(client: MatrixClient | null): string | null {
 }
 
 export function isPresenceEnabledForClient(config: CoreConfig | null, client: MatrixClient | null): boolean {
-    if (!isDesktopRuntime()) {
-        return false;
-    }
-
     const currentHomeserverOrigin = getClientHomeserverOrigin(client);
     if (!currentHomeserverOrigin) {
         return false;

@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import type { MatrixClient, Room } from "matrix-js-sdk/src/matrix";
 
+import { formatUserIdForDisplay } from "../../../../core/users/formatUserId";
 import { memberAvatarSources } from "../../../adapters/avatar";
 import { Avatar } from "../../../components/Avatar";
 import { getUserPowerLevel } from "../../../components/rooms/roomAdminUtils";
@@ -13,6 +14,7 @@ interface MembersTabProps {
 
 interface MemberRow {
     userId: string;
+    displayId: string;
     displayName: string;
     avatarUrl: string | null;
     avatarSources: string[];
@@ -21,14 +23,18 @@ interface MemberRow {
 
 export function MembersTab({ client, spaceRoom }: MembersTabProps): React.ReactElement {
     const members = useMemo(() => {
+        const localDomain = client.getDomain();
+
         return spaceRoom
             .getMembers()
             .filter((member) => member.membership === "join" || member.membership === "invite")
             .map((member): MemberRow => {
-                const displayName = member.rawDisplayName || member.name || member.userId;
+                const displayId = formatUserIdForDisplay(member.userId, localDomain);
+                const displayName = member.rawDisplayName || member.name || displayId;
                 const avatarSources = memberAvatarSources(client, member, 72, "crop");
                 return {
                     userId: member.userId,
+                    displayId,
                     displayName,
                     avatarUrl: avatarSources[0] ?? null,
                     avatarSources,
@@ -58,7 +64,7 @@ export function MembersTab({ client, spaceRoom }: MembersTabProps): React.ReactE
                             />
                             <div className="settings-members-main">
                                 <span className="settings-members-name">{member.displayName}</span>
-                                <span className="settings-members-id">{member.userId}</span>
+                                <span className="settings-members-id">{member.displayId}</span>
                             </div>
                             <span className={`settings-role-badge settings-role-${role.toLowerCase()}`}>
                                 {role} ({member.powerLevel})

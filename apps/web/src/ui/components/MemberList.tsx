@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import type { MatrixClient, Room } from "matrix-js-sdk/src/matrix";
 
+import { formatUserIdForDisplay } from "../../core/users/formatUserId";
 import { memberAvatarSources } from "../adapters/avatar";
 import { Avatar } from "./Avatar";
 
@@ -22,11 +23,14 @@ export function MemberList({ client, room }: MemberListProps): React.ReactElemen
             return [];
         }
 
+        const localDomain = client.getDomain();
+
         return room
             .getMembers()
             .filter((member) => member.membership === "join" || member.membership === "invite")
             .map((member): RenderMember => {
-                const displayName = member.rawDisplayName || member.name || member.userId;
+                const displayName =
+                    member.rawDisplayName || member.name || formatUserIdForDisplay(member.userId, localDomain);
                 const avatarSources = memberAvatarSources(client, member, 68, "crop");
                 const avatarUrl = avatarSources[0] ?? null;
 

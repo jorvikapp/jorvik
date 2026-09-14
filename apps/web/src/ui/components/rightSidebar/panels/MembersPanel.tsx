@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { EventType, type MatrixClient, type Room, type RoomMember } from "matrix-js-sdk/src/matrix";
 
+import { formatUserIdForDisplay } from "../../../../core/users/formatUserId";
 import { memberAvatarSources } from "../../../adapters/avatar";
 import { useMatrix } from "../../../providers/MatrixProvider";
 import { getPresenceSortRank, toAvatarPresenceState } from "../../../presence/buildPresenceVm";
@@ -76,6 +77,7 @@ export function MembersPanel({
     onSelectUser,
 }: MembersPanelProps): React.ReactElement {
     const { config } = useMatrix();
+    const localDomain = useMemo(() => client.getDomain(), [client]);
     const members = useMemo(() => getVisibleMembers(room), [room]);
     const roleSourceRoom = activeSpaceRoom ?? room;
     const presenceEnabled = useMemo(() => isPresenceEnabledForClient(config, client), [client, config]);
@@ -122,7 +124,8 @@ export function MembersPanel({
             </div>
             <div className="rs-members-list">
                 {orderedMembers.map((member) => {
-                    const displayName = member.rawDisplayName || member.name || member.userId;
+                    const displayName =
+                        member.rawDisplayName || member.name || formatUserIdForDisplay(member.userId, localDomain);
                     const sources = memberAvatarSources(client, member, 72, "crop");
                     const roleLabel = getRoleLabel(getUserPowerLevel(roleSourceRoom, member.userId));
                     const presence = presenceByUserId.get(member.userId);
@@ -146,7 +149,9 @@ export function MembersPanel({
                             />
                             <span className="rs-member-meta">
                                 <span className="rs-member-name">{displayName}</span>
-                                <span className="rs-member-id">{member.userId}</span>
+                                <span className="rs-member-id">
+                                    {formatUserIdForDisplay(member.userId, localDomain)}
+                                </span>
                             </span>
                             <span className="rs-member-badge">{roleLabel}</span>
                         </button>

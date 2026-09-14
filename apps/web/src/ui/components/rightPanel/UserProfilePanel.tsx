@@ -203,6 +203,7 @@ export function UserProfilePanel({
             <ProfileHeader
                 displayName={displayName}
                 userId={userId}
+                localDomain={client.getDomain()}
                 avatarSources={avatarSources}
                 presence={presenceEnabled ? presence : null}
                 onBack={onBack}

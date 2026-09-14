@@ -5,9 +5,12 @@ import type { PresenceVm } from "../../presence/buildPresenceVm";
 import { toAvatarPresenceState } from "../../presence/buildPresenceVm";
 import { PresenceText } from "../presence/PresenceText";
 
+import { formatUserIdForDisplay } from "../../../core/users/formatUserId";
+
 interface ProfileHeaderProps {
     displayName: string;
     userId: string;
+    localDomain?: string | null;
     avatarSources: string[];
     presence: PresenceVm | null;
     onBack: () => void;
@@ -27,6 +30,7 @@ function hashToHue(value: string): number {
 export function ProfileHeader({
     displayName,
     userId,
+    localDomain,
     avatarSources,
     presence,
     onBack,
@@ -88,7 +92,7 @@ export function ProfileHeader({
             />
             <div className="rp-profile-main">
                 <h2 className="rp-profile-name">{displayName}</h2>
-                <div className="rp-profile-mxid">{userId}</div>
+                <div className="rp-profile-mxid">{formatUserIdForDisplay(userId, localDomain)}</div>
                 {presence ? <PresenceText presence={presence} className="rp-profile-presence" /> : null}
             </div>
             <div className="rp-profile-actions">

@@ -12,6 +12,11 @@ import {
     type Room,
 } from "matrix-js-sdk/src/matrix";
 
+import { useMatrix } from "../providers/MatrixProvider";
+import { formatUserIdForDisplay } from "../../core/users/formatUserId";
+import { isPresenceEnabledForClient } from "../presence/presenceConfig";
+import { usePresenceSelection } from "../presence/usePresenceSelection";
+import { StatusMenu } from "./presence/StatusMenu";
 import { ensureDirectRoomMapping, getDirectRoomIds } from "../adapters/dmAdapter";
 import { describeJoinError, joinRoomWithRetry } from "../adapters/joinAdapter";
 import { mediaFromMxc, thumbnailFromMxc } from "../adapters/media";
@@ -838,6 +843,9 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     >(new Map());
     const [joiningDiscoverableRoomId, setJoiningDiscoverableRoomId] = useState<string | null>(null);
     const [settingsState, setSettingsState] = useState<SettingsState | null>(null);
+    const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+    const { config: coreConfig } = useMatrix();
+    const localDomain = useMemo(() => client.getDomain(), [client]);
     const [pendingFocusRoomId, setPendingFocusRoomId] = useState<string | null>(null);
     const [userSettings, setUserSettings] = useState<UserLocalSettings>(() => loadUserLocalSettings());
     const [toast, setToast] = useState<ToastState | null>(null);
@@ -996,6 +1004,11 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         }, 0),
         [visibleRooms, visibleRoomIdsKey, rooms],
     );
+    const presenceEnabled = useMemo(
+        () => isPresenceEnabledForClient(coreConfig, client),
+        [client, coreConfig],
+    );
+    const presenceControl = usePresenceSelection(client, presenceEnabled);
     useEffect(() => {
         const desktopBadge = window.heorotDesktop?.setBadgeCount;
         if (!desktopBadge) {
@@ -2188,25 +2201,58 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                             </div>
                         </div>
                     ) : null}
-                    <button
-                        type="button"
-                        className="pane-user-card"
-                        onClick={() => openUserSettings("my-account")}
-                        title="Open user settings"
-                    >
-                        <Avatar
-                            className="pane-user-avatar"
-                            name={ownDisplayName}
-                            src={ownAvatarSources[0] ?? null}
-                            sources={ownAvatarSources}
-                            seed={ownUserId || undefined}
-                            userId={ownUserId || undefined}
-                        />
-                        <span className="pane-user-meta">
-                            <span className="pane-user-name">{ownDisplayName}</span>
-                            <span className="pane-user-id">{ownUserId || "Unknown user"}</span>
-                        </span>
-                    </button>
+                    <div className="pane-user-row">
+                        <button
+                            type="button"
+                            className="pane-user-card"
+                            onClick={() => openUserSettings("my-account")}
+                            title="Open user settings"
+                        >
+                            <Avatar
+                                className="pane-user-avatar"
+                                name={ownDisplayName}
+                                src={ownAvatarSources[0] ?? null}
+                                sources={ownAvatarSources}
+                                seed={ownUserId || undefined}
+                                userId={ownUserId || undefined}
+                            />
+                            <span className="pane-user-meta">
+                                <span className="pane-user-name">{ownDisplayName}</span>
+                                <span className="pane-user-id">
+                                    {presenceControl.selection.statusMessage ||
+                                        formatUserIdForDisplay(ownUserId, localDomain) ||
+                                        "Unknown user"}
+                                </span>
+                            </span>
+                        </button>
+                        {presenceEnabled ? (
+                            <div className="pane-status-anchor">
+                                <button
+                                    type="button"
+                                    className="pane-status-button"
+                                    aria-haspopup="menu"
+                                    aria-expanded={statusMenuOpen}
+                                    onClick={() => setStatusMenuOpen((open) => !open)}
+                                    title="Set your status"
+                                >
+                                    <span
+                                        className={`status-menu-dot is-${presenceControl.selection.choice}`}
+                                        aria-hidden="true"
+                                    />
+                                </button>
+                                {statusMenuOpen ? (
+                                    <StatusMenu
+                                        choice={presenceControl.selection.choice}
+                                        statusMessage={presenceControl.selection.statusMessage}
+                                        error={presenceControl.error}
+                                        onChoose={presenceControl.setChoice}
+                                        onStatusMessage={presenceControl.setStatusMessage}
+                                        onClose={() => setStatusMenuOpen(false)}
+                                    />
+                                ) : null}
+                            </div>
+                        ) : null}
+                    </div>
                 </div>
             </section>
 
