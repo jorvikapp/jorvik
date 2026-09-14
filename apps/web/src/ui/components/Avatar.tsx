@@ -53,7 +53,12 @@ function buildSourceList(src?: string | null, sources?: Array<string | null | un
 export function Avatar({ name, src, sources, className, seed, userId, presenceState }: AvatarProps): React.ReactElement {
     const [sourceIndex, setSourceIndex] = useState(0);
     const initials = useMemo(() => getInitials(name, userId), [name, userId]);
-    const sourceList = useMemo(() => buildSourceList(src, sources), [src, sources]);
+    // Callers build `sources` inline (memberAvatarSources returns a fresh array
+    // every call), so keying off its identity would reset sourceIndex on every
+    // parent render - re-requesting URLs that already failed. Key off the URLs
+    // themselves instead, so a render with unchanged sources is a no-op.
+    const sourceKey = buildSourceList(src, sources).join("\n");
+    const sourceList = useMemo(() => (sourceKey ? sourceKey.split("\n") : []), [sourceKey]);
     const imageSrc = sourceList[sourceIndex] ?? null;
     const fallbackStyle = useMemo<React.CSSProperties | undefined>(() => {
         if (imageSrc || !seed) {
@@ -69,7 +74,7 @@ export function Avatar({ name, src, sources, className, seed, userId, presenceSt
 
     useEffect(() => {
         setSourceIndex(0);
-    }, [sourceList]);
+    }, [sourceKey]);
 
     return (
         <span className={`avatar ${className}`} aria-hidden="true">
