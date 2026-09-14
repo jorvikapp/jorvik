@@ -132,6 +132,10 @@
     right: 0;
     bottom: calc(100% + 10px);
     width: min(360px, calc(100vw - 120px));
+    /* Without a cap the picker grows with its contents and runs off the top
+       of the window. Keep it inside the viewport and scroll the grid instead. */
+    max-height: min(420px, 70vh);
+    display: flex;
     border: 1px solid var(--border);
     border-radius: 12px;
     background: var(--bg-pane);
@@ -311,6 +315,25 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+}
+
+.composer-emoji-picker-header,
+.composer-emoji-tabs {
+    flex: 0 0 auto;
+}
+
+/* The only scroller in the picker: search and category tabs stay pinned. */
+.composer-emoji-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-right: 2px;
 }
 
 .composer-emoji-picker-header {
@@ -370,8 +393,6 @@
 }
 
 .composer-emoji-grid-custom {
-    max-height: 188px;
-    overflow: auto;
     padding-right: 2px;
 }
 

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import type { MatrixClient, Room } from "matrix-js-sdk/src/matrix";
 
 import { loadAvailableEmojis } from "../../emoji/EmojiResolver";
+import { loadUnicodeEmoji, type UnicodeEmojiGroup } from "../../emoji/unicodeEmoji";
 import { subscribeEmojiPackUpdated } from "../../emoji/emojiEvents";
 import { mxcThumbnailToHttp } from "../../utils/mxc";
 
@@ -29,6 +30,22 @@ const QUICK_EMOJIS: QuickEmoji[] = [
     { value: "\u{1F440}", label: "eyes" },
 ];
 
+/** One glyph per Unicode group, used as the category tab label. */
+const GROUP_ICONS: Record<string, string> = {
+    "Smileys & Emotion": "\u{1F600}",
+    "People & Body": "\u{1F44B}",
+    "Animals & Nature": "\u{1F436}",
+    "Food & Drink": "\u{1F355}",
+    "Travel & Places": "\u{2708}\u{FE0F}",
+    Activities: "\u{26BD}",
+    Objects: "\u{1F4A1}",
+    Symbols: "\u{2764}\u{FE0F}",
+    Flags: "\u{1F3F3}\u{FE0F}",
+};
+
+/** Cap rendered results while searching; 1900 buttons at once is not useful. */
+const MAX_SEARCH_RESULTS = 200;
+
 export function EmojiPicker({
     client,
     room,
@@ -38,6 +55,29 @@ export function EmojiPicker({
 }: EmojiPickerProps): React.ReactElement {
     const [search, setSearch] = useState("");
     const [customEmojis, setCustomEmojis] = useState<Array<{ shortcode: string; name: string; url: string }>>([]);
+    const [groups, setGroups] = useState<UnicodeEmojiGroup[]>([]);
+    const [groupIndex, setGroupIndex] = useState(0);
+    const [loadError, setLoadError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        loadUnicodeEmoji().then(
+            (loaded) => {
+                if (!cancelled) {
+                    setGroups(loaded);
+                    setLoadError(null);
+                }
+            },
+            (error: unknown) => {
+                if (!cancelled) {
+                    setLoadError(error instanceof Error ? error.message : "Could not load emoji.");
+                }
+            },
+        );
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -75,6 +115,27 @@ export function EmojiPicker({
 
         return QUICK_EMOJIS.filter((emoji) => emoji.label.includes(normalizedSearch));
     }, [normalizedSearch]);
+
+    // Searching spans every group; browsing renders only the active category so
+    // the picker never mounts ~1900 buttons at once.
+    const unicodeResults = useMemo(() => {
+        if (!normalizedSearch) {
+            return groups[groupIndex]?.emojis ?? [];
+        }
+
+        const matches: { value: string; name: string }[] = [];
+        for (const group of groups) {
+            for (const emoji of group.emojis) {
+                if (emoji.name.includes(normalizedSearch)) {
+                    matches.push(emoji);
+                    if (matches.length >= MAX_SEARCH_RESULTS) {
+                        return matches;
+                    }
+                }
+            }
+        }
+        return matches;
+    }, [groupIndex, groups, normalizedSearch]);
 
     const filteredCustom = useMemo(() => {
         const searchable = customEmojis.map((emoji) => ({
@@ -114,9 +175,28 @@ export function EmojiPicker({
                 </button>
             </div>
 
-            {filteredQuick.length > 0 ? (
+            {groups.length > 0 && !normalizedSearch ? (
+                <div className="composer-emoji-tabs" role="tablist" aria-label="Emoji categories">
+                    {groups.map((group, index) => (
+                        <button
+                            key={group.name}
+                            type="button"
+                            role="tab"
+                            aria-selected={index === groupIndex}
+                            className={`composer-emoji-tab${index === groupIndex ? " is-active" : ""}`}
+                            onClick={() => setGroupIndex(index)}
+                            title={group.name}
+                        >
+                            {GROUP_ICONS[group.name] ?? "\u{2B50}"}
+                        </button>
+                    ))}
+                </div>
+            ) : null}
+
+            <div className="composer-emoji-scroll">
+            {filteredQuick.length > 0 && !normalizedSearch ? (
                 <div className="composer-emoji-section">
-                    <div className="composer-emoji-section-title">Emoji</div>
+                    <div className="composer-emoji-section-title">Quick</div>
                     <div className="composer-emoji-grid">
                         {filteredQuick.map((emoji) => (
                             <button
@@ -132,6 +212,29 @@ export function EmojiPicker({
                     </div>
                 </div>
             ) : null}
+
+            {unicodeResults.length > 0 ? (
+                <div className="composer-emoji-section">
+                    <div className="composer-emoji-section-title">
+                        {normalizedSearch ? "Results" : (groups[groupIndex]?.name ?? "Emoji")}
+                    </div>
+                    <div className="composer-emoji-grid">
+                        {unicodeResults.map((emoji) => (
+                            <button
+                                key={`${emoji.value}-${emoji.name}`}
+                                type="button"
+                                className="composer-emoji-item"
+                                onClick={() => onSelect(emoji.value)}
+                                title={emoji.name}
+                            >
+                                {emoji.value}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
+
+            {loadError ? <div className="composer-emoji-empty">{loadError}</div> : null}
 
             {filteredCustom.length > 0 ? (
                 <div className="composer-emoji-section">
@@ -157,9 +260,10 @@ export function EmojiPicker({
                 </div>
             ) : null}
 
-            {filteredQuick.length === 0 && filteredCustom.length === 0 ? (
+            {unicodeResults.length === 0 && filteredCustom.length === 0 && !loadError ? (
                 <div className="composer-emoji-empty">No emojis found</div>
             ) : null}
+            </div>
         </div>
     );
 }
