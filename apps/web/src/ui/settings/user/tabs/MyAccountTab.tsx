@@ -2,6 +2,7 @@ import React from "react";
 import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import type { ToastState } from "../../../components/Toast";
+import { useAppVersion } from "../../../version/useAppVersion";
 
 interface MyAccountTabProps {
     client: MatrixClient;
@@ -43,6 +44,7 @@ export function MyAccountTab({ client, onToast, onSignOut }: MyAccountTabProps):
     const userId = client.getUserId() ?? "Unknown";
     const deviceId = client.getDeviceId() ?? "Unknown";
     const homeserverDomain = getHomeserverDomain(client);
+    const appVersion = useAppVersion();
 
     return (
         <div className="settings-tab">
@@ -61,6 +63,12 @@ export function MyAccountTab({ client, onToast, onSignOut }: MyAccountTabProps):
                 <div className="settings-info-item">
                     <span className="settings-info-label">Device ID</span>
                     <code>{deviceId}</code>
+                </div>
+                <div className="settings-info-item">
+                    <span className="settings-info-label">Version</span>
+                    <code title={`Built ${appVersion.buildTime}`}>
+                        {appVersion.version} ({appVersion.surface})
+                    </code>
                 </div>
             </div>
 
@@ -96,6 +104,22 @@ export function MyAccountTab({ client, onToast, onSignOut }: MyAccountTabProps):
                     }
                 >
                     Copy device ID
+                </button>
+                <button
+                    type="button"
+                    className="settings-button settings-button-secondary"
+                    onClick={() =>
+                        void copyText(`${appVersion.label}\n${userId}\n${deviceId}`)
+                            .then(() => onToast({ type: "success", message: "Copied version details." }))
+                            .catch((error: unknown) =>
+                                onToast({
+                                    type: "error",
+                                    message: error instanceof Error ? error.message : "Failed to copy version.",
+                                }),
+                            )
+                    }
+                >
+                    Copy version
                 </button>
                 <button
                     type="button"

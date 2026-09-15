@@ -26,6 +26,7 @@ export interface HeorotDesktopBridge {
     clearMediaAuthState: () => Promise<void>;
     setCloseOnWindowCloseMinimize: (enabled: boolean) => Promise<void>;
     quitApp: () => Promise<void>;
+    getAppVersion: () => Promise<string>;
     getDesktopCapturerSources: () => Promise<Array<{ id: string; name: string }>>;
     setPreferredDisplayMediaSource: (sourceId: string) => Promise<void>;
     setBadgeCount: (count: number) => Promise<void>;
@@ -54,6 +55,9 @@ const bridge: HeorotDesktopBridge = {
     },
     quitApp: async (): Promise<void> => {
         await ipcRenderer.invoke("heorot:quitApp");
+    },
+    getAppVersion: async (): Promise<string> => {
+        return (await ipcRenderer.invoke("heorot:getAppVersion")) as string;
     },
     getDesktopCapturerSources: async (): Promise<Array<{ id: string; name: string }>> => {
         return (await ipcRenderer.invoke("heorot:getDesktopCapturerSources")) as Array<{ id: string; name: string }>;

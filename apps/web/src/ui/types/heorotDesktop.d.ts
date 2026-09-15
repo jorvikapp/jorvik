@@ -27,6 +27,7 @@ export interface HeorotDesktopBridge {
     clearMediaAuthState?: () => Promise<void>;
     setCloseOnWindowCloseMinimize?: (enabled: boolean) => Promise<void>;
     quitApp?: () => Promise<void>;
+    getAppVersion?: () => Promise<string>;
     getDesktopCapturerSources?: () => Promise<HeorotDesktopCaptureSource[]>;
     setPreferredDisplayMediaSource?: (sourceId: string) => Promise<void>;
     setBadgeCount?: (count: number) => Promise<void>;

@@ -605,6 +605,11 @@ function registerIpc(): void {
         isAppQuitting = true;
         app.quit();
     });
+
+    // The packaged version is authoritative on desktop: the renderer's
+    // build-time constant comes from whatever built the web bundle, which is
+    // not necessarily the installer the user actually has.
+    ipcMain.handle("heorot:getAppVersion", () => app.getVersion());
 }
 
 async function bootstrap(): Promise<void> {
