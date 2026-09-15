@@ -1969,7 +1969,7 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                             );
                             const isYou = p.isLocal || p.matrixUserId === ownUserId;
                             const avatarSrc = info.avatarMxc
-                                ? (client.mxcUrlToHttp(info.avatarMxc, 240, 240, "crop", false, true, true) ?? null)
+                                ? (client.mxcUrlToHttp(info.avatarMxc, 240, 240, "crop") ?? null)
                                 : null;
                             const participantVolumeKey = resolveVolumeParticipantKey(p.matrixUserId, p.identity);
                             const participantVolumePercent = getParticipantVolumePercent(participantVolumeKey);

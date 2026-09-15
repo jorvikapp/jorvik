@@ -10,7 +10,7 @@ export function mxcToHttp(client: MatrixClient, mxc: string | null | undefined):
         return null;
     }
 
-    return client.mxcUrlToHttp(mxc, undefined, undefined, undefined, false, true, true);
+    return client.mxcUrlToHttp(mxc, undefined, undefined, undefined, false, true);
 }
 
 export function mxcThumbnailToHttp(
@@ -29,7 +29,6 @@ export function mxcThumbnailToHttp(
         toDevicePixels(height),
         "crop",
         false,
-        true,
         true,
     );
 }

@@ -17,18 +17,19 @@ export function thumbnailFromMxc(
     }
 
     // Match Matrix spec/client behavior: fetch media through Matrix media APIs, not direct links.
-    // The 7th argument is useAuthentication. Without it matrix-js-sdk builds
-    // /_matrix/media/v3/ URLs, and Synapse no longer serves that route at all -
-    // it 404s with an unknown-endpoint error, so every image and avatar breaks.
-    // The media service worker attaches the token, and downgrades back to the
-    // legacy path if a server turns out not to support authenticated media.
+    // Deliberately NOT passing useAuthentication. An unauthenticated
+    // /_matrix/media/v3/ URL loads on its own, and the media service worker
+    // upgrades it to /_matrix/client/v1/media/ with a token when it is
+    // controlling the page. Requesting the authenticated URL directly inverts
+    // that: an <img> cannot set an Authorization header, so if the worker is
+    // not controlling - which happens on a first load, after a storage reset,
+    // or in private browsing - every image 401s with no way to recover.
     return client.mxcUrlToHttp(
         mxc,
         toDevicePixels(width),
         toDevicePixels(height),
         resizeMethod,
         false,
-        true,
         true,
     );
 }
@@ -39,5 +40,5 @@ export function mediaFromMxc(client: MatrixClient, mxc: string | null | undefine
     }
 
     // Use the regular media endpoint so <img> can load it directly in the browser.
-    return client.mxcUrlToHttp(mxc, undefined, undefined, undefined, false, true, true);
+    return client.mxcUrlToHttp(mxc, undefined, undefined, undefined, false, true);
 }

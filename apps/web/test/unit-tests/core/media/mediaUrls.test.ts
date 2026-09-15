@@ -4,40 +4,49 @@ import { mediaFromMxc, thumbnailFromMxc } from "../../../../src/core/media/media
 import { mxcThumbnailToHttp, mxcToHttp } from "../../../../src/ui/utils/mxc";
 
 /**
- * mxcUrlToHttp takes useAuthentication as its 7th positional argument. Omitting
- * it silently produces /_matrix/media/v3/ URLs, which Synapse no longer serves
- * at all - so every avatar and inline image 404s. Positional arguments make
- * that easy to reintroduce, hence these tests.
+ * mxcUrlToHttp's 7th positional argument is useAuthentication. Passing true
+ * makes the SDK emit /_matrix/client/v1/media/ URLs, which require an
+ * Authorization header - and an <img> cannot set one. Those requests only
+ * succeed while the media service worker is controlling the page, so a first
+ * load, a storage reset or private browsing turns every image into a 401 with
+ * no fallback.
+ *
+ * Unauthenticated /_matrix/media/v3/ URLs load on their own and the worker
+ * upgrades them when it can, so they degrade gracefully in both directions.
+ * These tests pin that choice, because it was reverted once already.
  */
 const USE_AUTHENTICATION_ARG = 6;
 
 function makeClient() {
-    return {
-        mxcUrlToHttp: vi.fn(() => "https://example.org/media"),
-    };
+    return { mxcUrlToHttp: vi.fn(() => "https://example.org/media") };
+}
+
+function assertNotForcingAuthenticated(client: ReturnType<typeof makeClient>) {
+    expect(client.mxcUrlToHttp).toHaveBeenCalled();
+    expect(client.mxcUrlToHttp.mock.calls[0][USE_AUTHENTICATION_ARG]).not.toBe(true);
 }
 
 describe("media URL helpers", () => {
-    it("requests authenticated URLs for full media", () => {
+    it("does not force authenticated URLs for full media", () => {
         const client = makeClient();
         mediaFromMxc(client as any, "mxc://example.org/abc");
-        expect(client.mxcUrlToHttp.mock.calls[0][USE_AUTHENTICATION_ARG]).toBe(true);
+        assertNotForcingAuthenticated(client);
     });
 
-    it("requests authenticated URLs for thumbnails", () => {
+    it("does not force authenticated URLs for thumbnails", () => {
         const client = makeClient();
         thumbnailFromMxc(client as any, "mxc://example.org/abc", 64, 64);
-        expect(client.mxcUrlToHttp.mock.calls[0][USE_AUTHENTICATION_ARG]).toBe(true);
+        assertNotForcingAuthenticated(client);
     });
 
-    it("requests authenticated URLs from the ui mxc helpers", () => {
+    it("does not force authenticated URLs from the ui mxc helpers", () => {
         const full = makeClient();
         mxcToHttp(full as any, "mxc://example.org/abc");
-        expect(full.mxcUrlToHttp.mock.calls[0][USE_AUTHENTICATION_ARG]).toBe(true);
+        assertNotForcingAuthenticated(full);
 
         const thumb = makeClient();
         mxcThumbnailToHttp(thumb as any, "mxc://example.org/abc", 28, 28);
-        expect(thumb.mxcUrlToHttp.mock.calls[0][USE_AUTHENTICATION_ARG]).toBe(true);
+        assertNotForcingAuthenticated(thumb);
     });
 
     it("returns null for a missing mxc without calling the client", () => {
