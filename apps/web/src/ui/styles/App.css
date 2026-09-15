@@ -2368,6 +2368,38 @@ textarea {
     border-radius: 999px;
 }
 
+/*
+ * Every other avatar declares its own size; this one never did, so it was
+ * sized by its content - a few pixels of initials, then jumping to the full
+ * image once it loaded. That layout jump is most of what the avatar "flash"
+ * actually was. 112px matches the thumbnail the component requests.
+ */
+.settings-profile-avatar {
+    width: 112px;
+    height: 112px;
+    border-radius: 999px;
+}
+
+.settings-profile-avatar-loading {
+    animation: settings-profile-avatar-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes settings-profile-avatar-pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .settings-profile-avatar-loading {
+        animation: none;
+    }
+}
+
 .timeline-sender {
     font-weight: 700;
 }
