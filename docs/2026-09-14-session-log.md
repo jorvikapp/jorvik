@@ -126,3 +126,70 @@ unless every sanitize checkbox is ticked.
   overrides it, but in-app version display may be wrong.
 - Desktop builds are unsigned: Gatekeeper blocks macOS, SmartScreen warns
   on Windows.
+
+---
+
+# Follow-up — 2026-09-15
+
+## Correction to the media conclusion above
+
+Two avatar/image bugs were reported and traced to a single cause:
+`mxcUrlToHttp` takes `useAuthentication` as its 7th positional argument
+and every call site stopped at six, so the SDK emitted
+`/_matrix/media/v3/` URLs. Synapse no longer registers that route:
+
+```
+GET /_matrix/media/v3/download/…        404  {"error":"Not found '/_matrix/media/v3/download/…'"}
+GET /_matrix/client/v1/media/download/… 401  (route exists, wants auth)
+```
+
+That is the unknown-endpoint error, not missing-media, so every legacy
+URL failed regardless of upload date. Inline images rendered as a broken
+icon with the filename; avatars fell through to initials because `Avatar`
+walks its sources on error — which made a transport failure look
+identical to absent data. Encrypted attachments were unaffected, since
+`buildEncryptedMediaDownloadCandidates` already tried both path shapes.
+
+**Worth recording:** I initially assumed one media bug explained
+everything. Being asked to trace all four avatar surfaces separately was
+the right call — it surfaced genuine divergences that the endpoint fix
+would have hidden rather than fixed.
+
+## The four avatar surfaces read from three different sources
+
+| Surface | Source |
+|---|---|
+| DM list | `room.getMxcAvatarUrl()`, then the fallback member |
+| Message author | `room.getMember(id).getMxcAvatarUrl()` |
+| Member list | `member.getMxcAvatarUrl()` |
+| Profile Settings | `GET /profile/{userId}` → `avatar_url` |
+
+`memberAvatarSources` had no global-profile fallback while
+`getReadReceiptUserMetadata`, thirty lines away, did — so a user whose
+`m.room.member` event lacked `avatar_url` would show their avatar on a
+read receipt and initials on their messages, in the same conversation.
+Unified, with tests.
+
+## Profile Settings flashed initials before the real avatar
+
+Three stacked causes, all loading-state:
+
+- `avatarMxc` started as `""`, which is also the legitimate value for
+  "no avatar" — "not asked yet" and "asked, none" were indistinguishable.
+- `loading` started `false` even though the effect runs immediately, so
+  the first paint had no loading state at all.
+- `.settings-profile-avatar` had **no CSS rule anywhere**, while every
+  other avatar declares its own size. It was sized by its content, so it
+  jumped from a few pixels of initials to a full-size image. That layout
+  jump was most of the visible "flash".
+
+A failed fetch now keeps the placeholder rather than falling through to
+initials: the avatar is unknown, not absent.
+
+## Open
+
+- `v1.0.1` and `diag/avatar-1.0.1` exist only for avatar tracing and are
+  now redundant.
+- Typing notifications still fire per keystroke.
+- Dead sessions still never surface a login screen.
+- `config.chat.jorvik.app.json` still 404s to `index.html`.

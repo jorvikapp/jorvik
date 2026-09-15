@@ -21,7 +21,13 @@ export function memberAvatarSources(
     size: number,
     resizeMethod: ResizeMethod = "crop",
 ): string[] {
-    const mxc = member?.getMxcAvatarUrl();
+    // A member event carries its own avatar_url, which can lag behind or be
+    // absent while the user's global profile has one - a profile change only
+    // reaches a room as a new m.room.member event. Falling back to the profile
+    // is what getReadReceiptUserMetadata already did, so without this the same
+    // user could render their avatar on a read receipt and initials on their
+    // messages, in the same conversation.
+    const mxc = member?.getMxcAvatarUrl() ?? profileAvatarMxc(client, member?.userId);
     if (!mxc) {
         return [];
     }
@@ -30,6 +36,15 @@ export function memberAvatarSources(
         thumbnailFromMxc(client, mxc, size, size, resizeMethod),
         mediaFromMxc(client, mxc),
     ]);
+}
+
+function profileAvatarMxc(client: MatrixClient, userId: string | undefined): string | undefined {
+    if (!userId) {
+        return undefined;
+    }
+
+    const avatarUrl = client.getUser(userId)?.avatarUrl;
+    return typeof avatarUrl === "string" && avatarUrl.length > 0 ? avatarUrl : undefined;
 }
 
 export function roomAvatarSources(
