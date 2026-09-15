@@ -24,6 +24,7 @@ import {
     restoreKeyBackupWithSecretStorageCredential,
     triggerRoomHistoryDecryption,
 } from "../adapters/securityRecoveryAdapter";
+import { subscribeAccessTokenRotated } from "../../core/lifecycle/tokenEvents";
 import { syncMediaServiceWorkerAuthState } from "../serviceWorker/registerMediaServiceWorker";
 
 export type MatrixSessionStatus =
@@ -557,8 +558,16 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
 
         void syncDesktopMediaAuth();
 
+        // state.client and state.status do not change when the access token
+        // rotates, so without this the worker keeps the token it was given at
+        // login and every media request it rewrites 401s a few minutes later.
+        const unsubscribe = subscribeAccessTokenRotated(() => {
+            void syncDesktopMediaAuth();
+        });
+
         return () => {
             isCancelled = true;
+            unsubscribe();
         };
     }, [state.client, state.status]);
 

@@ -141,7 +141,23 @@ async function handleMediaRequest(event, url) {
         requestUrl.pathname = `${V3_MEDIA_PATH_PREFIX}${requestUrl.pathname.slice(AUTH_MEDIA_PATH_PREFIX.length)}`;
     }
 
-    return fetch(requestUrl, fetchConfigForToken(authData?.accessToken));
+    const response = await fetch(requestUrl, fetchConfigForToken(authData?.accessToken));
+
+    // A rewritten request can 401 on a token that has rotated since we were
+    // handed it. The original URL is unauthenticated and works on servers that
+    // still serve the legacy route, so fall back to it rather than handing the
+    // page a 401 that an <img> can only render as a broken image. On a server
+    // that has retired the legacy route this returns 404 instead - no worse
+    // than the 401, and equally visible.
+    if (response.status === 401 && requestUrl.toString() !== url.toString()) {
+        console.warn("SW: media request 401 after rewrite, retrying the original URL", url.pathname);
+        const fallback = await fetch(url, fetchConfigForToken(undefined));
+        if (fallback.ok) {
+            return fallback;
+        }
+    }
+
+    return response;
 }
 
 async function tryUpdateServerSupportMap(origin, accessToken) {

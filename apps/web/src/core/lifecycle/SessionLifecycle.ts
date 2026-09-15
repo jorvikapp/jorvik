@@ -3,6 +3,7 @@ import { logger } from "matrix-js-sdk/src/logger";
 
 import { MatrixClientManager } from "../client/MatrixClientManager";
 import { createMatrixClient } from "../client/createMatrixClient";
+import { emitAccessTokenRotated } from "./tokenEvents";
 import { SSO_HOMESERVER_URL_KEY, SSO_ID_SERVER_URL_KEY, SSO_IDP_ID_KEY, WebPlatform } from "../platform/WebPlatform";
 import { CORE_SESSION_STORAGE_KEYS, getStoredSessionVars, persistCredentials } from "../storage/sessionStore";
 import { idbClear } from "../storage/storageAccess";
@@ -278,6 +279,10 @@ export class SessionLifecycle {
                 await persistAccessTokenInStorage(nextAccessToken, credentials.pickleKey);
                 await persistRefreshTokenInStorage(nextRefreshToken, credentials.pickleKey);
             }
+
+            // Anything holding a copy of the old token - notably the desktop
+            // media service worker - needs the new one, or it keeps 401ing.
+            emitAccessTokenRotated();
 
             return {
                 accessToken: nextAccessToken,
