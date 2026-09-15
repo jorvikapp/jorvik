@@ -22,6 +22,19 @@ export function memberAvatarSources(
     resizeMethod: ResizeMethod = "crop",
 ): string[] {
     const mxc = member?.getMxcAvatarUrl();
+
+    // TEMPORARY DIAGNOSTIC - remove with the rest of avatar-trace.
+    // The member event and the global profile are separate sources and can
+    // disagree; this records both so the four surfaces can be compared.
+    if (member?.userId) {
+        const profileMxc = client.getUser(member.userId)?.avatarUrl ?? null;
+        console.log(
+            `[avatar-trace] member user=${member.userId} size=${size}` +
+                ` memberMxc=${mxc ?? "NONE"} profileMxc=${profileMxc ?? "NONE"}` +
+                ` agree=${(mxc ?? null) === profileMxc}`,
+        );
+    }
+
     if (!mxc) {
         return [];
     }
@@ -39,11 +52,22 @@ export function roomAvatarSources(
     includeFallbackMember = true,
 ): string[] {
     const roomAvatarMxc = room.getMxcAvatarUrl();
-    const fallbackMxc = includeFallbackMember
+    const fallbackMember = includeFallbackMember
         ? (room as Room & {
               getAvatarFallbackMember?: () => RoomMember | undefined;
-          }).getAvatarFallbackMember?.()?.getMxcAvatarUrl()
+          }).getAvatarFallbackMember?.()
         : undefined;
+
+    // TEMPORARY DIAGNOSTIC - remove with the rest of avatar-trace.
+    console.log(
+        `[avatar-trace] room room=${room.roomId} size=${size}` +
+            ` roomMxc=${roomAvatarMxc ?? "NONE"}` +
+            ` fallbackMember=${fallbackMember?.userId ?? "NONE"}` +
+            ` fallbackMxc=${fallbackMember?.getMxcAvatarUrl() ?? "NONE"}` +
+            ` memberFallbackAllowed=${includeFallbackMember}`,
+    );
+
+    const fallbackMxc = fallbackMember?.getMxcAvatarUrl();
 
     return uniqueUrls([
         thumbnailFromMxc(client, roomAvatarMxc, size, size, "crop"),

@@ -40,6 +40,14 @@ export function ProfileTab({ client, onToast }: ProfileTabProps): React.ReactEle
 
                 const nextDisplayName = info.displayname ?? "";
                 const nextAvatarMxc = info.avatar_url ?? "";
+                // TEMPORARY DIAGNOSTIC - remove with the rest of avatar-trace.
+                // This is a fourth avatar source: an HTTP GET /profile/{userId},
+                // independent of both the room state and the member event.
+                console.log(
+                    `[avatar-trace] profileInfo user=${userId}` +
+                        ` avatar_url=${nextAvatarMxc || "NONE"}` +
+                        ` displayname=${nextDisplayName || "NONE"}`,
+                );
                 setDisplayName(nextDisplayName);
                 setAvatarMxc(nextAvatarMxc);
                 setBaselineDisplayName(nextDisplayName);

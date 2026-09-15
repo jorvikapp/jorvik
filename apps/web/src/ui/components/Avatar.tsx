@@ -76,6 +76,21 @@ export function Avatar({ name, src, sources, className, seed, userId, presenceSt
         setSourceIndex(0);
     }, [sourceKey]);
 
+    // TEMPORARY DIAGNOSTIC - remove with the rest of avatar-trace.
+    // className identifies which surface rendered this avatar, so the same
+    // user can be compared across the DM list, timeline, member list and
+    // profile settings. Distinguishes "no source" from "source failed".
+    useEffect(() => {
+        if (sourceList.length === 0) {
+            console.log(`[avatar-trace] render surface=${className} user=${userId ?? "?"} sources=NONE -> initials`);
+            return;
+        }
+        console.log(
+            `[avatar-trace] render surface=${className} user=${userId ?? "?"}` +
+                ` index=${sourceIndex}/${sourceList.length} src=${imageSrc ?? "EXHAUSTED -> initials"}`,
+        );
+    }, [className, imageSrc, sourceIndex, sourceKey, sourceList.length, userId]);
+
     return (
         <span className={`avatar ${className}`} aria-hidden="true">
             <span className="avatar-mask" style={fallbackStyle}>
@@ -86,7 +101,11 @@ export function Avatar({ name, src, sources, className, seed, userId, presenceSt
                         alt=""
                         loading="lazy"
                         decoding="async"
-                        onError={() => setSourceIndex((index) => index + 1)}
+                        onError={() => {
+                            // TEMPORARY DIAGNOSTIC - remove with avatar-trace.
+                            console.warn(`[avatar-trace] FAILED surface=${className} user=${userId ?? "?"} src=${imageSrc}`);
+                            setSourceIndex((index) => index + 1);
+                        }}
                     />
                 ) : (
                     <span className="avatar-fallback">{initials}</span>

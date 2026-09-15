@@ -505,6 +505,14 @@ function createMainWindow(): BrowserWindow {
             window.webContents.toggleDevTools();
         }
     });
+    // TEMPORARY DIAGNOSTIC - forwards avatar-trace to stdout so a packaged
+    // AppImage can be run from a terminal and the output copied out.
+    window.webContents.on("console-message", (_event, _level, message) => {
+        if (message.includes("[avatar-trace]")) {
+            console.log(message);
+        }
+    });
+
     window.webContents.on("preload-error", (_event, preloadPath, error) => {
         console.error(`[jorvik-preload] error path=${preloadPath} message=${error.message}`);
     });
