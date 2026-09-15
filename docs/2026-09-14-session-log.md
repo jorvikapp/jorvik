@@ -133,6 +133,53 @@ unless every sanitize checkbox is ticked.
 
 ## Correction to the media conclusion above
 
+**The section below is wrong and was reverted. Read this first.**
+
+I concluded that Synapse had removed the legacy `/_matrix/media/v3/`
+routes, and switched every media URL to the authenticated endpoint. The
+evidence was a 404 whose body reads:
+
+```json
+{"errcode":"M_NOT_FOUND","error":"Not found '/_matrix/media/v3/download/…'"}
+```
+
+That is Synapse's generic 404 echoing the requested path, not an
+unknown-endpoint error. **The media file I probed simply did not exist.**
+For media that does exist the legacy route returns `200 image/jpeg`,
+unauthenticated. It was never removed.
+
+The authenticated endpoint needs an `Authorization` header, and an
+`<img>` cannot set one - only the media service worker can, by
+intercepting the request. The worker registers and activates but does
+**not** control the page:
+
+```
+controller: NONE
+registrations: ["https://chat.jorvik.app/ active=activated"]
+```
+
+So the change broke avatars and inline images on web and desktop at
+once, with no deploy in between, and clearing site storage made it worse
+by destroying the one worker that was controlling.
+
+Reverted in 05b0bd1. Unauthenticated URLs degrade in both directions:
+they load unaided, and the worker upgrades them when it is controlling.
+The authenticated URL has no fallback.
+
+**Lesson:** a 404 that names the path is not evidence the route is gone.
+Confirm the resource exists before concluding the endpoint does not - the
+media file was sitting in `media_store` the whole time, and one
+`docker exec` would have settled it.
+
+## What the original media investigation got right
+
+Everything below still holds except the endpoint conclusion: the four
+avatar surfaces genuinely do read from three different sources, and both
+`memberAvatarSources` and the Profile Settings loading state were real
+defects, fixed independently of any endpoint change.
+
+## Superseded: original media conclusion
+
 Two avatar/image bugs were reported and traced to a single cause:
 `mxcUrlToHttp` takes `useAuthentication` as its 7th positional argument
 and every call site stopped at six, so the SDK emitted
