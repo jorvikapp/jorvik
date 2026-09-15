@@ -18,7 +18,12 @@ export function ProfileTab({ client, onToast }: ProfileTabProps): React.ReactEle
     const [avatarMxc, setAvatarMxc] = useState("");
     const [baselineDisplayName, setBaselineDisplayName] = useState("");
     const [baselineAvatarMxc, setBaselineAvatarMxc] = useState("");
-    const [loading, setLoading] = useState(false);
+    // "" is a legitimate value meaning the user has no avatar, so it cannot
+    // also stand for "we have not asked the server yet". Track that separately.
+    const [profileLoaded, setProfileLoaded] = useState(false);
+    // The effect below runs immediately when there is a userId, so starting
+    // false left the very first paint with no loading state at all.
+    const [loading, setLoading] = useState(Boolean(userId));
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -27,6 +32,8 @@ export function ProfileTab({ client, onToast }: ProfileTabProps): React.ReactEle
         let canceled = false;
         const loadProfile = async (): Promise<void> => {
             if (!userId) {
+                setProfileLoaded(true);
+                setLoading(false);
                 return;
             }
 
@@ -44,6 +51,7 @@ export function ProfileTab({ client, onToast }: ProfileTabProps): React.ReactEle
                 setAvatarMxc(nextAvatarMxc);
                 setBaselineDisplayName(nextDisplayName);
                 setBaselineAvatarMxc(nextAvatarMxc);
+                setProfileLoaded(true);
             } catch (loadError) {
                 if (!canceled) {
                     setError(loadError instanceof Error ? loadError.message : "Failed to load profile.");
@@ -131,19 +139,29 @@ export function ProfileTab({ client, onToast }: ProfileTabProps): React.ReactEle
             {loading ? <p className="settings-inline-note">Loading profile...</p> : null}
 
             <div className="settings-profile-row">
-                <Avatar
-                    className="settings-profile-avatar"
-                    name={displayName || userId || "User"}
-                    src={avatarPreview}
-                    sources={[avatarPreview]}
-                    seed={userId || undefined}
-                    userId={userId || undefined}
-                />
+                {profileLoaded ? (
+                    <Avatar
+                        className="settings-profile-avatar"
+                        name={displayName || userId || "User"}
+                        src={avatarPreview}
+                        sources={[avatarPreview]}
+                        seed={userId || undefined}
+                        userId={userId || undefined}
+                    />
+                ) : (
+                    <span
+                        className="avatar settings-profile-avatar"
+                        aria-label="Loading profile picture"
+                        role="img"
+                    >
+                        <span className="avatar-mask settings-profile-avatar-loading" />
+                    </span>
+                )}
                 <div className="settings-profile-actions">
                     <button
                         type="button"
                         className="settings-button"
-                        disabled={uploading}
+                        disabled={uploading || !profileLoaded}
                         onClick={() => fileInputRef.current?.click()}
                     >
                         {uploading ? "Uploading..." : "Upload avatar"}
