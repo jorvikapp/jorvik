@@ -296,8 +296,8 @@ export function RoomList({
         if (!manualOrderingEnabled) {
             setMenuRoomId(null);
             setDraggedRoomId(null);
-            setCategories([]);
-            setServerRoomOrder([]);
+            setCategories((current) => (current.length === 0 ? current : []));
+            setServerRoomOrder((current) => (current.length === 0 ? current : []));
             setOrderedRoomIds(currentRoomIds);
             return;
         }
