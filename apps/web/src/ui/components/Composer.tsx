@@ -877,6 +877,9 @@ export function Composer({
     const isTypingLocalRef = useRef(false);
     const lastTypingTrueSentAtRef = useRef(0);
     const typingRoomIdRef = useRef<string | null>(null);
+    // Bumped whenever pending typing work is cancelled, so an in-flight
+    // sendTyping(true) cannot resurrect the typing state after a stop.
+    const typingEpochRef = useRef(0);
     const currentRoomIdRef = useRef<string | null>(room?.roomId ?? null);
     const replySenderName = replyToEvent ? getReplySenderName(room, replyToEvent) : null;
     const replySnippet = replyToEvent ? getReplySnippet(replyToEvent) : null;
@@ -1069,6 +1072,7 @@ export function Composer({
     }, [activeSpaceId, client, room]);
 
     const clearTypingTimers = useCallback((): void => {
+        typingEpochRef.current += 1;
         if (typingStartTimerRef.current !== null) {
             window.clearTimeout(typingStartTimerRef.current);
             typingStartTimerRef.current = null;
@@ -1106,9 +1110,20 @@ export function Composer({
                 return;
             }
 
+            const epoch = typingEpochRef.current;
             void (async () => {
                 const sent = await sendTypingSafe(roomId, true);
-                if (!sent || currentRoomIdRef.current !== roomId) {
+                // A stop that lands while this PUT is in flight bumps the epoch.
+                // Without this guard the continuation would set isTypingLocalRef
+                // back to true and arm a fresh refresh timer, leaving a 4s typing
+                // loop that nothing can cancel: no further keystrokes means
+                // scheduleTypingStop never re-arms, and the refresh timer's own
+                // isTypingLocalRef guard passes because we just re-set it.
+                if (
+                    !sent ||
+                    currentRoomIdRef.current !== roomId ||
+                    typingEpochRef.current !== epoch
+                ) {
                     return;
                 }
 
