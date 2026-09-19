@@ -27,6 +27,10 @@ import { EmojiUploadDialog } from "./EmojiUploadDialog";
 import { ChannelHeader } from "./header/ChannelHeader";
 import { RightPanel } from "./rightPanel/RightPanel";
 import {
+    accountCacheKey,
+    SpaceHierarchyCache,
+} from "../../core/spaces/spaceHierarchyCache";
+import {
     fetchSpaceHierarchy,
     SpaceHierarchyAbortedError,
     SpaceHierarchyPageTimeoutError,
@@ -904,6 +908,11 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     // Aborted when the selected space changes, so a slow subspace load for the space
     // we left cannot land in the newly selected one.
     const subspaceAbortRef = useRef<AbortController>(new AbortController());
+    // Instance-scoped rather than a module singleton, so it cannot outlive this session.
+    // Entries are additionally keyed by account, so one account can never read another's.
+    const hierarchyCacheRef = useRef<SpaceHierarchyCache>(new SpaceHierarchyCache());
+    const accountKeyRef = useRef<string | null>(null);
+    accountKeyRef.current = accountCacheKey(client.getUserId(), client.getHomeserverUrl());
     const [refreshedVoiceChannelHintsBySpaceId, setRefreshedVoiceChannelHintsBySpaceId] = useState<
         Map<string, Set<string>>
     >(new Map());
@@ -998,6 +1007,19 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             setRooms([...client.getRooms()]);
         };
 
+        // Separate from onRoomsChanged because that one also serves listeners whose
+        // arguments are not MatrixEvents.
+        const onStateEvent = (event: MatrixEvent): void => {
+            if (event.getType() === EventType.SpaceChild) {
+                const spaceRoomId = event.getRoomId();
+                const accountKey = accountKeyRef.current;
+                if (spaceRoomId && accountKey) {
+                    hierarchyCacheRef.current.invalidate(accountKey, spaceRoomId);
+                }
+            }
+            onRoomsChanged();
+        };
+
         const attachRoomListeners = (room: Room): void => {
             if (watchedRooms.has(room)) {
                 return;
@@ -1006,7 +1028,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             watchedRooms.add(room);
             room.on(RoomEvent.UnreadNotifications, onRoomsChanged);
             room.on(RoomEvent.Receipt, onRoomsChanged);
-            room.currentState.on(RoomStateEvent.Events, onRoomsChanged);
+            room.currentState.on(RoomStateEvent.Events, onStateEvent);
         };
 
         const detachRoomListeners = (room: Room): void => {
@@ -1016,7 +1038,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
 
             room.removeListener(RoomEvent.UnreadNotifications, onRoomsChanged);
             room.removeListener(RoomEvent.Receipt, onRoomsChanged);
-            room.currentState.removeListener(RoomStateEvent.Events, onRoomsChanged);
+            room.currentState.removeListener(RoomStateEvent.Events, onStateEvent);
             watchedRooms.delete(room);
         };
 
@@ -1221,18 +1243,41 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 const advertisedChildCount = currentSpaceRoom.currentState.getStateEvents(
                     EventType.SpaceChild,
                 ).length;
-                if (advertisedChildCount > 0) {
-                    setSpaceContentsPending(true);
+                const accountKey = accountKeyRef.current;
+                const cachedHierarchy = accountKey
+                    ? hierarchyCacheRef.current.get(accountKey, currentSpaceRoom.roomId)
+                    : null;
+
+                let hierarchy: SpaceHierarchyResult;
+                if (cachedHierarchy) {
+                    // Switching back to a space already listed should be instant; only
+                    // complete results are ever cached, so this is never half a space.
+                    hierarchy = cachedHierarchy;
+                } else {
+                    if (advertisedChildCount > 0) {
+                        setSpaceContentsPending(true);
+                    }
+
+                    // Registered before the request so an invalidation arriving mid-flight
+                    // can refuse the write rather than let stale data back in.
+                    const cacheToken = accountKey
+                        ? hierarchyCacheRef.current.beginFetch(accountKey, currentSpaceRoom.roomId)
+                        : null;
+
+                    hierarchy = await getSpaceHierarchyRooms(
+                        client,
+                        currentSpaceRoom.roomId,
+                        abortController.signal,
+                    );
+                    if (cancelled) {
+                        return;
+                    }
+
+                    if (cacheToken) {
+                        hierarchyCacheRef.current.set(cacheToken, hierarchy);
+                    }
                 }
 
-                const hierarchy = await getSpaceHierarchyRooms(
-                    client,
-                    currentSpaceRoom.roomId,
-                    abortController.signal,
-                );
-                if (cancelled) {
-                    return;
-                }
                 const hierarchyRooms = hierarchy.rooms;
                 // The page cap stopped us with more pages on offer: say so rather than
                 // presenting a truncated hierarchy as the whole space.
