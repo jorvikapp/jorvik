@@ -49,6 +49,8 @@ interface RoomListProps {
     subspaceGroups?: SubspaceGroupView[];
     onToggleSubspace?: (roomId: string) => void;
     onKnockDiscoverableRoom?: (roomId: string) => void;
+    /** True when the hierarchy was cut short, so the list below is not the whole space. */
+    contentsTruncated?: boolean;
     activeRoomId: string | null;
     orderingMode?: "manual" | "dynamic";
     showOrderingControls?: boolean;
@@ -250,6 +252,7 @@ export function RoomList({
     subspaceGroups = [],
     onToggleSubspace,
     onKnockDiscoverableRoom,
+    contentsTruncated = false,
     activeRoomId,
     orderingMode = "manual",
     showOrderingControls = false,
@@ -1444,6 +1447,12 @@ export function RoomList({
                     <div className="room-list-discoverable">
                         <div className="room-list-discoverable-title">Subspaces</div>
                         {subspaceGroups.map((group) => renderSubspaceGroup(group, 0))}
+                    </div>
+                ) : null}
+                {contentsTruncated ? (
+                    <div className="room-list-empty">
+                        This space is too large to list in full, so some channels and subspaces are not
+                        shown here.
                     </div>
                 ) : null}
                 {uncategorized.length === 0 &&

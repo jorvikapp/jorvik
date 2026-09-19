@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ClientEvent,
+    ClientPrefix,
     EventType,
+    MatrixError,
     MatrixEventEvent,
+    Method,
     RoomEvent,
     RoomStateEvent,
     type HierarchyRoom,
@@ -23,6 +26,13 @@ import { Composer } from "./Composer";
 import { EmojiUploadDialog } from "./EmojiUploadDialog";
 import { ChannelHeader } from "./header/ChannelHeader";
 import { RightPanel } from "./rightPanel/RightPanel";
+import {
+    fetchSpaceHierarchy,
+    SpaceHierarchyAbortedError,
+    SpaceHierarchyPageTimeoutError,
+    type SpaceHierarchyPage,
+    type SpaceHierarchyResult,
+} from "../../core/spaces/fetchSpaceHierarchy";
 import {
     affordanceForJoinRule,
     normaliseJoinRule,
@@ -545,37 +555,62 @@ function getSpaceGlyph(spaceName: string): string {
     return normalized[0].toUpperCase();
 }
 
-const SPACE_HIERARCHY_TIMEOUT_MS = 20_000;
 const MAX_SUBSPACE_DEPTH = 5;
 
-class SpaceHierarchyTimeoutError extends Error {
-    public constructor() {
-        super("Timed out waiting for the space hierarchy");
+interface HierarchyPageResponse {
+    rooms: HierarchyRoom[];
+    next_batch?: string;
+}
+
+/**
+ * One hierarchy page, cancellable. client.getRoomHierarchy() takes no abort signal, so
+ * this issues the same request through the http layer, which does -- otherwise a page we
+ * have stopped waiting for would keep its connection open. Mirrors the SDK's
+ * M_UNRECOGNIZED fallback to the MSC2946 prefix.
+ */
+async function fetchSpaceHierarchyPage(
+    client: MatrixClient,
+    roomId: string,
+    fromToken: string | undefined,
+    signal: AbortSignal,
+): Promise<SpaceHierarchyPage> {
+    const path = `/rooms/${encodeURIComponent(roomId)}/hierarchy`;
+    const queryParams: Record<string, string> = {
+        suggested_only: "false",
+        max_depth: "1",
+        limit: "100",
+    };
+    if (fromToken !== undefined) {
+        queryParams.from = fromToken;
+    }
+
+    const request = (prefix: string): Promise<HierarchyPageResponse> =>
+        client.http.authedRequest<HierarchyPageResponse>(Method.Get, path, queryParams, undefined, {
+            prefix,
+            abortSignal: signal,
+        });
+
+    try {
+        const response = await request(ClientPrefix.V1);
+        return { rooms: response.rooms ?? [], nextBatch: response.next_batch };
+    } catch (error) {
+        if (error instanceof MatrixError && error.errcode === "M_UNRECOGNIZED") {
+            const response = await request("/_matrix/client/unstable/org.matrix.msc2946");
+            return { rooms: response.rooms ?? [], nextBatch: response.next_batch };
+        }
+        throw error;
     }
 }
 
-async function getSpaceHierarchyRooms(client: MatrixClient, spaceRoomId: string): Promise<HierarchyRoom[]> {
-    const roomById = new Map<string, HierarchyRoom>();
-    const visitedTokens = new Set<string>();
-    let fromToken: string | undefined;
-
-    while (true) {
-        const response = await client.getRoomHierarchy(spaceRoomId, 100, 1, false, fromToken);
-        response.rooms.forEach((room) => {
-            if (!roomById.has(room.room_id)) {
-                roomById.set(room.room_id, room);
-            }
-        });
-
-        const nextToken = response.next_batch;
-        if (!nextToken || visitedTokens.has(nextToken)) {
-            break;
-        }
-        visitedTokens.add(nextToken);
-        fromToken = nextToken;
-    }
-
-    return Array.from(roomById.values());
+function getSpaceHierarchyRooms(
+    client: MatrixClient,
+    spaceRoomId: string,
+    signal?: AbortSignal,
+): Promise<SpaceHierarchyResult> {
+    return fetchSpaceHierarchy({
+        fetchPage: (fromToken, pageSignal) => fetchSpaceHierarchyPage(client, spaceRoomId, fromToken, pageSignal),
+        signal,
+    });
 }
 
 function getHierarchyRoomName(room: HierarchyRoom): string {
@@ -856,7 +891,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const [selectedSpaceHierarchyJoinedRoomIds, setSelectedSpaceHierarchyJoinedRoomIds] = useState<string[]>([]);
     const [discoverableSpaceChannels, setDiscoverableSpaceChannels] = useState<DiscoverableSpaceChannel[]>([]);
     const [spaceContentsPending, setSpaceContentsPending] = useState(false);
-    const [hierarchyRetryTick, setHierarchyRetryTick] = useState(0);
+    const [spaceContentsTruncated, setSpaceContentsTruncated] = useState(false);
     const [topLevelSubspaces, setTopLevelSubspaces] = useState<SpaceChildSpace[]>([]);
     const [expandedSubspaceIds, setExpandedSubspaceIds] = useState<string[]>([]);
     const [subspaceChildren, setSubspaceChildren] = useState<Map<string, SpaceChildren>>(new Map());
@@ -866,6 +901,9 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     // and so an in-flight load is never restarted by unrelated state changes.
     const subspaceChildrenRef = useRef<Map<string, SpaceChildren>>(new Map());
     const subspaceLoadingRef = useRef<Set<string>>(new Set());
+    // Aborted when the selected space changes, so a slow subspace load for the space
+    // we left cannot land in the newly selected one.
+    const subspaceAbortRef = useRef<AbortController>(new AbortController());
     const [refreshedVoiceChannelHintsBySpaceId, setRefreshedVoiceChannelHintsBySpaceId] = useState<
         Map<string, Set<string>>
     >(new Map());
@@ -1165,6 +1203,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             setJoiningDiscoverableRoomId(null);
             setSpaceContentsPending(false);
             setTopLevelSubspaces([]);
+            setSpaceContentsTruncated(false);
             return;
         }
 
@@ -1173,8 +1212,8 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         const visibleRoomIds = new Set(
             visibleRoomIdsKey.length > 0 ? visibleRoomIdsKey.split("\u0000") : [],
         );
+        const abortController = new AbortController();
         const loadPublicChannels = async (): Promise<void> => {
-            let hierarchyPromise: Promise<HierarchyRoom[]> | undefined;
             try {
                 // Assume pending while the request is outstanding. A space whose own state
                 // advertises children has contents; if we cannot list them yet the honest
@@ -1186,24 +1225,18 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     setSpaceContentsPending(true);
                 }
 
-                let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-                hierarchyPromise = getSpaceHierarchyRooms(client, currentSpaceRoom.roomId);
-                const hierarchyRooms = await Promise.race([
-                    hierarchyPromise,
-                    new Promise<never>((_resolve, reject) => {
-                        timeoutHandle = setTimeout(
-                            () => reject(new SpaceHierarchyTimeoutError()),
-                            SPACE_HIERARCHY_TIMEOUT_MS,
-                        );
-                    }),
-                ]).finally(() => {
-                    if (timeoutHandle !== undefined) {
-                        clearTimeout(timeoutHandle);
-                    }
-                });
+                const hierarchy = await getSpaceHierarchyRooms(
+                    client,
+                    currentSpaceRoom.roomId,
+                    abortController.signal,
+                );
                 if (cancelled) {
                     return;
                 }
+                const hierarchyRooms = hierarchy.rooms;
+                // The page cap stopped us with more pages on offer: say so rather than
+                // presenting a truncated hierarchy as the whole space.
+                setSpaceContentsTruncated(!hierarchy.complete);
 
                 const hierarchyChildCount = hierarchyRooms.filter(
                     (room) => room.room_id !== currentSpaceRoom.roomId,
@@ -1308,25 +1341,16 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 const advertisesChildren =
                     currentSpaceRoom.currentState.getStateEvents(EventType.SpaceChild).length > 0;
 
-                if (loadError instanceof SpaceHierarchyTimeoutError) {
-                    // The request is still outstanding server-side rather than failed:
-                    // synapse blocks /hierarchy on a partial-state room instead of
-                    // answering. Keep whatever is already listed instead of blanking it,
-                    // and if the request ever does land with contents, re-run to pick
-                    // them up so the pending notice cannot stick forever.
+                if (loadError instanceof SpaceHierarchyAbortedError) {
+                    // We navigated away; the newly selected space owns the UI now.
+                    return;
+                }
+
+                if (loadError instanceof SpaceHierarchyPageTimeoutError) {
+                    // A page never answered, which is what a partial-state room does.
+                    // Leave whatever is already listed rather than blanking it, and say
+                    // the contents could not be listed yet.
                     setSpaceContentsPending(advertisesChildren);
-                    hierarchyPromise
-                        ?.then((lateRooms) => {
-                            const lateChildren = lateRooms.filter(
-                                (room) => room.room_id !== currentSpaceRoom.roomId,
-                            ).length;
-                            if (!cancelled && lateChildren > 0) {
-                                setHierarchyRetryTick((tick) => tick + 1);
-                            }
-                        })
-                        .catch(() => {
-                            // Already surfaced as the timeout above.
-                        });
                     return;
                 }
 
@@ -1347,9 +1371,12 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         void loadPublicChannels();
 
         return () => {
+            // Both: ignore anything still in flight, and cancel it, so a slow response
+            // for the space we just left cannot overwrite the one now selected.
             cancelled = true;
+            abortController.abort();
         };
-    }, [client, hierarchyRetryTick, selectedSpaceId, selectedSpaceRoom, visibleRoomIdsKey]);
+    }, [client, selectedSpaceId, selectedSpaceRoom, visibleRoomIdsKey]);
 
     useEffect(() => {
         setExpandedSubspaceIds([]);
@@ -1358,6 +1385,8 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         setSubspaceErrors(new Map());
         subspaceChildrenRef.current = new Map();
         subspaceLoadingRef.current = new Set();
+        subspaceAbortRef.current.abort();
+        subspaceAbortRef.current = new AbortController();
     }, [selectedSpaceId]);
 
     const loadSubspaceChildren = useCallback(
@@ -1378,7 +1407,8 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             });
 
             try {
-                const rooms = await getSpaceHierarchyRooms(client, spaceId);
+                const hierarchy = await getSpaceHierarchyRooms(client, spaceId, subspaceAbortRef.current.signal);
+                const rooms = hierarchy.rooms;
                 // Anything already placed in the tree is excluded, so a space listing an
                 // ancestor or sibling as a child cannot make the expansion recurse.
                 const exclude = new Set<string>(subspaceChildrenRef.current.keys());
@@ -1393,10 +1423,19 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 });
                 subspaceChildrenRef.current.set(spaceId, children);
                 setSubspaceChildren((current) => new Map(current).set(spaceId, children));
+                if (!hierarchy.complete) {
+                    setSubspaceErrors((current) =>
+                        new Map(current).set(spaceId, "This subspace is too large to list in full."),
+                    );
+                }
             } catch (loadError) {
+                if (loadError instanceof SpaceHierarchyAbortedError) {
+                    // The space selection changed; this result is no longer wanted.
+                    return;
+                }
                 const message =
-                    loadError instanceof SpaceHierarchyTimeoutError
-                        ? "Still fetching this subspace. Try again in a moment."
+                    loadError instanceof SpaceHierarchyPageTimeoutError
+                        ? "Still fetching this subspace. Reopen it to try again."
                         : loadError instanceof Error
                           ? loadError.message
                           : "Could not list this subspace.";
@@ -1772,7 +1811,8 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     return;
                 }
 
-                const hierarchyRooms = await getSpaceHierarchyRooms(client, hierarchySpaceRoom.roomId);
+                const hierarchyRooms = (await getSpaceHierarchyRooms(client, hierarchySpaceRoom.roomId))
+                    .rooms;
                 const { childOrderOverride, voiceHintRoomIds: refreshedVoiceHints } = await resolveSpaceHierarchyVoiceHints(
                     client,
                     hierarchySpaceRoom,
@@ -2408,6 +2448,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     }}
                     subspaceGroups={selectedSpaceId === PEOPLE_SPACE_ID ? [] : subspaceGroupViews}
                     onToggleSubspace={handleToggleSubspace}
+                    contentsTruncated={selectedSpaceId === PEOPLE_SPACE_ID ? false : spaceContentsTruncated}
                     localVoiceSession={
                         voiceSessionRoomId
                             ? {
