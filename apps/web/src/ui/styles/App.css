@@ -900,6 +900,72 @@ textarea {
     gap: 4px;
 }
 
+.room-list-subspace {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.room-list-subspace-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 5px 6px;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.room-list-subspace-header:hover {
+    background: var(--bg-hover);
+    color: var(--text-main);
+}
+
+.room-list-subspace-chevron {
+    flex: 0 0 auto;
+    width: 10px;
+    font-size: 10px;
+    line-height: 1;
+}
+
+.room-list-subspace-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.room-list-subspace-meta {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.7;
+}
+
+.room-list-subspace-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border-left: 1px solid var(--border);
+    margin-left: 5px;
+    padding-left: 6px;
+}
+
+.room-item-join-note {
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 0 4px;
+    white-space: nowrap;
+}
+
 .room-list-discoverable-title {
     color: var(--text-muted);
     text-transform: uppercase;

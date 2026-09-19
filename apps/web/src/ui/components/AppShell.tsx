@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
     ClientEvent,
     EventType,
-    JoinRule,
     MatrixEventEvent,
     RoomEvent,
     RoomStateEvent,
@@ -24,7 +23,16 @@ import { Composer } from "./Composer";
 import { EmojiUploadDialog } from "./EmojiUploadDialog";
 import { ChannelHeader } from "./header/ChannelHeader";
 import { RightPanel } from "./rightPanel/RightPanel";
-import { RoomList, type DiscoverableSpaceChannel } from "./RoomList";
+import {
+    affordanceForJoinRule,
+    normaliseJoinRule,
+    partitionSpaceChildren,
+    readViaServers,
+    type SpaceChildren,
+    type SpaceChildRoom,
+    type SpaceChildSpace,
+} from "../adapters/spaceHierarchyAdapter";
+import { RoomList, type DiscoverableSpaceChannel, type SubspaceGroupView } from "./RoomList";
 import { Timeline } from "./Timeline";
 import { Toast, type ToastState } from "./Toast";
 import { Avatar } from "./Avatar";
@@ -538,6 +546,7 @@ function getSpaceGlyph(spaceName: string): string {
 }
 
 const SPACE_HIERARCHY_TIMEOUT_MS = 20_000;
+const MAX_SUBSPACE_DEPTH = 5;
 
 class SpaceHierarchyTimeoutError extends Error {
     public constructor() {
@@ -697,17 +706,17 @@ function buildDiscoverableSpaceChannels(
         if (room.room_type === "m.space") {
             continue;
         }
-        if (room.join_rule !== JoinRule.Public) {
-            continue;
-        }
         if (visibleRoomIds.has(room.room_id)) {
             continue;
         }
 
+        const joinRule = normaliseJoinRule(room.join_rule);
         const metadata = childOrder.get(room.room_id);
         channels.push({
             roomId: room.room_id,
             name: getHierarchyRoomName(room),
+            joinRule,
+            affordance: affordanceForJoinRule(joinRule),
             topic: room.topic,
             avatarMxc: room.avatar_url ?? null,
             memberCount: room.num_joined_members,
@@ -848,6 +857,15 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const [discoverableSpaceChannels, setDiscoverableSpaceChannels] = useState<DiscoverableSpaceChannel[]>([]);
     const [spaceContentsPending, setSpaceContentsPending] = useState(false);
     const [hierarchyRetryTick, setHierarchyRetryTick] = useState(0);
+    const [topLevelSubspaces, setTopLevelSubspaces] = useState<SpaceChildSpace[]>([]);
+    const [expandedSubspaceIds, setExpandedSubspaceIds] = useState<string[]>([]);
+    const [subspaceChildren, setSubspaceChildren] = useState<Map<string, SpaceChildren>>(new Map());
+    const [loadingSubspaceIds, setLoadingSubspaceIds] = useState<string[]>([]);
+    const [subspaceErrors, setSubspaceErrors] = useState<Map<string, string>>(new Map());
+    // Read inside callbacks so expanding a subspace does not depend on a fresh render,
+    // and so an in-flight load is never restarted by unrelated state changes.
+    const subspaceChildrenRef = useRef<Map<string, SpaceChildren>>(new Map());
+    const subspaceLoadingRef = useRef<Set<string>>(new Set());
     const [refreshedVoiceChannelHintsBySpaceId, setRefreshedVoiceChannelHintsBySpaceId] = useState<
         Map<string, Set<string>>
     >(new Map());
@@ -1146,6 +1164,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             setDiscoverableSpaceChannels([]);
             setJoiningDiscoverableRoomId(null);
             setSpaceContentsPending(false);
+            setTopLevelSubspaces([]);
             return;
         }
 
@@ -1219,6 +1238,13 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 setSelectedSpaceHierarchyJoinedRoomIds(
                     buildJoinedHierarchyChannelIds(currentSpaceRoom, hierarchyRooms, visibleRoomIds, childOrderOverride, customOrderOverride),
                 );
+                const viaServersByRoomId = readViaServers(hierarchyRooms);
+                setTopLevelSubspaces(
+                    partitionSpaceChildren(currentSpaceRoom.roomId, hierarchyRooms, {
+                        viaServersByRoomId,
+                    }).spaces,
+                );
+
                 const channelsToJoin = buildDiscoverableSpaceChannels(
                     currentSpaceRoom,
                     hierarchyRooms,
@@ -1238,7 +1264,10 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 const spaceServerName = currentSpaceRoom.roomId.slice(
                     currentSpaceRoom.roomId.indexOf(":") + 1,
                 );
-                const channelsToAutoJoin = spaceServerName === client.getDomain() ? channelsToJoin : [];
+                const channelsToAutoJoin =
+                    spaceServerName === client.getDomain()
+                        ? channelsToJoin.filter((channel) => (channel.affordance ?? "join") === "join")
+                        : [];
 
                 const successfullyJoinedIds: string[] = [];
                 for (const channel of channelsToAutoJoin) {
@@ -1321,6 +1350,161 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             cancelled = true;
         };
     }, [client, hierarchyRetryTick, selectedSpaceId, selectedSpaceRoom, visibleRoomIdsKey]);
+
+    useEffect(() => {
+        setExpandedSubspaceIds([]);
+        setSubspaceChildren(new Map());
+        setLoadingSubspaceIds([]);
+        setSubspaceErrors(new Map());
+        subspaceChildrenRef.current = new Map();
+        subspaceLoadingRef.current = new Set();
+    }, [selectedSpaceId]);
+
+    const loadSubspaceChildren = useCallback(
+        async (spaceId: string): Promise<void> => {
+            if (subspaceChildrenRef.current.has(spaceId) || subspaceLoadingRef.current.has(spaceId)) {
+                return;
+            }
+
+            subspaceLoadingRef.current.add(spaceId);
+            setLoadingSubspaceIds((current) => (current.includes(spaceId) ? current : [...current, spaceId]));
+            setSubspaceErrors((current) => {
+                if (!current.has(spaceId)) {
+                    return current;
+                }
+                const next = new Map(current);
+                next.delete(spaceId);
+                return next;
+            });
+
+            try {
+                const rooms = await getSpaceHierarchyRooms(client, spaceId);
+                // Anything already placed in the tree is excluded, so a space listing an
+                // ancestor or sibling as a child cannot make the expansion recurse.
+                const exclude = new Set<string>(subspaceChildrenRef.current.keys());
+                if (selectedSpaceRoom) {
+                    exclude.add(selectedSpaceRoom.roomId);
+                }
+                exclude.delete(spaceId);
+
+                const children = partitionSpaceChildren(spaceId, rooms, {
+                    excludeRoomIds: exclude,
+                    viaServersByRoomId: readViaServers(rooms),
+                });
+                subspaceChildrenRef.current.set(spaceId, children);
+                setSubspaceChildren((current) => new Map(current).set(spaceId, children));
+            } catch (loadError) {
+                const message =
+                    loadError instanceof SpaceHierarchyTimeoutError
+                        ? "Still fetching this subspace. Try again in a moment."
+                        : loadError instanceof Error
+                          ? loadError.message
+                          : "Could not list this subspace.";
+                setSubspaceErrors((current) => new Map(current).set(spaceId, message));
+            } finally {
+                subspaceLoadingRef.current.delete(spaceId);
+                setLoadingSubspaceIds((current) => current.filter((id) => id !== spaceId));
+            }
+        },
+        [client, selectedSpaceRoom],
+    );
+
+    const handleToggleSubspace = useCallback(
+        (roomId: string): void => {
+            let willExpand = false;
+            setExpandedSubspaceIds((current) => {
+                if (current.includes(roomId)) {
+                    return current.filter((id) => id !== roomId);
+                }
+                willExpand = true;
+                return [...current, roomId];
+            });
+
+            if (willExpand) {
+                void loadSubspaceChildren(roomId);
+            }
+        },
+        [loadSubspaceChildren],
+    );
+
+    const visibleRoomIdSet = useMemo(
+        () => new Set(visibleRoomIdsKey.length > 0 ? visibleRoomIdsKey.split("\u0000") : []),
+        [visibleRoomIdsKey],
+    );
+
+    const subspaceGroupViews = useMemo<SubspaceGroupView[]>(() => {
+        const toChannel = (room: SpaceChildRoom): DiscoverableSpaceChannel => ({
+            roomId: room.roomId,
+            name: room.name,
+            topic: room.topic,
+            avatarMxc: room.avatarMxc,
+            memberCount: room.memberCount,
+            viaServers: room.viaServers,
+            joinRule: room.joinRule,
+            affordance: room.affordance,
+        });
+
+        const build = (space: SpaceChildSpace, depth: number, seen: ReadonlySet<string>): SubspaceGroupView => {
+            const children = subspaceChildren.get(space.roomId);
+            const nextSeen = new Set(seen).add(space.roomId);
+
+            return {
+                roomId: space.roomId,
+                name: space.name,
+                memberCount: space.memberCount,
+                expanded: expandedSubspaceIds.includes(space.roomId),
+                loading: loadingSubspaceIds.includes(space.roomId),
+                error: subspaceErrors.get(space.roomId) ?? null,
+                rooms: (children?.rooms ?? [])
+                    .filter((room) => !visibleRoomIdSet.has(room.roomId))
+                    .map(toChannel),
+                // Bounded depth as a second guard: excludeRoomIds already stops cycles,
+                // but a deliberately deep tree should not render without limit either.
+                subspaces:
+                    depth + 1 >= MAX_SUBSPACE_DEPTH
+                        ? []
+                        : (children?.spaces ?? [])
+                              .filter((child) => !nextSeen.has(child.roomId))
+                              .map((child) => build(child, depth + 1, nextSeen)),
+            };
+        };
+
+        const roots: ReadonlySet<string> = new Set(selectedSpaceRoom ? [selectedSpaceRoom.roomId] : []);
+        return topLevelSubspaces.map((space) => build(space, 0, roots));
+    }, [
+        expandedSubspaceIds,
+        loadingSubspaceIds,
+        selectedSpaceRoom,
+        subspaceChildren,
+        subspaceErrors,
+        topLevelSubspaces,
+        visibleRoomIdSet,
+    ]);
+
+    /** Every channel currently offered, including ones nested inside subspaces. */
+    const listedChannelsById = useMemo(() => {
+        const byId = new Map<string, DiscoverableSpaceChannel>();
+        for (const channel of discoverableSpaceChannels) {
+            byId.set(channel.roomId, channel);
+        }
+        for (const children of subspaceChildren.values()) {
+            for (const room of children.rooms) {
+                if (!byId.has(room.roomId)) {
+                    byId.set(room.roomId, {
+                        roomId: room.roomId,
+                        name: room.name,
+                        topic: room.topic,
+                        avatarMxc: room.avatarMxc,
+                        memberCount: room.memberCount,
+                        viaServers: room.viaServers,
+                        joinRule: room.joinRule,
+                        affordance: room.affordance,
+                    });
+                }
+            }
+        }
+        return byId;
+    }, [discoverableSpaceChannels, subspaceChildren]);
 
     const showSpaceOnboarding =
         Boolean(spaceOnboardingSpaceId) &&
@@ -1834,7 +2018,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 return;
             }
 
-            const targetChannel = discoverableSpaceChannels.find((channel) => channel.roomId === roomId);
+            const targetChannel = listedChannelsById.get(roomId);
             if (!targetChannel) {
                 return;
             }
@@ -1853,7 +2037,36 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 setJoiningDiscoverableRoomId(null);
             }
         },
-        [discoverableSpaceChannels, joiningDiscoverableRoomId, pushToast, requestJoinRoom, selectedSpaceId],
+        [joiningDiscoverableRoomId, listedChannelsById, pushToast, requestJoinRoom, selectedSpaceId],
+    );
+
+    const knockDiscoverableSpaceChannel = useCallback(
+        async (roomId: string): Promise<void> => {
+            if (joiningDiscoverableRoomId) {
+                return;
+            }
+
+            const targetChannel = listedChannelsById.get(roomId);
+            if (!targetChannel) {
+                return;
+            }
+
+            setJoiningDiscoverableRoomId(roomId);
+            try {
+                await client.knockRoom(roomId, {
+                    viaServers: targetChannel.viaServers?.filter((via) => via.length > 0) ?? [],
+                });
+                pushToast({
+                    type: "success",
+                    message: "Join request sent. You will be let in if a moderator approves.",
+                });
+            } catch (knockError) {
+                pushToast({ type: "error", message: describeJoinError(knockError, roomId) });
+            } finally {
+                setJoiningDiscoverableRoomId(null);
+            }
+        },
+        [client, joiningDiscoverableRoomId, listedChannelsById, pushToast],
     );
 
     useEffect(() => {
@@ -2189,6 +2402,11 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     onJoinDiscoverableRoom={(roomId) => {
                         void joinDiscoverableSpaceChannel(roomId);
                     }}
+                    onKnockDiscoverableRoom={(roomId) => {
+                        void knockDiscoverableSpaceChannel(roomId);
+                    }}
+                    subspaceGroups={selectedSpaceId === PEOPLE_SPACE_ID ? [] : subspaceGroupViews}
+                    onToggleSubspace={handleToggleSubspace}
                     localVoiceSession={
                         voiceSessionRoomId
                             ? {

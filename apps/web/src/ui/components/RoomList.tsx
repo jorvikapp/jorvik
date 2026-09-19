@@ -11,6 +11,7 @@ import {
 
 import { memberAvatarSources, roomAvatarSources } from "../adapters/avatar";
 import { mediaFromMxc, thumbnailFromMxc } from "../adapters/media";
+import type { SpaceChildAffordance } from "../adapters/spaceHierarchyAdapter";
 import { fetchVoiceParticipants, isVoiceFeatureEnabled } from "../adapters/voiceAdapter";
 import { useMatrix } from "../providers/MatrixProvider";
 import { isPresenceEnabledForClient } from "../presence/presenceConfig";
@@ -45,6 +46,9 @@ interface RoomListProps {
     discoverableRooms?: DiscoverableSpaceChannel[];
     discoverableJoiningRoomId?: string | null;
     contentsPending?: boolean;
+    subspaceGroups?: SubspaceGroupView[];
+    onToggleSubspace?: (roomId: string) => void;
+    onKnockDiscoverableRoom?: (roomId: string) => void;
     activeRoomId: string | null;
     orderingMode?: "manual" | "dynamic";
     showOrderingControls?: boolean;
@@ -92,6 +96,21 @@ export interface DiscoverableSpaceChannel {
     memberCount?: number;
     isVoiceChannel?: boolean;
     viaServers?: string[];
+    /** The room's actual join rule, lowercased. Absent means it was not reported. */
+    joinRule?: string;
+    /** What the user can do: join outright, ask to join, or nothing without an invite. */
+    affordance?: SpaceChildAffordance;
+}
+
+export interface SubspaceGroupView {
+    roomId: string;
+    name: string;
+    memberCount?: number;
+    expanded: boolean;
+    loading: boolean;
+    error: string | null;
+    rooms: DiscoverableSpaceChannel[];
+    subspaces: SubspaceGroupView[];
 }
 
 const EMPTY_VOICE_CHANNEL_HINT_IDS = new Set<string>();
@@ -228,6 +247,9 @@ export function RoomList({
     discoverableRooms = [],
     discoverableJoiningRoomId = null,
     contentsPending = false,
+    subspaceGroups = [],
+    onToggleSubspace,
+    onKnockDiscoverableRoom,
     activeRoomId,
     orderingMode = "manual",
     showOrderingControls = false,
@@ -1162,6 +1184,123 @@ export function RoomList({
         );
     };
 
+    const renderDiscoverableRoom = (room: DiscoverableSpaceChannel): React.ReactElement => {
+
+                            const isVoiceChannel = room.isVoiceChannel === true || voiceChannelHintRoomIds.has(room.roomId);
+                            const previewAvatarSources =
+                                room.avatarMxc && room.avatarMxc.length > 0
+                                    ? [
+                                          thumbnailFromMxc(client, room.avatarMxc, 64, 64, "crop"),
+                                          mediaFromMxc(client, room.avatarMxc),
+                                      ].filter((source): source is string => Boolean(source))
+                                    : [];
+                            const isJoining = discoverableJoiningRoomId === room.roomId;
+            // Absent affordance means the caller did not classify it; treat as joinable
+            // so existing local-space behaviour is unchanged.
+            const affordance = room.affordance ?? "join";
+                            const subtitle =
+                                room.topic && room.topic.trim().length > 0
+                                    ? room.topic.trim()
+                                    : isVoiceChannel
+                                      ? "Voice channel"
+                                      : `${room.memberCount ?? 0} members`;
+
+                            return (
+                                <div key={room.roomId} className="room-item room-item-discoverable">
+                                    <div className="room-item-row">
+                                        <span className={`room-item-main${showRoomAvatars ? "" : " room-item-main-no-avatar"}`}>
+                                            {showRoomAvatars ? (
+                                                <Avatar
+                                                    className="room-item-avatar"
+                                                    name={room.name}
+                                                    src={previewAvatarSources[0] ?? null}
+                                                    sources={previewAvatarSources}
+                                                    seed={room.roomId}
+                                                    userId={room.roomId}
+                                                />
+                                            ) : null}
+                                            <span className="room-item-title-block">
+                                                <span className="room-item-name">
+                                                    {isVoiceChannel ? "\uD83D\uDD0A " : ""}
+                                                    {showHashPrefix ? "#" : ""}
+                                                    {room.name}
+                                                </span>
+                                                <span className="room-item-subtitle">{subtitle}</span>
+                                            </span>
+                                        </span>
+                                        {affordance === "invite_only" ? (
+                                            <span
+                                                className="room-item-join-note"
+                                                title={`Join rule: ${room.joinRule ?? "invite"}`}
+                                            >
+                                                Invite only
+                                            </span>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className="room-item-join-button"
+                                                onClick={() =>
+                                                    affordance === "request"
+                                                        ? onKnockDiscoverableRoom?.(room.roomId)
+                                                        : onJoinDiscoverableRoom?.(room.roomId)
+                                                }
+                                                disabled={
+                                                    isJoining ||
+                                                    (affordance === "request"
+                                                        ? !onKnockDiscoverableRoom
+                                                        : !onJoinDiscoverableRoom)
+                                                }
+                                            >
+                                                {isJoining
+                                                    ? affordance === "request"
+                                                        ? "Asking..."
+                                                        : "Joining..."
+                                                    : affordance === "request"
+                                                      ? "Ask to join"
+                                                      : "Join"}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+        );
+    };
+
+    const renderSubspaceGroup = (group: SubspaceGroupView, depth: number): React.ReactElement => (
+        <div
+            key={group.roomId}
+            className="room-list-subspace"
+            style={depth > 0 ? { marginLeft: `${Math.min(depth, 4) * 10}px` } : undefined}
+        >
+            <button
+                type="button"
+                className="room-list-subspace-header"
+                onClick={() => onToggleSubspace?.(group.roomId)}
+                aria-expanded={group.expanded}
+                disabled={!onToggleSubspace}
+            >
+                <span className="room-list-subspace-chevron">{group.expanded ? "\u25be" : "\u25b8"}</span>
+                <span className="room-list-subspace-name">{group.name}</span>
+                {typeof group.memberCount === "number" ? (
+                    <span className="room-list-subspace-meta">{group.memberCount}</span>
+                ) : null}
+            </button>
+            {group.expanded ? (
+                <div className="room-list-subspace-body">
+                    {group.loading ? <div className="room-list-empty">Loading...</div> : null}
+                    {group.error ? <div className="room-list-empty">{group.error}</div> : null}
+                    {!group.loading &&
+                    !group.error &&
+                    group.rooms.length === 0 &&
+                    group.subspaces.length === 0 ? (
+                        <div className="room-list-empty">Nothing listed in here.</div>
+                    ) : null}
+                    {group.rooms.map((room) => renderDiscoverableRoom(room))}
+                    {group.subspaces.map((child) => renderSubspaceGroup(child, depth + 1))}
+                </div>
+            ) : null}
+        </div>
+    );
+
     return (
         <div className="room-list">
             <div className="room-list-header">
@@ -1297,62 +1436,20 @@ export function RoomList({
                 ))}
                 {discoverableRooms.length > 0 ? (
                     <div className="room-list-discoverable">
-                        <div className="room-list-discoverable-title">Public channels</div>
-                        {discoverableRooms.map((room) => {
-                            const isVoiceChannel = room.isVoiceChannel === true || voiceChannelHintRoomIds.has(room.roomId);
-                            const previewAvatarSources =
-                                room.avatarMxc && room.avatarMxc.length > 0
-                                    ? [
-                                          thumbnailFromMxc(client, room.avatarMxc, 64, 64, "crop"),
-                                          mediaFromMxc(client, room.avatarMxc),
-                                      ].filter((source): source is string => Boolean(source))
-                                    : [];
-                            const isJoining = discoverableJoiningRoomId === room.roomId;
-                            const subtitle =
-                                room.topic && room.topic.trim().length > 0
-                                    ? room.topic.trim()
-                                    : isVoiceChannel
-                                      ? "Voice channel"
-                                      : `${room.memberCount ?? 0} members`;
-
-                            return (
-                                <div key={room.roomId} className="room-item room-item-discoverable">
-                                    <div className="room-item-row">
-                                        <span className={`room-item-main${showRoomAvatars ? "" : " room-item-main-no-avatar"}`}>
-                                            {showRoomAvatars ? (
-                                                <Avatar
-                                                    className="room-item-avatar"
-                                                    name={room.name}
-                                                    src={previewAvatarSources[0] ?? null}
-                                                    sources={previewAvatarSources}
-                                                    seed={room.roomId}
-                                                    userId={room.roomId}
-                                                />
-                                            ) : null}
-                                            <span className="room-item-title-block">
-                                                <span className="room-item-name">
-                                                    {isVoiceChannel ? "\uD83D\uDD0A " : ""}
-                                                    {showHashPrefix ? "#" : ""}
-                                                    {room.name}
-                                                </span>
-                                                <span className="room-item-subtitle">{subtitle}</span>
-                                            </span>
-                                        </span>
-                                        <button
-                                            type="button"
-                                            className="room-item-join-button"
-                                            onClick={() => onJoinDiscoverableRoom?.(room.roomId)}
-                                            disabled={isJoining || !onJoinDiscoverableRoom}
-                                        >
-                                            {isJoining ? "Joining..." : "Join"}
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                        <div className="room-list-discoverable-title">Available channels</div>
+                        {discoverableRooms.map((room) => renderDiscoverableRoom(room))}
                     </div>
                 ) : null}
-                {uncategorized.length === 0 && categorizedGroups.length === 0 && discoverableRooms.length === 0 ? (
+                {subspaceGroups.length > 0 ? (
+                    <div className="room-list-discoverable">
+                        <div className="room-list-discoverable-title">Subspaces</div>
+                        {subspaceGroups.map((group) => renderSubspaceGroup(group, 0))}
+                    </div>
+                ) : null}
+                {uncategorized.length === 0 &&
+                categorizedGroups.length === 0 &&
+                discoverableRooms.length === 0 &&
+                subspaceGroups.length === 0 ? (
                     contentsPending ? (
                         <div className="room-list-empty">
                             Your server has not been able to list this space's contents yet. Large spaces can
