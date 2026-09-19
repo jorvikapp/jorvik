@@ -44,6 +44,7 @@ interface RoomListProps {
     voiceChannelHintRoomIds?: Set<string>;
     discoverableRooms?: DiscoverableSpaceChannel[];
     discoverableJoiningRoomId?: string | null;
+    contentsPending?: boolean;
     activeRoomId: string | null;
     orderingMode?: "manual" | "dynamic";
     showOrderingControls?: boolean;
@@ -226,6 +227,7 @@ export function RoomList({
     voiceChannelHintRoomIds = EMPTY_VOICE_CHANNEL_HINT_IDS,
     discoverableRooms = [],
     discoverableJoiningRoomId = null,
+    contentsPending = false,
     activeRoomId,
     orderingMode = "manual",
     showOrderingControls = false,
@@ -1351,7 +1353,15 @@ export function RoomList({
                     </div>
                 ) : null}
                 {uncategorized.length === 0 && categorizedGroups.length === 0 && discoverableRooms.length === 0 ? (
-                    <div className="room-list-empty">No channels in this space.</div>
+                    contentsPending ? (
+                        <div className="room-list-empty">
+                            Your server has not been able to list this space's contents yet. Large spaces can
+                            take a while to fetch from the other servers in them, and it keeps trying in the
+                            background.
+                        </div>
+                    ) : (
+                        <div className="room-list-empty">No channels in this space.</div>
+                    )
                 ) : null}
             </div>
         </div>

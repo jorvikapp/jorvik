@@ -537,6 +537,14 @@ function getSpaceGlyph(spaceName: string): string {
     return normalized[0].toUpperCase();
 }
 
+const SPACE_HIERARCHY_TIMEOUT_MS = 20_000;
+
+class SpaceHierarchyTimeoutError extends Error {
+    public constructor() {
+        super("Timed out waiting for the space hierarchy");
+    }
+}
+
 async function getSpaceHierarchyRooms(client: MatrixClient, spaceRoomId: string): Promise<HierarchyRoom[]> {
     const roomById = new Map<string, HierarchyRoom>();
     const visitedTokens = new Set<string>();
@@ -838,6 +846,8 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const [sidebarSearchQuery, setSidebarSearchQuery] = useState("");
     const [selectedSpaceHierarchyJoinedRoomIds, setSelectedSpaceHierarchyJoinedRoomIds] = useState<string[]>([]);
     const [discoverableSpaceChannels, setDiscoverableSpaceChannels] = useState<DiscoverableSpaceChannel[]>([]);
+    const [spaceContentsPending, setSpaceContentsPending] = useState(false);
+    const [hierarchyRetryTick, setHierarchyRetryTick] = useState(0);
     const [refreshedVoiceChannelHintsBySpaceId, setRefreshedVoiceChannelHintsBySpaceId] = useState<
         Map<string, Set<string>>
     >(new Map());
@@ -1135,6 +1145,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             setSelectedSpaceHierarchyJoinedRoomIds([]);
             setDiscoverableSpaceChannels([]);
             setJoiningDiscoverableRoomId(null);
+            setSpaceContentsPending(false);
             return;
         }
 
@@ -1144,11 +1155,42 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             visibleRoomIdsKey.length > 0 ? visibleRoomIdsKey.split("\u0000") : [],
         );
         const loadPublicChannels = async (): Promise<void> => {
+            let hierarchyPromise: Promise<HierarchyRoom[]> | undefined;
             try {
-                const hierarchyRooms = await getSpaceHierarchyRooms(client, currentSpaceRoom.roomId);
+                // Assume pending while the request is outstanding. A space whose own state
+                // advertises children has contents; if we cannot list them yet the honest
+                // thing to show is "still fetching", not "empty".
+                const advertisedChildCount = currentSpaceRoom.currentState.getStateEvents(
+                    EventType.SpaceChild,
+                ).length;
+                if (advertisedChildCount > 0) {
+                    setSpaceContentsPending(true);
+                }
+
+                let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+                hierarchyPromise = getSpaceHierarchyRooms(client, currentSpaceRoom.roomId);
+                const hierarchyRooms = await Promise.race([
+                    hierarchyPromise,
+                    new Promise<never>((_resolve, reject) => {
+                        timeoutHandle = setTimeout(
+                            () => reject(new SpaceHierarchyTimeoutError()),
+                            SPACE_HIERARCHY_TIMEOUT_MS,
+                        );
+                    }),
+                ]).finally(() => {
+                    if (timeoutHandle !== undefined) {
+                        clearTimeout(timeoutHandle);
+                    }
+                });
                 if (cancelled) {
                     return;
                 }
+
+                const hierarchyChildCount = hierarchyRooms.filter(
+                    (room) => room.room_id !== currentSpaceRoom.roomId,
+                ).length;
+                setSpaceContentsPending(hierarchyChildCount === 0 && advertisedChildCount > 0);
+
                 const { childOrderOverride, customOrderOverride, voiceHintRoomIds } = await resolveSpaceHierarchyVoiceHints(
                     client,
                     currentSpaceRoom,
@@ -1229,19 +1271,47 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                         current.filter((channel) => !successfulRoomIds.has(channel.roomId)),
                     );
                 }
-            } catch {
-                if (!cancelled) {
-                    setSelectedSpaceHierarchyJoinedRoomIds([]);
-                    setDiscoverableSpaceChannels([]);
-                    setRefreshedVoiceChannelHintsBySpaceId((current) => {
-                        if (!current.has(currentSpaceRoom.roomId)) {
-                            return current;
-                        }
-                        const next = new Map(current);
-                        next.delete(currentSpaceRoom.roomId);
-                        return next;
-                    });
+            } catch (loadError) {
+                if (cancelled) {
+                    return;
                 }
+
+                const advertisesChildren =
+                    currentSpaceRoom.currentState.getStateEvents(EventType.SpaceChild).length > 0;
+
+                if (loadError instanceof SpaceHierarchyTimeoutError) {
+                    // The request is still outstanding server-side rather than failed:
+                    // synapse blocks /hierarchy on a partial-state room instead of
+                    // answering. Keep whatever is already listed instead of blanking it,
+                    // and if the request ever does land with contents, re-run to pick
+                    // them up so the pending notice cannot stick forever.
+                    setSpaceContentsPending(advertisesChildren);
+                    hierarchyPromise
+                        ?.then((lateRooms) => {
+                            const lateChildren = lateRooms.filter(
+                                (room) => room.room_id !== currentSpaceRoom.roomId,
+                            ).length;
+                            if (!cancelled && lateChildren > 0) {
+                                setHierarchyRetryTick((tick) => tick + 1);
+                            }
+                        })
+                        .catch(() => {
+                            // Already surfaced as the timeout above.
+                        });
+                    return;
+                }
+
+                setSelectedSpaceHierarchyJoinedRoomIds([]);
+                setDiscoverableSpaceChannels([]);
+                setSpaceContentsPending(advertisesChildren);
+                setRefreshedVoiceChannelHintsBySpaceId((current) => {
+                    if (!current.has(currentSpaceRoom.roomId)) {
+                        return current;
+                    }
+                    const next = new Map(current);
+                    next.delete(currentSpaceRoom.roomId);
+                    return next;
+                });
             }
         };
 
@@ -1250,7 +1320,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         return () => {
             cancelled = true;
         };
-    }, [client, selectedSpaceId, selectedSpaceRoom, visibleRoomIdsKey]);
+    }, [client, hierarchyRetryTick, selectedSpaceId, selectedSpaceRoom, visibleRoomIdsKey]);
 
     const showSpaceOnboarding =
         Boolean(spaceOnboardingSpaceId) &&
@@ -2110,6 +2180,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     showRoomAvatars={selectedSpaceId === PEOPLE_SPACE_ID || userSettings.appearance.showSpaceChannelAvatars}
                     discoverableRooms={selectedSpaceId === PEOPLE_SPACE_ID ? [] : discoverableSpaceChannels}
                     discoverableJoiningRoomId={joiningDiscoverableRoomId}
+                    contentsPending={selectedSpaceId === PEOPLE_SPACE_ID ? false : spaceContentsPending}
                     activeRoomId={activeRoomId}
                     orderingMode={selectedSpaceId === PEOPLE_SPACE_ID ? "dynamic" : "manual"}
                     showOrderingControls={selectedSpaceId !== PEOPLE_SPACE_ID}
