@@ -364,7 +364,7 @@ export function LoginView({
                     />
                 ) : registerStep === "form" ? (
                     <form onSubmit={handleRegisterSubmit}>
-                        <p className="login-subtitle">Create a Matrix account with Matrix-native verification stages.</p>
+                        <p className="login-subtitle">Join Jorvik. Create your account and start connecting</p>
                         {!disableHomeserverInput && (
                             <label>
                                 Homeserver
