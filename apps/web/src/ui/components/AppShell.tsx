@@ -1187,8 +1187,19 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 );
                 setDiscoverableSpaceChannels(channelsToJoin);
 
+                // Auto-joining every public channel is the intended experience for a
+                // space on our own server: opening it should feel like the whole space
+                // is already yours. For a remote space it is not -- browsing something
+                // like #community:matrix.org would silently drag the account into dozens
+                // of unrelated rooms, so there they stay opt-in through the discoverable
+                // list and its Join buttons.
+                const spaceServerName = currentSpaceRoom.roomId.slice(
+                    currentSpaceRoom.roomId.indexOf(":") + 1,
+                );
+                const channelsToAutoJoin = spaceServerName === client.getDomain() ? channelsToJoin : [];
+
                 const successfullyJoinedIds: string[] = [];
-                for (const channel of channelsToJoin) {
+                for (const channel of channelsToAutoJoin) {
                     if (cancelled) {
                         return;
                     }
