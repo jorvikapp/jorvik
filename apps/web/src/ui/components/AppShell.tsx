@@ -1411,20 +1411,21 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
 
     const handleToggleSubspace = useCallback(
         (roomId: string): void => {
-            let willExpand = false;
-            setExpandedSubspaceIds((current) => {
-                if (current.includes(roomId)) {
-                    return current.filter((id) => id !== roomId);
-                }
-                willExpand = true;
-                return [...current, roomId];
-            });
+            // Decide from current state rather than from a flag set inside the updater:
+            // React runs updaters while processing the queue, so such a flag is still
+            // unset when the callback continues, and the load would never fire.
+            const isExpanded = expandedSubspaceIds.includes(roomId);
+            setExpandedSubspaceIds(
+                isExpanded ? expandedSubspaceIds.filter((id) => id !== roomId) : [...expandedSubspaceIds, roomId],
+            );
 
-            if (willExpand) {
+            if (!isExpanded) {
+                // Idempotent: returns immediately if this subspace is already cached or
+                // in flight, so reopening a group costs no request.
                 void loadSubspaceChildren(roomId);
             }
         },
-        [loadSubspaceChildren],
+        [expandedSubspaceIds, loadSubspaceChildren],
     );
 
     const visibleRoomIdSet = useMemo(
