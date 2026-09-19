@@ -1,6 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { EventType, Preset, RoomCreateTypeField, RoomType, Visibility, type MatrixClient } from "matrix-js-sdk/src/matrix";
 
+import {
+    describeDirectoryError,
+    isValidDirectoryServer,
+    loadRememberedServers,
+    normalizeDirectoryServer,
+    rememberServer,
+} from "../../adapters/directoryAdapter";
 import { describeJoinError, joinRoomWithRetry } from "../../adapters/joinAdapter";
 import { RoomDialog } from "./RoomDialog";
 
@@ -81,6 +88,22 @@ export function CreateSpaceDialog({
     const [supportsPublic, setSupportsPublic] = useState(true);
     const [publicSearchInput, setPublicSearchInput] = useState("");
     const [publicSearchTerm, setPublicSearchTerm] = useState("");
+    const [serverInput, setServerInput] = useState("");
+    const [directoryServer, setDirectoryServer] = useState("");
+    const [rememberedServers, setRememberedServers] = useState<string[]>(() => loadRememberedServers());
+
+    const homeServerName = useMemo(() => client.getDomain() ?? "", [client]);
+    const serverSuggestions = useMemo(() => {
+        const seen = new Set<string>();
+        const suggestions: string[] = [];
+        for (const candidate of [...rememberedServers, "matrix.org"]) {
+            if (candidate.length > 0 && candidate !== homeServerName && !seen.has(candidate)) {
+                seen.add(candidate);
+                suggestions.push(candidate);
+            }
+        }
+        return suggestions;
+    }, [homeServerName, rememberedServers]);
     const [publicSpaces, setPublicSpaces] = useState<PublicSpaceResult[]>([]);
     const [publicNextBatch, setPublicNextBatch] = useState<string | null>(null);
     const [publicLoading, setPublicLoading] = useState(false);
@@ -194,8 +217,11 @@ export function CreateSpaceDialog({
                 const response = await client.publicRooms({
                     limit: 24,
                     since: sinceToken,
-                    // Ask the homeserver for the federated directory as well
-                    // as rooms published locally on matrix.jorvik.app.
+                    // "server" is what reaches another homeserver's directory; without it
+                    // the request only ever returns rooms published on our own server.
+                    // include_all_networks covers third-party/appservice networks on
+                    // whichever server is being asked -- it is not federation.
+                    ...(directoryServer.length > 0 ? { server: directoryServer } : {}),
                     include_all_networks: true,
                     filter: {
                         generic_search_term: publicSearchTerm || undefined,
@@ -223,15 +249,17 @@ export function CreateSpaceDialog({
                 });
                 setPublicNextBatch(response.next_batch ?? null);
                 setPublicLoaded(true);
+                if (directoryServer.length > 0) {
+                    setRememberedServers((current) => rememberServer(directoryServer, current));
+                }
             } catch (loadError) {
-                const message = loadError instanceof Error ? loadError.message : "Failed to load public spaces.";
-                setPublicError(message);
+                setPublicError(describeDirectoryError(loadError, directoryServer));
             } finally {
                 setPublicLoading(false);
                 setPublicLoadingMore(false);
             }
         },
-        [client, publicNextBatch, publicSearchTerm, supportsPublic],
+        [client, directoryServer, publicNextBatch, publicSearchTerm, supportsPublic],
     );
 
     useEffect(() => {
@@ -242,8 +270,15 @@ export function CreateSpaceDialog({
     }, [activeTab, loadPublicSpaces, open, publicError, publicLoaded, publicLoading]);
 
     const submitPublicSearch = (): void => {
-        const searchTerm = publicSearchInput.trim();
-        setPublicSearchTerm(searchTerm);
+        const normalizedServer = normalizeDirectoryServer(serverInput);
+        if (normalizedServer.length > 0 && !isValidDirectoryServer(normalizedServer)) {
+            setPublicError(`"${serverInput.trim()}" is not a valid server name.`);
+            return;
+        }
+
+        setServerInput(normalizedServer);
+        setDirectoryServer(normalizedServer);
+        setPublicSearchTerm(publicSearchInput.trim());
         setPublicSpaces([]);
         setPublicNextBatch(null);
         setPublicLoaded(false);
@@ -427,9 +462,34 @@ export function CreateSpaceDialog({
                             type="text"
                             value={publicSearchInput}
                             onChange={(event) => setPublicSearchInput(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                    submitPublicSearch();
+                                }
+                            }}
                             placeholder="Search public spaces"
                             disabled={publicLoading || publicLoadingMore}
                         />
+                        <input
+                            className="room-dialog-input join-public-server"
+                            type="text"
+                            list="jorvik-directory-servers"
+                            value={serverInput}
+                            onChange={(event) => setServerInput(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                    submitPublicSearch();
+                                }
+                            }}
+                            placeholder={homeServerName.length > 0 ? homeServerName : "Server"}
+                            aria-label="Homeserver to browse"
+                            disabled={publicLoading || publicLoadingMore}
+                        />
+                        <datalist id="jorvik-directory-servers">
+                            {serverSuggestions.map((suggestion) => (
+                                <option key={suggestion} value={suggestion} />
+                            ))}
+                        </datalist>
                         <button
                             type="button"
                             className="room-dialog-button room-dialog-button-secondary"
@@ -439,6 +499,11 @@ export function CreateSpaceDialog({
                             Search
                         </button>
                     </div>
+                    <p className="room-dialog-muted">
+                        {directoryServer.length > 0
+                            ? `Browsing spaces published on ${directoryServer}.`
+                            : "Browsing spaces published on your own server. Enter another server to look there."}
+                    </p>
                     <div className="join-public-results">
                         {publicLoading ? <p className="room-dialog-muted">Loading public spaces...</p> : null}
                         {!publicLoading && publicSpaces.length === 0 && !publicError ? (
