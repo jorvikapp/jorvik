@@ -13,9 +13,10 @@ import {
     RegistrationProbeError,
     type RegistrationFlow,
 } from "../adapters/registrationAdapter";
+import { PasswordResetView } from "./auth/PasswordResetView";
 import { RegistrationInteractiveAuth } from "./auth/RegistrationInteractiveAuth";
 
-type AuthMode = "sign_in" | "register";
+type AuthMode = "sign_in" | "register" | "reset";
 type RegistrationStep = "form" | "uia";
 
 interface LoginViewProps {
@@ -83,8 +84,20 @@ export function LoginView({
             return false;
         }
 
+        if (registerEmail.trim().length === 0) {
+            return false;
+        }
+
         return true;
-    }, [homeserver, registerBusy, registerPassword, registerPasswordConfirm, registerStep, registerUsername]);
+    }, [
+        homeserver,
+        registerBusy,
+        registerEmail,
+        registerPassword,
+        registerPasswordConfirm,
+        registerStep,
+        registerUsername,
+    ]);
 
     const handleSignInSubmit = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
         event.preventDefault();
@@ -129,7 +142,12 @@ export function LoginView({
             return;
         }
 
-        if (normalizedEmail.length > 0 && !looksLikeEmail(normalizedEmail)) {
+        if (normalizedEmail.length === 0) {
+            setRegisterError("An email address is required so you can reset your password later.");
+            return;
+        }
+
+        if (!looksLikeEmail(normalizedEmail)) {
             setRegisterError("Email format is invalid.");
             return;
         }
@@ -172,15 +190,6 @@ export function LoginView({
                 return;
             }
 
-            if (emailUsed && !emailRequired && normalizedEmail.length === 0) {
-                const proceed = window.confirm(
-                    "Continue without email? You may not be able to reset your password if you lose access.",
-                );
-                if (!proceed) {
-                    return;
-                }
-            }
-
             setRegisterUsesEmail(emailUsed);
             setRegisterRequiresEmail(emailRequired);
             setRegisterFlows(probe.flows);
@@ -208,7 +217,8 @@ export function LoginView({
     };
 
     const providerError = error;
-    const displayError = mode === "sign_in" ? providerError : registerError ?? providerError;
+    const displayError =
+        mode === "register" ? registerError ?? providerError : mode === "sign_in" ? providerError : null;
     const flowContentRef = useRef<HTMLDivElement | null>(null);
     const [flowHeight, setFlowHeight] = useState<number | null>(null);
 
@@ -263,11 +273,14 @@ export function LoginView({
     return (
         <div className="login-view">
             <div className="login-card login-card-wide">
-                <h1>Jorvik</h1>
+                <div className="login-title">
+                    <img src="/branding/jorvik-logo-848bff6b.webp" width="36" height="36" alt="" />
+                    <h1>Jorvik</h1>
+                </div>
                 <div className="login-mode-switch" role="tablist" aria-label="Authentication flow">
                     <button
                         type="button"
-                        className={`login-mode-button${mode === "sign_in" ? " is-active" : ""}`}
+                        className={`login-mode-button${mode !== "register" ? " is-active" : ""}`}
                         onClick={() => switchMode("sign_in")}
                     >
                         Sign in
@@ -286,17 +299,18 @@ export function LoginView({
                     <form onSubmit={handleSignInSubmit}>
                         <p className="login-subtitle">Sign in to continue</p>
 
-                        <label>
-                            Homeserver
-                            <input
-                                type="url"
-                                value={homeserver}
-                                onChange={(event) => setHomeserver(event.target.value)}
-                                placeholder="https://matrix.org"
-                                autoComplete="url"
-                                disabled={disableHomeserverInput}
-                            />
-                        </label>
+                        {!disableHomeserverInput && (
+                            <label>
+                                Homeserver
+                                <input
+                                    type="url"
+                                    value={homeserver}
+                                    onChange={(event) => setHomeserver(event.target.value)}
+                                    placeholder="https://matrix.org"
+                                    autoComplete="url"
+                                />
+                            </label>
+                        )}
 
                         <label>
                             Username or email
@@ -334,21 +348,36 @@ export function LoginView({
                         <button type="submit" disabled={!canSignIn}>
                             {loading ? "Signing in..." : "Sign in"}
                         </button>
+
+                        <div className="login-actions-row">
+                            <button type="button" className="login-link-button" onClick={() => switchMode("reset")}>
+                                Forgot password?
+                            </button>
+                        </div>
                     </form>
+                ) : mode === "reset" ? (
+                    <PasswordResetView
+                        homeserver={homeserver}
+                        disableHomeserverInput={disableHomeserverInput}
+                        onHomeserverChange={setHomeserver}
+                        onBack={() => switchMode("sign_in")}
+                    />
                 ) : registerStep === "form" ? (
                     <form onSubmit={handleRegisterSubmit}>
                         <p className="login-subtitle">Create a Matrix account with Matrix-native verification stages.</p>
-                        <label>
-                            Homeserver
-                            <input
-                                type="url"
-                                value={homeserver}
-                                onChange={(event) => setHomeserver(event.target.value)}
-                                placeholder="https://matrix.org"
-                                autoComplete="url"
-                                disabled={disableHomeserverInput || registerBusy}
-                            />
-                        </label>
+                        {!disableHomeserverInput && (
+                            <label>
+                                Homeserver
+                                <input
+                                    type="url"
+                                    value={homeserver}
+                                    onChange={(event) => setHomeserver(event.target.value)}
+                                    placeholder="https://matrix.org"
+                                    autoComplete="url"
+                                    disabled={registerBusy}
+                                />
+                            </label>
+                        )}
 
                         <label>
                             Username
@@ -363,7 +392,7 @@ export function LoginView({
                         </label>
 
                         <label>
-                            Email (optional)
+                            Email
                             <input
                                 type="email"
                                 value={registerEmail}
