@@ -1437,16 +1437,16 @@ export function RoomList({
                         </div>
                     </div>
                 ))}
-                {discoverableRooms.length > 0 ? (
-                    <div className="room-list-discoverable">
-                        <div className="room-list-discoverable-title">Available channels</div>
-                        {discoverableRooms.map((room) => renderDiscoverableRoom(room))}
-                    </div>
-                ) : null}
                 {subspaceGroups.length > 0 ? (
                     <div className="room-list-discoverable">
                         <div className="room-list-discoverable-title">Subspaces</div>
                         {subspaceGroups.map((group) => renderSubspaceGroup(group, 0))}
+                    </div>
+                ) : null}
+                {discoverableRooms.length > 0 ? (
+                    <div className="room-list-discoverable">
+                        <div className="room-list-discoverable-title">Available channels</div>
+                        {discoverableRooms.map((room) => renderDiscoverableRoom(room))}
                     </div>
                 ) : null}
                 {contentsTruncated ? (
