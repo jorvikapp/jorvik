@@ -652,11 +652,10 @@ textarea {
 .rail-icon {
     width: 46px;
     height: 46px;
-    /* .rail-icon is a <button>, which every engine gives its own default
-       padding. With the global border-box sizing that padding comes out of
-       these 46px, so the avatar inside ends up in a non-square box whose
-       dimensions depend on the browser -- correct in one, squashed in another. */
-    padding: 0;
+    /* Deliberately no padding reset: the browser default (1px 6px in Chromium)
+       comes out of these 46px, so the avatar lands in a 34x44 box and reads as
+       smaller than the brand logo above it. Setting padding: 0 makes it square
+       at the full 46px, which was tried and rejected as too prominent. */
     border-radius: 14px;
     display: grid;
     place-items: center;
