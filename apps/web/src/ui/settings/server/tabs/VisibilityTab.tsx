@@ -6,6 +6,7 @@ import {
     JoinRule,
     type MatrixClient,
     type Room,
+    Visibility,
 } from "matrix-js-sdk/src/matrix";
 
 import type { ToastState } from "../../../components/Toast";
@@ -52,6 +53,11 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
     const [guestAccessEnabled, setGuestAccessEnabled] = useState<boolean>(() => readGuestAccessEnabled(spaceRoom));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Directory visibility is not room state, so it cannot be read synchronously
+    // from the Room the way the three settings above are.
+    const [published, setPublished] = useState(false);
+    const [initialPublished, setInitialPublished] = useState(false);
+    const [directoryStatus, setDirectoryStatus] = useState<"loading" | "ready" | "unavailable">("loading");
 
     const myUserId = client.getUserId() ?? "";
     const canEditJoinRule = Boolean(myUserId && spaceRoom.currentState.maySendStateEvent(EventType.RoomJoinRules, myUserId));
@@ -61,6 +67,34 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
     const canEditGuestAccess = Boolean(
         myUserId && spaceRoom.currentState.maySendStateEvent(EventType.RoomGuestAccess, myUserId),
     );
+
+    useEffect(() => {
+        let cancelled = false;
+        setDirectoryStatus("loading");
+        void client
+            .getRoomDirectoryVisibility(spaceRoom.roomId)
+            .then((response) => {
+                if (cancelled) {
+                    return;
+                }
+                const isPublished = response.visibility === Visibility.Public;
+                setPublished(isPublished);
+                setInitialPublished(isPublished);
+                setDirectoryStatus("ready");
+            })
+            .catch(() => {
+                if (cancelled) {
+                    return;
+                }
+                // Our homeserver only knows its own directory, so this fails for
+                // Spaces hosted elsewhere. Leave the control out rather than
+                // offering a toggle that cannot work.
+                setDirectoryStatus("unavailable");
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [client, spaceRoom.roomId]);
 
     useEffect(() => {
         setJoinRule(readJoinRule(spaceRoom));
@@ -74,9 +108,13 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
         return (
             (canEditJoinRule && joinRule !== readJoinRule(spaceRoom)) ||
             (canEditHistoryVisibility && historyVisibility !== readHistoryVisibility(spaceRoom)) ||
-            (canEditGuestAccess && guestAccessEnabled !== readGuestAccessEnabled(spaceRoom))
+            (canEditGuestAccess && guestAccessEnabled !== readGuestAccessEnabled(spaceRoom)) ||
+            (directoryStatus === "ready" && published !== initialPublished)
         );
     }, [
+        directoryStatus,
+        initialPublished,
+        published,
         canEditGuestAccess,
         canEditHistoryVisibility,
         canEditJoinRule,
@@ -124,11 +162,28 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
                 );
             }
 
+            if (directoryStatus === "ready" && published !== initialPublished) {
+                updates.push(
+                    client.setRoomDirectoryVisibility(
+                        spaceRoom.roomId,
+                        published ? Visibility.Public : Visibility.Private,
+                    ),
+                );
+            }
+
             await Promise.all(updates);
+            setInitialPublished(published);
             onToast({ type: "success", message: "Visibility settings updated." });
         } catch (saveError) {
             const message = saveError instanceof Error ? saveError.message : "Failed to update visibility settings.";
-            setError(message);
+            const status = (saveError as { httpStatus?: number } | null)?.httpStatus;
+            // Publishing is gated by the homeserver, not by power levels, so a
+            // refusal here is not something the user can fix in this dialog.
+            setError(
+                status === 403
+                    ? `${message} Your homeserver restricts who may publish to its room directory.`
+                    : message,
+            );
         } finally {
             setSaving(false);
         }
@@ -138,7 +193,8 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
         <div className="settings-tab">
             <h2 className="settings-tab-title">Visibility</h2>
             <p className="settings-tab-description">
-                Configure who can join this Space and how much history is visible.
+                Configure who can join this Space, how much history is visible, and whether
+                people can find it by searching the server's room directory.
             </p>
 
             <div className="settings-section-card">
@@ -179,6 +235,18 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
                     />
                     Allow guest users to join
                 </label>
+
+                {directoryStatus === "unavailable" ? null : (
+                    <label className="settings-toggle">
+                        <input
+                            type="checkbox"
+                            checked={published}
+                            onChange={(event) => setPublished(event.target.checked)}
+                            disabled={saving || directoryStatus !== "ready"}
+                        />
+                        Publish this Space in the server's room directory
+                    </label>
+                )}
 
                 {!canEditJoinRule || !canEditHistoryVisibility || !canEditGuestAccess ? (
                     <p className="settings-inline-note">
