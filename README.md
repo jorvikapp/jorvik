@@ -1,10 +1,10 @@
-# Heorot
+# Jorvik
 
 A self-hosted Matrix client built to feel like Discord. Spaces are servers. Rooms are channels. End-to-end encryption is on by default.
 
 Runs as a web app or a native desktop client (Windows · macOS · Linux).
 
-![Heorot UI](docs/ui.png)
+![Jorvik UI](docs/ui.png)
 
 <details>
 <summary>More screenshots</summary>
@@ -20,6 +20,10 @@ Runs as a web app or a native desktop client (Windows · macOS · Linux).
 - Custom emoji per space and personal packs
 - Fully self-hostable in minutes via Docker Compose
 
+> Jorvik is a rebrand and continuation of **[Heorot](https://github.com/Vitosicz/heorot)** by Vitosicz, the project this client grew out of. Full credit to that work — the architecture, the Discord-shaped take on Matrix and most of this codebase started there.
+>
+> Internal identifiers deliberately keep the `heorot` name: the `com.heorot.*` state event types are written into real rooms, so renaming them would orphan existing data, and `@heorot/*` are the workspace package names.
+>
 > Heavily inspired by [Element Web](https://github.com/element-hq/element-web). Parts of the client logic and architecture are derived from the Element codebase and adapted for a different UX approach.
 
 ---
@@ -105,8 +109,8 @@ Personal open-source experiment — alpha stage. Core features work, rough edges
 ## Quick start (web)
 
 ```bash
-git clone https://github.com/Vitosicz/heorot.git
-cd heorot
+git clone https://github.com/jorvikapp/jorvik.git
+cd jorvik
 pnpm install
 ```
 
@@ -126,7 +130,7 @@ Edit `apps/web/config.json`:
       "server_name": "matrix.example.com"
     }
   },
-  "brand": "Heorot",
+  "brand": "Jorvik",
   "disable_guests": false,
   "disable_custom_urls": false,
   "force_verification": false,
@@ -185,7 +189,7 @@ pnpm setup:linux
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `default_server_config` | object | — | Default homeserver and identity server |
-| `brand` | string | `"Heorot"` | App name shown in the UI |
+| `brand` | string | `"Jorvik"` | App name shown in the UI |
 | `disable_guests` | boolean | `false` | Hide guest login option |
 | `disable_custom_urls` | boolean | `false` | Lock to the default homeserver |
 | `force_verification` | boolean | `false` | Require device verification before access |
@@ -289,7 +293,7 @@ Planned:
 3. Start dev server: `pnpm dev:web`
 4. Make your changes and open a pull request
 
-Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/Vitosicz/heorot/issues).
+Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/jorvikapp/jorvik/issues).
 
 ---
 
