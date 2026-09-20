@@ -652,6 +652,11 @@ textarea {
 .rail-icon {
     width: 46px;
     height: 46px;
+    /* .rail-icon is a <button>, which every engine gives its own default
+       padding. With the global border-box sizing that padding comes out of
+       these 46px, so the avatar inside ends up in a non-square box whose
+       dimensions depend on the browser -- correct in one, squashed in another. */
+    padding: 0;
     border-radius: 14px;
     display: grid;
     place-items: center;
