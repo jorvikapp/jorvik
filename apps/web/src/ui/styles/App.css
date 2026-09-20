@@ -652,10 +652,10 @@ textarea {
 .rail-icon {
     width: 46px;
     height: 46px;
-    /* Deliberately no padding reset: the browser default (1px 6px in Chromium)
-       comes out of these 46px, so the avatar lands in a 34x44 box and reads as
-       smaller than the brand logo above it. Setting padding: 0 makes it square
-       at the full 46px, which was tried and rejected as too prominent. */
+    /* .rail-icon is a <button>, so without this each engine's default padding
+       (1px 6px in Chromium) comes out of these 46px and distorts whatever sits
+       inside. The avatar is kept smaller than the tile on purpose below. */
+    padding: 0;
     border-radius: 14px;
     display: grid;
     place-items: center;
@@ -684,8 +684,11 @@ textarea {
 }
 
 .rail-icon-avatar {
-    width: 100%;
-    height: 100%;
+    /* Square, and smaller than the 46px brand logo above it, so a Space reads
+       as one item in the rail rather than competing with the logo. Sizing it
+       here instead of letting the padding squash it keeps the aspect intact. */
+    width: 34px;
+    height: 34px;
     object-fit: cover;
     border-radius: inherit;
     display: block;
