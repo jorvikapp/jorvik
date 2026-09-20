@@ -44,6 +44,28 @@ function badgeSvg(label) {
     );
 }
 
+// Windows draws a taskbar overlay at the small-icon metric: 16px at 100% DPI,
+// 32px at 200%. The tray art above is the whole mark plus a badge, which is
+// wrong here -- the overlay sits on the corner of the app icon, so it has to be
+// the badge alone.
+const OVERLAY_SIZE = 32;
+
+function overlaySvg(label) {
+    const d = OVERLAY_SIZE - 2;
+    const r = d / 2;
+    const fontSize = label.length > 2 ? 12 : label.length > 1 ? 18 : 22;
+    return Buffer.from(
+        `<svg width="${OVERLAY_SIZE}" height="${OVERLAY_SIZE}" xmlns="http://www.w3.org/2000/svg">` +
+        `<rect x="1" y="1" width="${d}" height="${d}" rx="${r}" ry="${r}" ` +
+        `fill="${BADGE_BG}" stroke="${OUTLINE}" stroke-width="1.5"/>` +
+        `<text x="${OVERLAY_SIZE / 2}" y="${OVERLAY_SIZE / 2 + fontSize * 0.36}" ` +
+        `font-family="DejaVu Sans, Noto Sans, sans-serif" ` +
+        `font-size="${fontSize}" font-weight="bold" fill="${BADGE_FG}" ` +
+        `text-anchor="middle">${label}</text>` +
+        `</svg>`
+    );
+}
+
 async function main() {
     const [base, outDir] = process.argv.slice(2);
     if (!base || !outDir) {
@@ -71,10 +93,15 @@ async function main() {
         fs.writeFileSync(path.join(outDir, file), out);
     }
 
+    for (const [label, file] of labels) {
+        const out = await sharp(overlaySvg(label)).png().toBuffer();
+        fs.writeFileSync(path.join(outDir, file.replace(/^tray-/, 'overlay-')), out);
+    }
+
     // A blank badge almost always means the build machine has no usable font.
     const probe = await sharp(path.join(outDir, 'tray-8.png')).stats();
     const flat = probe.channels.every(c => c.min === c.max);
-    console.log(`generated ${labels.length + 1} icons in ${outDir}`);
+    console.log(`generated ${labels.length * 2 + 1} icons in ${outDir}`);
     if (flat) {
         console.error('WARNING: rendered badge looks blank - install a font ' +
                       '(fonts-dejavu-core) on the build machine and re-run.');

@@ -79,13 +79,34 @@ function logWindowState(label: string, window: BrowserWindow | null = mainWindow
     console.log(`[jorvik-window] ${label} destroyed=${window.isDestroyed()} visible=${window.isVisible()} minimized=${window.isMinimized()}`);
 }
 
+function resolveOverlayBadgePath(count: number): string | null {
+    // Windows draws the overlay at 16-32px. Handing it the full-size app icon,
+    // as this did before, renders nothing at all on the taskbar.
+    const name = count > 99 ? "overlay-99plus.png" : `overlay-${count}.png`;
+    const candidates = [
+        path.join(process.resourcesPath, "tray-badges", name),
+        path.join(app.getAppPath(), "build", "tray-badges", name),
+    ];
+    return candidates.find(candidate => fs.existsSync(candidate)) ?? null;
+}
+
 function setNativeBadge(count: number): void {
     const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
     if (process.platform === "darwin") {
         app.dock?.setBadge(safeCount > 0 ? String(safeCount) : "");
     } else if (process.platform === "win32") {
         if (mainWindow && safeCount > 0) {
-            mainWindow.setOverlayIcon(nativeImage.createFromPath(resolveIconPath()), String(safeCount));
+            const badgePath = resolveOverlayBadgePath(safeCount);
+            const overlay = badgePath
+                ? nativeImage.createFromPath(badgePath)
+                : nativeImage.createFromPath(resolveIconPath()).resize({ width: 32, height: 32 });
+            mainWindow.setOverlayIcon(overlay, `${safeCount} unread`);
+            console.log(`[jorvik-badge] ${JSON.stringify({
+                platform: "win32",
+                count: safeCount,
+                asset: badgePath ?? "missing, fell back to the app icon",
+                empty: overlay.isEmpty(),
+            })}`);
         } else {
             mainWindow?.setOverlayIcon(null, "");
         }

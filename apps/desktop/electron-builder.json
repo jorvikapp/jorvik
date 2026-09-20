@@ -30,6 +30,10 @@
     {
       "from": "../web/public/jorvik-icon.png",
       "to": "jorvik.png"
+    },
+    {
+      "from": "build/tray-badges",
+      "to": "tray-badges"
     }
   ],
   "afterPack": "scripts/electron-builder-after-pack.cjs",
@@ -76,16 +80,6 @@
     ],
     "category": "Network;Chat;",
     "executableName": "jorvik",
-    "extraResources": [
-      {
-        "from": "../web/public/jorvik-icon.png",
-        "to": "jorvik.png"
-      },
-      {
-        "from": "build/tray-badges",
-        "to": "tray-badges"
-      }
-    ],
     "artifactName": "Jorvik-${version}.${ext}"
   },
   "deb": {
