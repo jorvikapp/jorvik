@@ -16,7 +16,7 @@ import {
 } from "electron";
 
 import { openExternalSafely, readWindowState, writeWindowState } from "./util";
-import { LinuxTrayBadge } from "./linux-tray-badge";
+import { TrayBadge } from "./tray-badge";
 
 const APP_TITLE = "Jorvik";
 // Keep the Linux window identity aligned with the generated desktop entry so
@@ -57,7 +57,7 @@ let closeOnWindowCloseMinimize = true;
 let isAppQuitting = false;
 let preferredDisplayMediaSourceId: string | null = null;
 let tray: Tray | null = null;
-let linuxTrayBadge: LinuxTrayBadge | null = null;
+let trayBadge: TrayBadge | null = null;
 // Remembered so a tray recreated after a badge arrives is restored, not blank.
 let lastBadgeCount = 0;
 
@@ -110,11 +110,16 @@ function setNativeBadge(count: number): void {
         } else {
             mainWindow?.setOverlayIcon(null, "");
         }
+        // The overlay lives on the taskbar button, which disappears when the
+        // window is hidden to the tray -- which is when a count matters most.
+        // The tray icon carries it as well, from the same assets as Linux.
+        lastBadgeCount = safeCount;
+        trayBadge?.update(safeCount);
     } else {
         const result = app.setBadgeCount?.(safeCount);
         if (process.platform === "linux") {
             lastBadgeCount = safeCount;
-            linuxTrayBadge?.update(safeCount);
+            trayBadge?.update(safeCount);
             console.log(`[jorvik-badge] ${JSON.stringify({
                 electron: process.versions.electron,
                 count: safeCount,
@@ -672,19 +677,20 @@ async function bootstrap(): Promise<void> {
     const trayImage = nativeImage.createFromPath(resolveIconPath()).resize({ width: 32, height: 32 });
     tray = new Tray(trayImage);
 
-    // --- Linux-only unread indicator ---------------------------------
+    // --- Tray unread indicator (Linux and Windows) --------------------
     // Badge assets sit beside the base icon, so this follows resolveIconPath()
-    // in both the dev and packaged layouts.
-    if (process.platform === "linux") {
-        linuxTrayBadge?.dispose();
-        linuxTrayBadge = new LinuxTrayBadge({
+    // in both the dev and packaged layouts. macOS is excluded: it has the dock
+    // badge, and its menu bar is not the same kind of surface.
+    if (process.platform === "linux" || process.platform === "win32") {
+        trayBadge?.dispose();
+        trayBadge = new TrayBadge({
             tray,
             assetDir: path.join(path.dirname(resolveIconPath()), "tray-badges"),
             baseIconPath: resolveIconPath(),
             tmpDir: app.getPath("temp"),
             iconPx: 32,
         });
-        linuxTrayBadge.update(lastBadgeCount);
+        trayBadge.update(lastBadgeCount);
     }
     tray.setToolTip(APP_TITLE);
     tray.setContextMenu(Menu.buildFromTemplate([
@@ -713,6 +719,6 @@ async function bootstrap(): Promise<void> {
 void bootstrap();
 
 app.on("before-quit", () => {
-    linuxTrayBadge?.dispose();
-    linuxTrayBadge = null;
+    trayBadge?.dispose();
+    trayBadge = null;
 });

@@ -1,5 +1,5 @@
 /**
- * Linux-only unread indicator drawn onto the tray icon.
+ * Unread indicator drawn onto the tray icon.
  *
  * Portable by design: no XDG_CURRENT_DESKTOP checks and nothing KDE-specific.
  * It mirrors the same count the shared setBadgeCount() already receives, so
@@ -7,7 +7,11 @@
  * this provides the indicator anywhere a tray host exists (KDE tray-only,
  * XFCE/Cinnamon/MATE, wlroots panels, GNOME + AppIndicator extension).
  *
- * Never constructed on win32/darwin.
+ * Also used on Windows, where the taskbar overlay is not enough on its own: a
+ * window hidden to the tray has no taskbar button to carry it, which is exactly
+ * when the tray icon is the only thing left to show a count on.
+ *
+ * Not used on macOS, which has the dock badge.
  */
 import * as fs from 'fs';
 import * as path from 'path';
@@ -24,7 +28,7 @@ interface Imaging {
     };
 }
 
-export interface LinuxTrayBadgeOptions {
+export interface TrayBadgeOptions {
     /** May be null; every call then becomes a no-op. */
     tray: Tray | null;
     /** Directory holding tray-0.png .. tray-99.png and tray-99plus.png. */
@@ -43,7 +47,7 @@ export interface LinuxTrayBadgeOptions {
     imaging?: Imaging;
 }
 
-export class LinuxTrayBadge {
+export class TrayBadge {
     private tray: Tray | null;
     private readonly assetDir: string;
     private readonly baseIconPath: string | null;
@@ -58,7 +62,7 @@ export class LinuxTrayBadge {
     private disposed = false;
     private imagingCache?: Imaging;
 
-    constructor(opts: LinuxTrayBadgeOptions) {
+    constructor(opts: TrayBadgeOptions) {
         this.tray = opts.tray ?? null;
         this.assetDir = opts.assetDir;
         this.baseIconPath = opts.baseIconPath ?? null;
@@ -111,7 +115,7 @@ export class LinuxTrayBadge {
     /** Count 0 restores the app's own icon when one was supplied. */
     private sourceFor(n: number): string {
         if (n <= 0 && this.baseIconPath) return this.baseIconPath;
-        return path.join(this.assetDir, LinuxTrayBadge.assetFor(n));
+        return path.join(this.assetDir, TrayBadge.assetFor(n));
     }
 
     private apply(n: number): void {
@@ -132,7 +136,7 @@ export class LinuxTrayBadge {
                 // Resize here rather than shipping 32px assets: the source stays
                 // crisp for HiDPI, and the result matches main.ts's tray sizing.
                 const png = image.resize({ width: this.iconPx, height: this.iconPx }).toPNG();
-                target = path.join(this.workDir, `t${this.seq++}-${LinuxTrayBadge.assetFor(n)}`);
+                target = path.join(this.workDir, `t${this.seq++}-${TrayBadge.assetFor(n)}`);
                 fs.writeFileSync(target, png);
                 this.recent.push(target);
                 while (this.recent.length > KEEP_FILES) {
