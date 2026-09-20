@@ -1,4 +1,7 @@
-# Jorvik
+<h1>
+  <img src="docs/jorvik-icon.png" alt="" width="38" align="top">
+  Jorvik
+</h1>
 
 A self-hosted Matrix client built to feel like Discord. Spaces are servers. Rooms are channels. End-to-end encryption is on by default.
 
