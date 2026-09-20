@@ -23,7 +23,8 @@
     "web/**/*",
     "package.json",
     "build/**/*",
-    "!build/tray-badges/**"
+    "!build/tray-badges/**",
+    "!build/icons/**"
   ],
   "extraResources": [
     {
@@ -56,7 +57,7 @@
   },
   "dmg": {},
   "linux": {
-    "icon": "build/icon.png",
+    "icon": "build/icons",
     "desktop": {
       "entry": {
         "Name": "Jorvik",
@@ -68,7 +69,10 @@
       }
     },
     "target": [
-      "AppImage"
+      "AppImage",
+      "deb",
+      "rpm",
+      "tar.gz"
     ],
     "category": "Network;Chat;",
     "executableName": "jorvik",
@@ -81,6 +85,13 @@
         "from": "build/tray-badges",
         "to": "tray-badges"
       }
-    ]
+    ],
+    "artifactName": "Jorvik-${version}.${ext}"
+  },
+  "deb": {
+    "maintainer": "Jorvik contributors <admin@jorvik.app>"
+  },
+  "rpm": {
+    "packageName": "jorvik"
   }
 }
