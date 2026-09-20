@@ -21,22 +21,66 @@ response arriving after a switch is correctly ignored in the UI.
 `0B` completion in Synapse's access log plus no content appearing in the newly selected
 space. Note the per-space client cache makes a cold load harder to reproduce.
 
-## 2. Isolated HTTP 401 on a hierarchy request
+## 2. HTTP 401 on authenticated requests: ordinary token expiry, recovers by itself
+
+Investigated 2026-09-20. **No action taken, and none proposed.** Recorded so a future
+reader does not re-investigate, and so the limits of the evidence are clear.
+
+Two occurrences seen, on different endpoints:
 
 ```
-2026-09-19 21:52:42  0.001s  83B  401  {None}
-GET /_matrix/client/v1/rooms/!iMZEhwCvbfeAYUxAjZ%3At2l.io/hierarchy?...
+2026-09-19 21:52:42  0.001s  83B  401  {None}  GET /_matrix/client/v1/rooms/{space}/hierarchy
+2026-09-20 02:24:38  0.001s  83B  401  {None}  GET /_matrix/client/v3/sync
 ```
 
-One occurrence. `{None}` means Synapse identified no user for the request. The client
-recovered: the same three pages loaded normally at 21:52:55.
+The second was captured with its surroundings, which the first was not:
 
-**Not established:** the cause. An access-token refresh race is one candidate, but there
-is no evidence for it beyond the timing, and a single 1ms 401 is thin material.
+```
+02:24:37.873  200  GET  /_matrix/client/v3/sync    user=@user
+02:24:38.187  401  GET  /_matrix/client/v3/sync    user=None
+02:24:38.507  200  POST /_matrix/client/v3/refresh
+02:24:42.449  200  GET  /_matrix/client/v3/sync    user=@user   recovered
+```
 
-**What would settle it:** a second occurrence with the surrounding client requests
-captured, particularly whether a `POST /_matrix/client/v3/refresh` precedes it.
-Symptomatically it would show as a space briefly appearing empty or erroring.
+**Confirmed**
+
+- Both recovered automatically. The 2026-09-20 case took about 4.3 seconds; in the
+  2026-09-19 case the three hierarchy pages loaded normally 13 seconds later.
+- `refreshable_access_token_lifetime` is **not set** in `homeserver.yaml`, so Synapse's
+  default of **5 minutes** applies (`synapse/config/registration.py`). That matches the
+  observed cadence: 63 refreshes across a retained 1h48m window, clustered every ~5 min.
+- matrix-js-sdk refreshes and **retries the original request** transparently on
+  `M_UNKNOWN_TOKEN` (`http-api/fetch.ts`): on a successful refresh it re-issues via
+  `doAuthedRequest(attempt + 1, ...)`. It also refreshes eagerly within 500ms of expiry,
+  shares one `tokenRefreshPromise` across concurrent callers, backs off exponentially, and
+  deliberately does **not** refresh when the token should still be valid.
+- The space hierarchy fetch uses `client.http.authedRequest`, so it sits behind that same
+  refresh-and-retry rather than bypassing it.
+
+**Suspected, not established**
+
+- That the errcode was `M_UNKNOWN_TOKEN`, i.e. an expired token. Everything observed is
+  consistent with it and 83 bytes matches that error's shape, but the access log records
+  status and size, not the body.
+- **Correction to an earlier claim in this file's history:** `{None}` does *not* prove an
+  `Authorization` header was present. It means only that Synapse resolved no user, which a
+  missing header, a malformed one, or an invalid token all produce. The access logs cannot
+  distinguish them.
+
+**Observation, not a fault:** refreshes arrive in clusters of 2-3 within seconds, roughly
+2.9 per expiry window where one would do. The dedupe clears `tokenRefreshPromise` in a
+`finally`, so a request failing just after one refresh completes starts another. At 139
+bytes per refresh this costs nothing worth changing.
+
+**One narrow risk left open.** If a refresh ever returned `Logout` or `Failure`, the error
+would surface to the hierarchy effect, whose generic `catch` clears the channel lists and
+shows the pending notice with nothing re-triggering the fetch until the user switches
+spaces. No evidence this has happened; both observed 401s recovered.
+
+**What would justify revisiting:** repeated authentication failures, or a user-visible
+symptom such as a space that stays empty until you navigate away and back. Confirming the
+errcode would need a Synapse tracer at `debug` or a browser network capture, neither of
+which is warranted for two self-healing occurrences.
 
 ## 3. RoomList does not finish rendering under the test harness
 
