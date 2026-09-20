@@ -127,11 +127,17 @@ jobs:
         shell: bash
         run: |
           mkdir -p release-files
-          find release-assets -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.zip' \) -exec cp {} release-files/ \;
-          # Linux packages sit at the artifact root; stay shallow so nothing
-          # bundled inside *-unpacked/ is mistaken for a release asset.
-          find release-assets -maxdepth 2 -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' \) -exec cp {} release-files/ \;
+          # Everything publishable sits at the artifact root. Skipping the
+          # *-unpacked/ trees keeps the loose binaries inside them out of the
+          # release: they are what shipped Jorvik.exe (234MB, not an installer)
+          # and elevate.exe on every release up to v1.0.5.
+          find release-assets -type f ! -path '*-unpacked/*' \
+            \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.zip' \
+               -o -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' \) \
+            -exec cp {} release-files/ \;
           ls -lh release-files/
+          # A layout change upstream must not quietly publish an empty release.
+          test -n "$(ls -A release-files)"
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
