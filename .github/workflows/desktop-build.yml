@@ -56,6 +56,11 @@ jobs:
       - name: Apply desktop version
         shell: bash
         run: npm --prefix apps/desktop version "$HEOROT_DESKTOP_VERSION" --no-git-tag-version --allow-same-version
+      - name: Install Linux packaging tools
+        if: matrix.artifact == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @heorot/desktop run ${{ matrix.target }}
       - name: Verify packaged Linux icon
@@ -76,7 +81,24 @@ jobs:
           fi
           "$appimage" --appimage-extract >/dev/null
           test -f squashfs-root/resources/jorvik.png
+          # The desktop-entry icon is a different file from the runtime resource
+          # above. build/ is gitignored, so a missing build/icons makes Electron
+          # Builder fall back to its stock icon without failing the build.
+          cmp squashfs-root/usr/share/icons/hicolor/256x256/apps/jorvik.png build/icons/256x256.png
           ls -lh dist-electron/*.AppImage
+      - name: Verify Linux package set
+        if: matrix.artifact == 'linux'
+        working-directory: apps/desktop
+        shell: bash
+        run: |
+          for ext in AppImage deb rpm tar.gz; do
+            found=$(find dist-electron -maxdepth 1 -name "*.${ext}" -print -quit)
+            if [[ -z "$found" ]]; then
+              echo "::error::no .${ext} produced by dist:linux"
+              exit 1
+            fi
+            echo "$found"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: jorvik-${{ matrix.artifact }}
@@ -106,6 +128,10 @@ jobs:
         run: |
           mkdir -p release-files
           find release-assets -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.zip' \) -exec cp {} release-files/ \;
+          # Linux packages sit at the artifact root; stay shallow so nothing
+          # bundled inside *-unpacked/ is mistaken for a release asset.
+          find release-assets -maxdepth 2 -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' \) -exec cp {} release-files/ \;
+          ls -lh release-files/
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
