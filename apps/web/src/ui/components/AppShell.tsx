@@ -2389,7 +2389,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 <img className="rail-logo" src="/branding/jorvik-logo-848bff6b.webp" width="46" height="46" alt="Jorvik" />
                 <button
                     type="button"
-                    className={`rail-icon${selectedSpaceId === PEOPLE_SPACE_ID ? " is-active" : ""}`}
+                    className={`rail-icon rail-people${selectedSpaceId === PEOPLE_SPACE_ID ? " is-active" : ""}`}
                     onClick={() => setSelectedSpaceId(PEOPLE_SPACE_ID)}
                     title="People"
                 >

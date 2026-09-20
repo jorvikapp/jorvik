@@ -682,6 +682,13 @@ textarea {
         transform var(--motion-fast) var(--motion-ease-standard);
 }
 
+.rail-icon.rail-people {
+    /* People is a peer of the brand logo, not one of the Spaces below it, so
+       it keeps the full tile while the Space tiles sit smaller. */
+    width: 46px;
+    height: 46px;
+}
+
 .rail-icon.is-active {
     background: rgba(16, 99, 40, 0.2);
     color: var(--text-main);
