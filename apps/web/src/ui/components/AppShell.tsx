@@ -26,6 +26,8 @@ import { Composer } from "./Composer";
 import { EmojiUploadDialog } from "./EmojiUploadDialog";
 import { ChannelHeader } from "./header/ChannelHeader";
 import { RightPanel } from "./rightPanel/RightPanel";
+import { sharedStateEventDeduperFor } from "../../core/net/stateEventDeduper";
+import { rootChildrenState, selectVoiceHintCandidates } from "../../core/spaces/voiceHints";
 import {
     accountCacheKey,
     SpaceHierarchyCache,
@@ -790,33 +792,51 @@ async function resolveSpaceHierarchyVoiceHints(
         .filter((room) => room.room_type !== "m.space")
         .map((room) => room.room_id);
 
-    try {
-        const remoteStateEvents = await client.roomState(spaceRoom.roomId);
-        childOrderOverride = readSpaceChildOrderFromStateSnapshot(remoteStateEvents as SpaceChildStateSnapshotEvent[]);
-        const remoteChannelOrder = readChannelOrderFromStateSnapshot(remoteStateEvents as SpaceChildStateSnapshotEvent[]);
-        if (remoteChannelOrder.length > 0) {
-            customOrderOverride = remoteChannelOrder;
-        }
-        for (const [roomId, metadata] of childOrderOverride.entries()) {
-            if (metadata.isVoiceChannel) {
-                voiceHintRoomIds.add(roomId);
-            }
-        }
-    } catch {
-        childOrderOverride = undefined;
-        customOrderOverride = undefined;
-    }
-
-    for (const roomId of hierarchyChannelRoomIds) {
-        const room = client.getRoom(roomId);
-        if (isVoiceChannelRoom(room)) {
+    // The parent's m.space.child events come from the hierarchy response we already
+    // fetched and cached, instead of downloading the space's entire state -- 20MB for
+    // #community:matrix.org. Synapse builds children_state from the same current state,
+    // untruncated, so this is the same data.
+    childOrderOverride = readSpaceChildOrderFromStateSnapshot(
+        rootChildrenState(hierarchyRooms, spaceRoom.roomId) as SpaceChildStateSnapshotEvent[],
+    );
+    for (const [roomId, metadata] of childOrderOverride.entries()) {
+        if (metadata.isVoiceChannel) {
             voiceHintRoomIds.add(roomId);
         }
     }
 
-    const unresolvedVoiceCandidates = hierarchyChannelRoomIds.filter((roomId) => !voiceHintRoomIds.has(roomId));
+    // The channel order is a single state event with an empty state key, so ask for just
+    // that one rather than the whole room.
+    try {
+        const content = await sharedStateEventDeduperFor(client).get(
+            spaceRoom.roomId,
+            CHANNEL_ORDER_STATE_EVENT,
+            "",
+        );
+        const remoteChannelOrder = readChannelOrderFromStateSnapshot([
+            { type: CHANNEL_ORDER_STATE_EVENT, state_key: "", content },
+        ] as SpaceChildStateSnapshotEvent[]);
+        if (remoteChannelOrder.length > 0) {
+            customOrderOverride = remoteChannelOrder;
+        }
+    } catch {
+        // Absent or unreadable: fall back to whatever local state provides.
+        customOrderOverride = undefined;
+    }
+
+    const voiceSelection = selectVoiceHintCandidates({
+        childRoomIds: hierarchyChannelRoomIds,
+        getRoom: (roomId) => client.getRoom(roomId),
+        isVoiceChannel: isVoiceChannelRoom,
+    });
+    for (const roomId of voiceSelection.detected) {
+        voiceHintRoomIds.add(roomId);
+    }
+
+    // Only joined rooms are probed: a non-member cannot read room state, and every one of
+    // those requests was refused.
     await Promise.all(
-        unresolvedVoiceCandidates.map(async (roomId) => {
+        voiceSelection.toProbe.map(async (roomId) => {
             try {
                 const roomState = await client.roomState(roomId);
                 if (isVoiceChannelFromStateSnapshot(roomState as SpaceChildStateSnapshotEvent[])) {

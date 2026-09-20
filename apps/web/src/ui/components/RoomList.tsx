@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     EventType,
+    MatrixError,
     NotificationCountType,
     M_BEACON,
     RoomStateEvent,
@@ -10,6 +11,7 @@ import {
 } from "matrix-js-sdk/src/matrix";
 
 import { memberAvatarSources, roomAvatarSources } from "../adapters/avatar";
+import { sharedStateEventDeduperFor } from "../../core/net/stateEventDeduper";
 import { mediaFromMxc, thumbnailFromMxc } from "../adapters/media";
 import type { SpaceChildAffordance } from "../adapters/spaceHierarchyAdapter";
 import { fetchVoiceParticipants, isVoiceFeatureEnabled } from "../adapters/voiceAdapter";
@@ -357,17 +359,44 @@ export function RoomList({
             setServerRoomOrder(readChannelOrder(spaceRoom));
         };
 
-        const loadFromServerState = async (): Promise<void> => {
+        // Both values are single state events with an empty state key, so ask for those
+        // two rather than downloading the space's entire state, which is 20MB for a space
+        // the size of #community:matrix.org. Shared with AppShell through one deduper, so
+        // simultaneous callers cost a single request each.
+        const readSingletonState = async (eventType: string): Promise<unknown | undefined> => {
             try {
-                const remoteStateEvents = await client.roomState(spaceId);
-                if (cancelled) {
-                    return;
+                return await sharedStateEventDeduperFor(client).get(spaceId, eventType, "");
+            } catch (error) {
+                // Absent is an authoritative "none"; anything else leaves local state alone.
+                if (error instanceof MatrixError && error.errcode === "M_NOT_FOUND") {
+                    return null;
                 }
-                const snapshotEvents = remoteStateEvents as Array<{ type?: unknown; state_key?: unknown; content?: unknown }>;
-                setCategories(readCategoriesFromStateSnapshot(snapshotEvents));
-                setServerRoomOrder(readChannelOrderFromStateSnapshot(snapshotEvents));
-            } catch {
-                // Keep best-effort data from synced current state.
+                return undefined;
+            }
+        };
+
+        const loadFromServerState = async (): Promise<void> => {
+            const [categoryContent, orderContent] = await Promise.all([
+                readSingletonState(CATEGORY_STATE_EVENT),
+                readSingletonState(CHANNEL_ORDER_STATE_EVENT),
+            ]);
+            if (cancelled) {
+                return;
+            }
+
+            if (categoryContent !== undefined) {
+                setCategories(
+                    readCategoriesFromStateSnapshot([
+                        { type: CATEGORY_STATE_EVENT, state_key: "", content: categoryContent },
+                    ]),
+                );
+            }
+            if (orderContent !== undefined) {
+                setServerRoomOrder(
+                    readChannelOrderFromStateSnapshot([
+                        { type: CHANNEL_ORDER_STATE_EVENT, state_key: "", content: orderContent },
+                    ]),
+                );
             }
         };
 
