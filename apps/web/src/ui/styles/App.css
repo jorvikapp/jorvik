@@ -653,8 +653,7 @@ textarea {
     width: 46px;
     height: 46px;
     /* .rail-icon is a <button>, so without this each engine's default padding
-       (1px 6px in Chromium) comes out of these 46px and distorts whatever sits
-       inside. The avatar is kept smaller than the tile on purpose below. */
+       comes out of its declared size and distorts the avatar inside it. */
     padding: 0;
     border-radius: 14px;
     display: grid;
@@ -670,6 +669,11 @@ textarea {
 }
 
 .rail-icon {
+    /* Smaller than the 46px brand logo above, so a Space reads as one item in
+       the rail rather than competing with it. Shrinking the tile rather than
+       the image keeps the avatar edge to edge. */
+    width: 38px;
+    height: 38px;
     background: var(--bg-pane);
     color: var(--text-muted);
     transition:
@@ -684,11 +688,8 @@ textarea {
 }
 
 .rail-icon-avatar {
-    /* Square, and smaller than the 46px brand logo above it, so a Space reads
-       as one item in the rail rather than competing with the logo. Sizing it
-       here instead of letting the padding squash it keeps the aspect intact. */
-    width: 34px;
-    height: 34px;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
     border-radius: inherit;
     display: block;
