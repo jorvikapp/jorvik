@@ -4848,7 +4848,10 @@ select,
 .right-panel,
 .channel-header-actions,
 .composer-bar,
-.composer-input-shell {
+.composer-input-shell,
+.settings-sidebar,
+.settings-content,
+.settings-table-wrap {
     -webkit-app-region: no-drag;
 }
 
