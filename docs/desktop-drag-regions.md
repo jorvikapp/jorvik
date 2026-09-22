@@ -31,8 +31,15 @@ confusing: the layout, the overflow and the scroll container were all correct.
 It has to be extended every time anyone adds a scrollable surface, and nothing
 enforces it. At the time of writing, of roughly twenty scrollable containers in
 the app, only `.timeline` and `.room-list-items` were opted out -- the two the
-author happened to exercise. Settings was added on 2026-09-23. Still swallowing
-the wheel:
+author happened to exercise. Settings was added on 2026-09-23.
+
+The containers below are **not opted out**. That is a fact about the CSS, not a
+list of reproduced bugs: asked to look, the user could not find another frozen
+scroller on 2026-09-23. Interactive children opt out individually, so on a
+surface dense with buttons and inputs the pointer is usually over a no-drag
+child and the wheel reaches the page anyway. Whether a given surface misbehaves
+depends on where the cursor happens to sit, which is its own argument against
+leaving this to chance:
 
 ```
 .right-panel-body          .rs-members-list      .rs-search-results
