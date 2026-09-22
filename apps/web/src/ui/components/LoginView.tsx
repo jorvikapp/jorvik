@@ -129,7 +129,7 @@ export function LoginView({
             return;
         }
 
-        const normalizedUsername = registerUsername.trim();
+        const normalizedUsername = registerUsername.trim().toLowerCase();
         const normalizedEmail = registerEmail.trim();
 
         if (registerPassword.length < 8) {
@@ -172,7 +172,7 @@ export function LoginView({
                 usernameAvailable = await probe.client.isUsernameAvailable(normalizedUsername);
             } catch (usernameError) {
                 if (usernameError instanceof MatrixError && usernameError.errcode === "M_INVALID_USERNAME") {
-                    setRegisterError("This username is not allowed by homeserver policy.");
+                    setRegisterError("Usernames can only contain lowercase letters, numbers, and . _ - = / +");
                     return;
                 }
                 throw usernameError;
@@ -385,7 +385,7 @@ export function LoginView({
                             <input
                                 type="text"
                                 value={registerUsername}
-                                onChange={(event) => setRegisterUsername(event.target.value)}
+                                onChange={(event) => setRegisterUsername(event.target.value.toLowerCase())}
                                 placeholder="alice"
                                 autoComplete="username"
                             />
