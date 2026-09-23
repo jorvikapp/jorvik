@@ -77,6 +77,12 @@ function runElectronBuilder(version, extraArgs) {
         "--config",
         "electron-builder.json",
         `--config.extraMetadata.version=${version}`,
+        // Snap targets default to publishing to the Snap Store, so building one
+        // tried to upload and failed the job on a runner without snapcraft.
+        // Publishing is a deliberate step elsewhere, never a side effect of a
+        // build; the mac scripts already pass this.
+        "--publish",
+        "never",
         ...extraArgs,
     ];
 
