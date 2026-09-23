@@ -8,6 +8,7 @@ pkgbase = jorvik-git
 	makedepends = git
 	makedepends = nodejs
 	makedepends = pnpm
+	makedepends = ttf-dejavu
 	depends = electron44
 	provides = jorvik=1.0.8
 	conflicts = jorvik
