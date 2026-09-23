@@ -39,24 +39,26 @@ releases is normal.
 
 ## The AUR bump, step 9
 
-`packaging/aur/jorvik-bin/` holds the source of truth; the AUR repository is a
-copy of it. For each release:
+`packaging/aur/jorvik-bin/` is the source of truth; the AUR repository is a copy.
 
 ```sh
-ver=X.Y.Z
-cd packaging/aur/jorvik-bin
-curl -sLO "https://github.com/jorvikapp/jorvik/releases/download/v$ver/Jorvik-$ver.deb"
-sha=$(sha256sum "Jorvik-$ver.deb" | cut -d' ' -f1)
-sed -i "s/^pkgver=.*/pkgver=$ver/; s/^pkgrel=.*/pkgrel=1/" PKGBUILD
-sed -i "s/^sha256sums=.*/sha256sums=('$sha')/" PKGBUILD
-rm "Jorvik-$ver.deb"
+cd packaging/aur
+./bump.sh 1.0.11          # refuses a version that is not published yet
 ```
 
-Then regenerate `.SRCINFO` (`makepkg --printsrcinfo > .SRCINFO`, which needs an
-Arch machine) and push both files to `ssh://aur@aur.archlinux.org/jorvik-bin.git`.
+That rewrites `PKGBUILD` and `.SRCINFO`, checks the two agree, and prints the
+diff. Then copy both files into a clone of
+`ssh://aur@aur.archlinux.org/jorvik-bin.git` and push, and commit the same
+change here.
 
-`pkgrel` goes back to 1 on a version bump, and increments only when the
-packaging changes without the upstream version changing.
+`.SRCINFO` is written by hand rather than by `makepkg --printsrcinfo`, which
+does not run off Arch. That output was verified byte-identical on a real Arch
+machine at 1.0.10. Re-verify if `PKGBUILD` gains fields: a wrong `.SRCINFO`
+fails silently, because the AUR accepts it and helpers simply display the wrong
+metadata.
+
+`pkgrel` returns to 1 on a version bump, and increments only when the packaging
+changes without the upstream version changing.
 
 ## Notes
 
