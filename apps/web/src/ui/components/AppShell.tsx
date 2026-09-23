@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { mxidLocalpart } from "../mentions/mentionTokens";
 import {
     ClientEvent,
     ClientPrefix,
@@ -8,6 +9,7 @@ import {
     Method,
     RoomEvent,
     RoomStateEvent,
+    UserEvent,
     type HierarchyRoom,
     type MatrixClient,
     type MatrixEvent,
@@ -1708,9 +1710,64 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const { panelMode, selectUser, clearSelectedUser } = useSelectedUser(activeRoom?.roomId ?? null);
     const ownUserId = client.getUserId() ?? "";
     const canInviteInActiveRoom = Boolean(activeRoom && ownUserId && activeRoom.canInvite(ownUserId));
-    const ownUser = ownUserId ? client.getUser(ownUserId) : null;
-    const ownDisplayName = ownUser?.displayName || ownUserId || "User";
-    const ownAvatarMxc = ownUser?.avatarUrl || "";
+    // Read once and never updated, this showed the raw user ID whenever the
+    // profile had not reached the store before the first render -- nothing
+    // listened for it arriving, so it stayed wrong until some unrelated state
+    // change re-rendered the shell.
+    const [ownProfile, setOwnProfile] = useState<{ displayName: string; avatarMxc: string }>(() => {
+        const user = ownUserId ? client.getUser(ownUserId) : null;
+        return { displayName: user?.displayName ?? "", avatarMxc: user?.avatarUrl ?? "" };
+    });
+
+    useEffect(() => {
+        if (!ownUserId) {
+            return;
+        }
+
+        let cancelled = false;
+        const user = client.getUser(ownUserId);
+
+        const applyFromUser = (): void => {
+            const current = client.getUser(ownUserId);
+            setOwnProfile((previous) => {
+                const displayName = current?.displayName ?? previous.displayName;
+                const avatarMxc = current?.avatarUrl ?? previous.avatarMxc;
+                return displayName === previous.displayName && avatarMxc === previous.avatarMxc
+                    ? previous
+                    : { displayName, avatarMxc };
+            });
+        };
+
+        applyFromUser();
+        user?.on(UserEvent.DisplayName, applyFromUser);
+        user?.on(UserEvent.AvatarUrl, applyFromUser);
+
+        // The User object exists before sync has filled it in, so the events
+        // above may never fire for a profile that was already set. Ask once.
+        void client
+            .getProfileInfo(ownUserId)
+            .then((profile) => {
+                if (cancelled) {
+                    return;
+                }
+                setOwnProfile((previous) => ({
+                    displayName: profile.displayname || previous.displayName,
+                    avatarMxc: profile.avatar_url || previous.avatarMxc,
+                }));
+            })
+            .catch(() => undefined);
+
+        return () => {
+            cancelled = true;
+            user?.off(UserEvent.DisplayName, applyFromUser);
+            user?.off(UserEvent.AvatarUrl, applyFromUser);
+        };
+    }, [client, ownUserId]);
+
+    // Falling back to the bare user ID read as a bug; the localpart is what the
+    // account is called, and is what a still-unknown profile should look like.
+    const ownDisplayName = ownProfile.displayName || mxidLocalpart(ownUserId) || "User";
+    const ownAvatarMxc = ownProfile.avatarMxc;
     const ownAvatarSources = useMemo(
         () =>
             Array.from(
