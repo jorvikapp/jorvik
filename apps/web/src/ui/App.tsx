@@ -25,11 +25,11 @@ function AppRouter(): React.ReactElement {
     const matrix = useMatrix();
 
     if (matrix.status === "booting") {
-        return <LoadingView label="Bootstrapping core..." />;
+        return <LoadingView label="Starting Jorvik..." />;
     }
 
     if (matrix.status === "starting") {
-        return <LoadingView label="Starting Matrix session..." />;
+        return <LoadingView label="Starting Jorvik session..." />;
     }
 
     if (matrix.status === "login_required") {
