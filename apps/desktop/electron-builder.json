@@ -82,6 +82,9 @@
     "executableName": "jorvik",
     "artifactName": "Jorvik-${version}.${ext}"
   },
+  "appImage": {
+    "artifactName": "Jorvik-${version}-${arch}.AppImage"
+  },
   "deb": {
     "maintainer": "Jorvik contributors <admin@jorvik.app>"
   },

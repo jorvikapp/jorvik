@@ -19,7 +19,12 @@ releases is normal.
    `cd /root/matrix-stack && docker compose build heorot && docker compose up -d heorot`.
    This is separate from the release; the desktop client carries its own copy of
    the bundle.
-6. **Bump `jorvik-bin` on the AUR.** See below. The AUR package pins a version
+6. **Add the version to the AppStream metainfo.**
+   `apps/desktop/metainfo/app.jorvik.Jorvik.metainfo.xml` carries a `<releases>`
+   list that software centres show as a changelog. Add the new version and date,
+   then check it with `appstreamcli validate` -- AppImage hub rejects a metainfo
+   file that fails validation, and it ships inside the AppImage.
+7. **Bump `jorvik-bin` on the AUR.** See below. The AUR package pins a version
    and a checksum, so it keeps installing the previous release until it is
    updated. `jorvik-git` tracks HEAD and needs nothing.
 
