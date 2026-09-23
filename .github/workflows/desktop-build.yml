@@ -91,7 +91,7 @@ jobs:
         working-directory: apps/desktop
         shell: bash
         run: |
-          for ext in AppImage deb rpm tar.gz; do
+          for ext in AppImage deb rpm tar.gz snap; do
             found=$(find dist-electron -maxdepth 1 -name "*.${ext}" -print -quit)
             if [[ -z "$found" ]]; then
               echo "::error::no .${ext} produced by dist:linux"

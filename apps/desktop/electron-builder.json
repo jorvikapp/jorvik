@@ -76,7 +76,8 @@
       "AppImage",
       "deb",
       "rpm",
-      "tar.gz"
+      "tar.gz",
+      "snap"
     ],
     "category": "Network;Chat;",
     "executableName": "jorvik",
