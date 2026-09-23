@@ -133,7 +133,7 @@ jobs:
           # and elevate.exe on every release up to v1.0.5.
           find release-assets -type f ! -path '*-unpacked/*' \
             \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.zip' \
-               -o -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' \) \
+               -o -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' -o -name '*.snap' \) \
             -exec cp {} release-files/ \;
           ls -lh release-files/
           # A layout change upstream must not quietly publish an empty release.
