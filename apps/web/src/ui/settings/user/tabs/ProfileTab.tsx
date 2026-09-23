@@ -5,6 +5,11 @@ import { mediaFromMxc, thumbnailFromMxc } from "../../../adapters/media";
 import { Avatar } from "../../../components/Avatar";
 import type { ToastState } from "../../../components/Toast";
 
+// Synapse caps an extended profile value at 255 characters
+// (handlers/profile.py MAX_CUSTOM_FIELD_LEN); stop short of a server rejection.
+const BIO_MAX_LENGTH = 255;
+const BIO_FIELD = "bio";
+
 interface ProfileTabProps {
     client: MatrixClient;
     onToast: (toast: Omit<ToastState, "id">) => void;
@@ -16,8 +21,13 @@ export function ProfileTab({ client, onToast }: ProfileTabProps): React.ReactEle
 
     const [displayName, setDisplayName] = useState("");
     const [avatarMxc, setAvatarMxc] = useState("");
+    const [bio, setBio] = useState("");
     const [baselineDisplayName, setBaselineDisplayName] = useState("");
     const [baselineAvatarMxc, setBaselineAvatarMxc] = useState("");
+    const [baselineBio, setBaselineBio] = useState("");
+    // Custom profile fields are MSC4133 and off by default in Synapse. Hide the
+    // field rather than offering one that cannot be saved.
+    const [bioSupported, setBioSupported] = useState(false);
     // "" is a legitimate value meaning the user has no avatar, so it cannot
     // also stand for "we have not asked the server yet". Track that separately.
     const [profileLoaded, setProfileLoaded] = useState(false);
@@ -52,6 +62,28 @@ export function ProfileTab({ client, onToast }: ProfileTabProps): React.ReactEle
                 setBaselineDisplayName(nextDisplayName);
                 setBaselineAvatarMxc(nextAvatarMxc);
                 setProfileLoaded(true);
+
+                const supportsExtendedProfiles = await client
+                    .doesServerSupportExtendedProfiles()
+                    .catch(() => false);
+                if (canceled) {
+                    return;
+                }
+                setBioSupported(supportsExtendedProfiles);
+                if (!supportsExtendedProfiles) {
+                    return;
+                }
+
+                // An unset field is a 404 rather than an empty value.
+                const storedBio = await client
+                    .getExtendedProfileProperty(userId, BIO_FIELD)
+                    .catch(() => null);
+                if (canceled) {
+                    return;
+                }
+                const nextBio = typeof storedBio === "string" ? storedBio : "";
+                setBio(nextBio);
+                setBaselineBio(nextBio);
             } catch (loadError) {
                 if (!canceled) {
                     setError(loadError instanceof Error ? loadError.message : "Failed to load profile.");
@@ -78,7 +110,8 @@ export function ProfileTab({ client, onToast }: ProfileTabProps): React.ReactEle
 
     const hasChanges =
         displayName.trim() !== baselineDisplayName.trim() ||
-        avatarMxc !== baselineAvatarMxc;
+        avatarMxc !== baselineAvatarMxc ||
+        (bioSupported && bio.trim() !== baselineBio.trim());
 
     const uploadAvatar = async (file: File): Promise<void> => {
         setUploading(true);
@@ -117,6 +150,19 @@ export function ProfileTab({ client, onToast }: ProfileTabProps): React.ReactEle
 
             if (avatarMxc !== baselineAvatarMxc) {
                 await client.setAvatarUrl(avatarMxc || "");
+            }
+
+            if (bioSupported && bio.trim() !== baselineBio.trim()) {
+                const nextBio = bio.trim();
+                // Clearing a bio is a delete, not an empty string: the field
+                // should disappear from the profile rather than linger blank.
+                if (nextBio) {
+                    await client.setExtendedProfileProperty(BIO_FIELD, nextBio);
+                } else {
+                    await client.deleteExtendedProfileProperty(BIO_FIELD);
+                }
+                setBaselineBio(nextBio);
+                setBio(nextBio);
             }
 
             setBaselineDisplayName(displayName);
@@ -199,6 +245,23 @@ export function ProfileTab({ client, onToast }: ProfileTabProps): React.ReactEle
                     disabled={saving}
                 />
             </label>
+
+            {bioSupported ? (
+                <label className="settings-field">
+                    <span>Bio</span>
+                    <textarea
+                        value={bio}
+                        onChange={(event) => setBio(event.target.value.slice(0, BIO_MAX_LENGTH))}
+                        maxLength={BIO_MAX_LENGTH}
+                        rows={3}
+                        placeholder="A short line about you"
+                        disabled={saving}
+                    />
+                    <span className="settings-inline-note">
+                        {bio.trim().length}/{BIO_MAX_LENGTH} - shown on your profile to people on this server.
+                    </span>
+                </label>
+            ) : null}
 
             {error ? <p className="settings-inline-error">{error}</p> : null}
 
