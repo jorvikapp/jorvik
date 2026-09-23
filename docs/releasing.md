@@ -24,7 +24,11 @@ releases is normal.
    list that software centres show as a changelog. Add the new version and date,
    then check it with `appstreamcli validate` -- AppImage hub rejects a metainfo
    file that fails validation, and it ships inside the AppImage.
-7. **Bump `jorvik-bin` on the AUR.** See below. The AUR package pins a version
+7. **Bump the COPR spec.** `packaging/rpm/jorvik.spec`: set `Version`, reset
+   `Release` to `1%{?dist}`, and add a `%changelog` entry. COPR rebuilds from
+   this file; its sources are fetched by URL at SRPM time, so nothing needs
+   uploading.
+8. **Bump `jorvik-bin` on the AUR.** See below. The AUR package pins a version
    and a checksum, so it keeps installing the previous release until it is
    updated. `jorvik-git` tracks HEAD and needs nothing.
 
