@@ -99,6 +99,18 @@ jobs:
             fi
             echo "$found"
           done
+      - name: Publish the snap to the Snap Store
+        # Tags only: a manual validation build must not push a revision to
+        # users. A missing credential fails the release rather than skipping
+        # quietly, because a release that silently does not publish looks
+        # identical to one that did.
+        if: matrix.artifact == 'linux' && startsWith(github.ref, 'refs/tags/v')
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: apps/desktop/dist-electron/Jorvik-${{ env.HEOROT_DESKTOP_VERSION }}.snap
+          release: stable
       - uses: actions/upload-artifact@v4
         with:
           name: jorvik-${{ matrix.artifact }}
