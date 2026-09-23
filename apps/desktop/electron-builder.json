@@ -90,5 +90,15 @@
   },
   "rpm": {
     "packageName": "jorvik"
+  },
+  "snap": {
+    "summary": "Self-hosted Matrix client built to feel like Discord",
+    "description": "Jorvik is a Matrix client that arranges a homeserver the way a chat app should feel: Spaces are servers, rooms are channels, and end-to-end encryption is on by default.",
+    "plugs": [
+      "default",
+      "audio-record",
+      "password-manager-service",
+      "camera"
+    ]
   }
 }
