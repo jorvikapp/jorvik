@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as encrypt from "matrix-encrypt-attachment";
 import {
     ClientEvent,
+    EventStatus,
     EventType,
     MatrixEventEvent,
     MsgType,
@@ -620,13 +621,54 @@ function isRenderableMessage(event: MatrixEvent): boolean {
     return isRenderableMessageContent(content);
 }
 
+/**
+ * True while a message we sent has not yet come back from the server.
+ *
+ * The client starts with pendingEventOrdering Detached, which keeps unsent
+ * events out of the live timeline, so without this they are invisible until the
+ * server echoes them back. On a distant server that is most of a second of the
+ * composer looking like it did nothing.
+ */
+export function isPendingEvent(event: MatrixEvent): boolean {
+    const status = event.status;
+    return (
+        status === EventStatus.ENCRYPTING ||
+        status === EventStatus.SENDING ||
+        status === EventStatus.QUEUED ||
+        status === EventStatus.NOT_SENT
+    );
+}
+
+export function hasSendFailed(event: MatrixEvent): boolean {
+    return event.status === EventStatus.NOT_SENT;
+}
+
 function extractMessageEvents(room: Room | null): MatrixEvent[] {
     if (!room) {
         return [];
     }
 
     const liveEvents = room.getLiveTimeline()?.getEvents() ?? room.timeline;
-    return liveEvents.filter(isRenderableMessage);
+    const events = liveEvents.filter(isRenderableMessage);
+
+    // Pending events are newer than anything in the timeline by definition, so
+    // they go last. The SDK drops one from this list as soon as the remote echo
+    // arrives, but guard against showing both for the frame in between.
+    const seen = new Set(events.map(event => event.getId()).filter((id): id is string => Boolean(id)));
+    for (const pending of room.getPendingEvents()) {
+        if (pending.status === EventStatus.CANCELLED) {
+            continue;
+        }
+        const id = pending.getId();
+        if (id && seen.has(id)) {
+            continue;
+        }
+        if (isRenderableMessage(pending)) {
+            events.push(pending);
+        }
+    }
+
+    return events;
 }
 
 function formatTime(timestamp: number): string {
@@ -1819,11 +1861,24 @@ export function Timeline({
             refreshEvents();
         };
 
+        // Fires as a pending event moves through encrypting, sending and either
+        // the remote echo or not_sent. Without it the local echo would appear
+        // and then never update.
+        const onLocalEcho = (_event: MatrixEvent, eventRoom: Room): void => {
+            if (eventRoom.roomId !== room.roomId) {
+                return;
+            }
+
+            refreshEvents();
+        };
+
         client.on(RoomEvent.Timeline, onTimeline);
+        client.on(RoomEvent.LocalEchoUpdated, onLocalEcho);
         client.on(MatrixEventEvent.Decrypted, onEventDecrypted);
 
         return () => {
             client.removeListener(RoomEvent.Timeline, onTimeline);
+            client.removeListener(RoomEvent.LocalEchoUpdated, onLocalEcho);
             client.removeListener(MatrixEventEvent.Decrypted, onEventDecrypted);
         };
     }, [client, refreshEvents, room]);
@@ -2063,7 +2118,7 @@ export function Timeline({
 
                     return (
                         <div
-                            className={`timeline-event${isActiveReplyTarget ? " timeline-event-reply-target" : ""}${isDirectMentionEvent ? " timeline-event-direct-mention" : ""}`}
+                            className={`timeline-event${isActiveReplyTarget ? " timeline-event-reply-target" : ""}${isDirectMentionEvent ? " timeline-event-direct-mention" : ""}${isPendingEvent(event) ? " timeline-event-pending" : ""}${hasSendFailed(event) ? " timeline-event-failed" : ""}`}
                             key={key}
                             data-event-key={key}
                             data-event-id={eventId ?? undefined}
