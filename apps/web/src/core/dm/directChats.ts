@@ -523,6 +523,22 @@ export async function ensureDirectRoomMappings(
     await client.setAccountData(EventType.Direct, next);
 }
 
+/**
+ * Direct chats are created encrypted, which is what the app claims and what a
+ * one-to-one conversation should be. Channels already did this from their
+ * create dialog; the DM paths did not, so a new DM started in the clear until
+ * someone turned encryption on by hand. Synapse only fills this in itself when
+ * encryption_enabled_by_default_for_room_type is set, which is off by default,
+ * so the client cannot rely on the homeserver for it.
+ */
+const ENCRYPTION_INITIAL_STATE = [
+    {
+        type: EventType.RoomEncryption,
+        state_key: "",
+        content: { algorithm: "m.megolm.v1.aes-sha2" },
+    },
+];
+
 export async function createOrReuseDirectChat(
     client: MatrixClient,
     targetUserId: string,
@@ -541,6 +557,7 @@ export async function createOrReuseDirectChat(
         is_direct: true,
         invite: [trimmedTarget],
         preset: Preset.TrustedPrivateChat,
+        initial_state: ENCRYPTION_INITIAL_STATE,
     } as any);
 
     await ensureDirectRoomMappings(client, response.room_id, [trimmedTarget]);
@@ -566,6 +583,7 @@ export async function createOrReuseDirectGroupChat(
     const response = await client.createRoom({
         invite: targets,
         preset: Preset.PrivateChat,
+        initial_state: ENCRYPTION_INITIAL_STATE,
     } as any);
 
     await ensureDirectRoomMappings(client, response.room_id, targets, { replaceExisting: false });
