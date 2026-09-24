@@ -10,7 +10,8 @@ releases is normal.
    `__APP_VERSION__` through `vite.config.ts`, and that is what Settings shows.
    Miss it and the release reports the previous version.
    The desktop package version is overwritten by CI from the tag, so leave it.
-2. **Commit and push** to the working branch and to `main`.
+2. **Commit and push** to `main`. There is one branch: the per-release
+   `release/*` branches were deleted once they were all identical to `main`.
 3. **Tag and push the tag**: `git tag -a vX.Y.Z -m "Jorvik X.Y.Z" && git push origin vX.Y.Z`.
 4. **Watch the run.** Windows, macOS and Linux build in parallel, then a publish
    job attaches the assets. Seven are expected: `.exe`, `.dmg`, `-mac.zip`,
@@ -29,10 +30,14 @@ releases is normal.
    list that software centres show as a changelog. Add the new version and date,
    then check it with `appstreamcli validate` -- AppImage hub rejects a metainfo
    file that fails validation, and it ships inside the AppImage.
-8. **Bump the COPR spec.** `packaging/rpm/jorvik.spec`: set `Version`, reset
-   `Release` to `1%{?dist}`, and add a `%changelog` entry. COPR rebuilds from
-   this file; its sources are fetched by URL at SRPM time, so nothing needs
-   uploading.
+8. **Bump the COPR spec and trigger a rebuild.** `packaging/rpm/jorvik.spec`:
+   set `Version`, reset `Release` to `1%{?dist}`, add a `%changelog` entry.
+   Then click Rebuild on the package at
+   `https://copr.fedorainfracloud.org/coprs/xuruh/Jorvik/`. **This is not
+   automatic** -- the package has `auto_rebuild` set, but that only acts on a
+   webhook, and no webhook is configured on the GitHub repository. Its sources
+   are fetched by URL at SRPM time, so nothing needs uploading, but the release
+   must be published first or the fetch 404s.
 9. **Bump `jorvik-bin` on the AUR.** See below. The AUR package pins a version
    and a checksum, so it keeps installing the previous release until it is
    updated. `jorvik-git` tracks HEAD and needs nothing.
