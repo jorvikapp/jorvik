@@ -32,10 +32,10 @@ releases is normal.
    file that fails validation, and it ships inside the AppImage.
 8. **Bump the COPR spec and trigger a rebuild.** `packaging/rpm/jorvik.spec`:
    set `Version`, reset `Release` to `1%{?dist}`, add a `%changelog` entry.
-   Then click Rebuild on the package at
-   `https://copr.fedorainfracloud.org/coprs/xuruh/Jorvik/`. **This is not
-   automatic** -- the package has `auto_rebuild` set, but that only acts on a
-   webhook, and no webhook is configured on the GitHub repository. Its sources
+   A webhook on the repository rebuilds COPR on every push to `main`, so
+   committing the bump is enough; no click required. If a rebuild does not
+   appear, check the hook's recent deliveries under the repository's webhook
+   settings. Its sources
    are fetched by URL at SRPM time, so nothing needs uploading, but the release
    must be published first or the fetch 404s.
 9. **Bump `jorvik-bin` on the AUR.** See below. The AUR package pins a version
