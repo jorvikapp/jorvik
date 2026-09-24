@@ -31,6 +31,34 @@ Runs as a web app or a native desktop client (Windows · macOS · Linux).
 
 ---
 
+## Install
+
+Desktop builds for Windows, macOS and Linux are on the
+[releases page](https://github.com/jorvikapp/jorvik/releases).
+
+```bash
+# Snap (any distribution with snapd)
+sudo snap install jorvik
+
+# Arch, prebuilt
+yay -S jorvik-bin        # or jorvik-git to build from main
+
+# Fedora
+sudo dnf copr enable xuruh/Jorvik
+sudo dnf install jorvik
+```
+
+Debian and RPM packages, an AppImage and a plain tarball are attached to every
+release if you would rather not add a repository.
+
+> **Coming from a manually installed copy or an integrated AppImage?** Remove it
+> first. A desktop entry in `~/.local/share/applications` takes precedence over
+> the one a package installs, so the menu keeps launching the old copy and the
+> new install looks like it did nothing. Check with
+> `ls ~/.local/share/applications | grep -i jorvik`, delete what you find there
+> along with any matching icons in `~/.local/share/icons`, then run
+> `update-desktop-database ~/.local/share/applications`.
+
 ## Status
 
 Personal open-source experiment — alpha stage. Core features work, rough edges remain. Breaking changes between updates are possible.
