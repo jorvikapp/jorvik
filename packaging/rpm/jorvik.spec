@@ -3,7 +3,7 @@
 # network. The tarball is payload only, so the desktop entry and the icon set
 # are produced here.
 Name:           jorvik
-Version:        1.0.12
+Version:        1.0.13
 Release:        1%{?dist}
 Summary:        Self-hosted Matrix client built to feel like Discord
 
@@ -101,6 +101,9 @@ appstream-util validate-relax --nonet \
 %{_datadir}/metainfo/app.jorvik.Jorvik.metainfo.xml
 
 %changelog
+* Fri Sep 25 2026 Jorvik contributors <admin@jorvik.app> - 1.0.13-1
+- Update to 1.0.13
+
 * Fri Sep 25 2026 Jorvik contributors <admin@jorvik.app> - 1.0.12-1
 - Update to 1.0.12
 
