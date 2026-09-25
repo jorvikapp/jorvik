@@ -29,6 +29,7 @@ import { EmojiUploadDialog } from "./EmojiUploadDialog";
 import { ChannelHeader } from "./header/ChannelHeader";
 import { RightPanel } from "./rightPanel/RightPanel";
 import { getOneToOnePartnerId } from "./rightPanel/directPartner";
+import { useRightSidebarMode } from "./rightPanel/useRightSidebarMode";
 import { sharedStateEventDeduperFor } from "../../core/net/stateEventDeduper";
 import { rootChildrenState, selectVoiceHintCandidates } from "../../core/spaces/voiceHints";
 import {
@@ -113,7 +114,6 @@ interface SettingsState {
 }
 
 const PEOPLE_SPACE_ID = "people-space";
-const RIGHT_SIDEBAR_MODE_STORAGE_KEY = "heorot.ui.rightSidebarMode";
 const CHANNELS_PANE_WIDTH_KEY = "heorot.ui.channelsPaneWidth";
 const CHANNELS_PANE_MIN = 180;
 const CHANNELS_PANE_MAX = 480;
@@ -134,19 +134,6 @@ function readChannelsPaneWidth(): number {
         }
     } catch { /* ignore */ }
     return CHANNELS_PANE_DEFAULT;
-}
-
-function readStoredRightSidebarMode(): RightSidebarMode {
-    if (typeof window === "undefined") {
-        return "members";
-    }
-
-    const raw = window.localStorage.getItem(RIGHT_SIDEBAR_MODE_STORAGE_KEY);
-    if (raw === "members" || raw === "search" || raw === "pins" || raw === "info" || raw === "closed") {
-        return raw;
-    }
-
-    return "members";
 }
 
 function getRoomName(room: Room): string {
@@ -913,7 +900,6 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const [inviteTargetRoomId, setInviteTargetRoomId] = useState<string | null>(null);
     const [roomSettingsRoomId, setRoomSettingsRoomId] = useState<string | null>(null);
     const [roomModerationOpen, setRoomModerationOpen] = useState(false);
-    const [rightSidebarMode, setRightSidebarMode] = useState<RightSidebarMode>(() => readStoredRightSidebarMode());
     const [sidebarSearchQuery, setSidebarSearchQuery] = useState("");
     const [selectedSpaceHierarchyJoinedRoomIds, setSelectedSpaceHierarchyJoinedRoomIds] = useState<string[]>([]);
     const [discoverableSpaceChannels, setDiscoverableSpaceChannels] = useState<DiscoverableSpaceChannel[]>([]);
@@ -1688,14 +1674,6 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         setSidebarSearchQuery("");
     }, [activeRoomId]);
 
-    useEffect(() => {
-        if (typeof window === "undefined") {
-            return;
-        }
-
-        window.localStorage.setItem(RIGHT_SIDEBAR_MODE_STORAGE_KEY, rightSidebarMode);
-    }, [rightSidebarMode]);
-
     const activeRoom = useMemo(
         () => (activeRoomId ? roomById.get(activeRoomId) ?? null : null),
         [activeRoomId, roomById],
@@ -1790,6 +1768,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const isActiveRoomDirect = Boolean(activeRoom && directRoomIds.has(activeRoom.roomId));
     const activeDirectPartnerId =
         activeRoom && isActiveRoomDirect ? getOneToOnePartnerId(activeRoom, client.getUserId() ?? "") : null;
+    const [rightSidebarMode, setRightSidebarMode] = useRightSidebarMode(isActiveRoomDirect);
     const shouldShowReadReceipts =
         userSettings.privacy.showReadReceipts && selectedSpaceId === PEOPLE_SPACE_ID && isActiveRoomDirect;
     const isActiveRoomVoiceChannel = isRoomVoiceChannel(activeRoom);
@@ -2071,7 +2050,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             clearSelectedUser();
             setRightSidebarMode(mode);
         },
-        [clearSelectedUser],
+        [clearSelectedUser, setRightSidebarMode],
     );
 
     const selectChannel = useCallback(
