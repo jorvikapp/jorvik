@@ -10,7 +10,6 @@ import { memberAvatarSources } from "../../adapters/avatar";
 import { ProfileHeader } from "./ProfileHeader";
 import { AboutCard } from "./cards/AboutCard";
 import { RolesCard } from "./cards/RolesCard";
-import { MediaCard } from "./cards/MediaCard";
 
 interface UserProfilePanelProps {
     client: MatrixClient;
@@ -225,8 +224,6 @@ export function UserProfilePanel({
             />
 
             <RolesCard roleLabel={role.label} roleBadgeClass={role.badgeClass} mutualRoomsCount={mutualRoomsCount} />
-
-            <MediaCard title="Media" description="Recent images by this user will be shown here." />
 
             <section className="rp-card rp-footer-actions">
                 <button type="button" className="rp-row-button" disabled>
