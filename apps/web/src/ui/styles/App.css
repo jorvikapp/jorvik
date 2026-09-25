@@ -620,8 +620,16 @@ textarea {
 }
 
 
-.app-shell.is-desktop-runtime.is-desktop-win32 {
-    --desktop-titlebar-overlay-height: 32px;
+/* The height of the window controls titleBarOverlay draws at the top right,
+   as the overlay reports it at runtime. Linux draws them there as Windows
+   does; macOS keeps them on the left, where nothing needs to move down, so
+   the width they take from the right edge decides: multiplied up, any width
+   at all exceeds the height, and min() settles on the height; none gives 0. */
+.app-shell.is-desktop-runtime {
+    --desktop-titlebar-overlay-height: min(
+        env(titlebar-area-height, 0px),
+        calc((100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)) * 1000)
+    );
 }
 
 .app-shell.right-panel-collapsed {
@@ -3060,7 +3068,7 @@ textarea {
     cursor: pointer;
 }
 
-.app-shell.is-desktop-runtime.is-desktop-win32 .timeline-lightbox-close {
+.app-shell.is-desktop-runtime .timeline-lightbox-close {
     top: calc(16px + var(--desktop-titlebar-overlay-height, 0px));
     right: 16px;
 }

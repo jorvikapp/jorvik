@@ -193,7 +193,7 @@
     gap: 12px;
 }
 
-.app-shell.is-desktop-runtime.is-desktop-win32 .settings-header {
+.app-shell.is-desktop-runtime .settings-header {
     padding-top: calc(16px + var(--desktop-titlebar-overlay-height, 0px));
 }
 

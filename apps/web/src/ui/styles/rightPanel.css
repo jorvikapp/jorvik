@@ -338,13 +338,13 @@
     gap: 10px;
 }
 
-.app-shell.is-desktop-runtime.is-desktop-win32 .right-panel-body-user {
+.app-shell.is-desktop-runtime .right-panel-body-user {
     padding-top: calc(12px + var(--desktop-titlebar-overlay-height, 0px));
 }
 
 
 
-.app-shell.is-desktop-runtime.is-desktop-win32 .right-panel-body:not(.right-panel-body-user) .rs-panel-header {
+.app-shell.is-desktop-runtime .right-panel-body:not(.right-panel-body-user) .rs-panel-header {
     padding-top: calc(12px + var(--desktop-titlebar-overlay-height, 0px));
 }
 .rp-room-header {
