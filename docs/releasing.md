@@ -29,7 +29,8 @@ releases is normal.
    `apps/desktop/metainfo/app.jorvik.Jorvik.metainfo.xml` carries a `<releases>`
    list that software centres show as a changelog. Add the new version and date,
    then check it with `appstreamcli validate` -- AppImage hub rejects a metainfo
-   file that fails validation, and it ships inside the AppImage.
+   file that fails validation, and it ships inside the AppImage. Because it
+   ships in the build, commit it with step 1's bump, before the tag.
 8. **Bump the COPR spec and trigger a rebuild.** `packaging/rpm/jorvik.spec`:
    set `Version`, reset `Release` to `1%{?dist}`, add a `%changelog` entry.
    A webhook on the repository rebuilds COPR on every push to `main`, so
@@ -40,7 +41,11 @@ releases is normal.
    must be published first or the fetch 404s.
 9. **Bump `jorvik-bin` on the AUR.** See below. The AUR package pins a version
    and a checksum, so it keeps installing the previous release until it is
-   updated. `jorvik-git` tracks HEAD and needs nothing.
+   updated.
+10. **Bump the version `jorvik-git` lists.** It builds whatever `main` holds,
+    and `pkgver()` works out the real version at build time, so installs never
+    depend on this. But the AUR page shows the value in `PKGBUILD`, and a stale
+    one makes the package look abandoned. See below.
 
 ## The AUR bump, step 9
 
@@ -64,6 +69,24 @@ metadata.
 
 `pkgrel` returns to 1 on a version bump, and increments only when the packaging
 changes without the upstream version changing.
+
+## The jorvik-git bump, step 10
+
+Set `pkgver` in `packaging/aur/jorvik-git/PKGBUILD` and `.SRCINFO` to what
+`pkgver()` would print for `main` as it stands, and `provides` in `.SRCINFO` to
+`jorvik=X.Y.Z`:
+
+```sh
+git describe --long --tags --abbrev=7 | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
+```
+
+Then push both files to `ssh://aur@aur.archlinux.org/jorvik-git.git` and commit
+the same change here, as for `jorvik-bin`.
+
+Right after a push, the AUR's API and its file views keep serving the previous
+version for several minutes, while the package page and git are current at
+once. `yay` reads the API, so it installs the old version during that window;
+that is the AUR's cache, not a broken package.
 
 ## Notes
 
