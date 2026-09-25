@@ -186,8 +186,15 @@
     border-top: 1px solid var(--border);
     margin: 4px 0;
 }
-.app-shell.is-desktop-runtime.is-desktop-win32 .channel-header {
-    padding-top: calc(10px + var(--desktop-titlebar-overlay-height, 0px));
+/* With the right panel closed, the header runs to the window's right edge,
+   where titleBarOverlay draws the window controls. The overlay publishes the
+   title bar area the controls leave free; whatever of the viewport lies right
+   of it is theirs. It is measured at runtime because the controls differ in
+   width between Linux, Windows and macOS (where they sit on the left, so this
+   resolves to 0). Outside the desktop app the variables are unset and the
+   fallbacks also resolve to 0. */
+.app-shell.is-desktop-runtime.right-panel-collapsed .channel-header {
+    padding-right: calc(12px + 100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
 }
 
 
