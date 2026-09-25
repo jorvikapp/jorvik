@@ -6,6 +6,7 @@ import type { RightSidebarMode } from "../rightPanel/types";
 interface ChannelHeaderProps {
     room: Room | null;
     isDirectMessage: boolean;
+    isOneToOneDirect: boolean;
     showHashPrefix: boolean;
     sidebarMode: RightSidebarMode;
     searchQuery: string;
@@ -22,7 +23,7 @@ interface ChannelHeaderProps {
     onLeaveRoom: () => Promise<void>;
 }
 
-type HeaderIconKind = "search" | "pins" | "members" | "more";
+type HeaderIconKind = "search" | "pins" | "members" | "profile" | "more";
 
 function getRoomName(room: Room | null): string {
     if (!room) {
@@ -64,6 +65,15 @@ function HeaderIcon({ kind }: { kind: HeaderIconKind }): React.ReactElement {
         );
     }
 
+    if (kind === "profile") {
+        return (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="9" r="3" />
+                <path d="M6.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" />
+            </svg>
+        );
+    }
+
     if (kind === "pins") {
         return (
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -86,6 +96,7 @@ function HeaderIcon({ kind }: { kind: HeaderIconKind }): React.ReactElement {
 export function ChannelHeader({
     room,
     isDirectMessage,
+    isOneToOneDirect,
     showHashPrefix,
     sidebarMode,
     searchQuery,
@@ -217,12 +228,12 @@ export function ChannelHeader({
                 <button
                     type="button"
                     className={`channel-header-icon-btn${sidebarMode === "members" ? " is-active" : ""}`}
-                    aria-label="Members panel"
-                    title="Members"
+                    aria-label={isOneToOneDirect ? "Profile panel" : "Members panel"}
+                    title={isOneToOneDirect ? "Profile" : "Members"}
                     onClick={() => toggleMode("members")}
                     disabled={!room}
                 >
-                    <HeaderIcon kind="members" />
+                    <HeaderIcon kind={isOneToOneDirect ? "profile" : "members"} />
                 </button>
 
                 <div className="channel-header-menu" ref={menuRef}>

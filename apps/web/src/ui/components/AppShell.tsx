@@ -28,6 +28,7 @@ import { Composer } from "./Composer";
 import { EmojiUploadDialog } from "./EmojiUploadDialog";
 import { ChannelHeader } from "./header/ChannelHeader";
 import { RightPanel } from "./rightPanel/RightPanel";
+import { getOneToOnePartnerId } from "./rightPanel/directPartner";
 import { sharedStateEventDeduperFor } from "../../core/net/stateEventDeduper";
 import { rootChildrenState, selectVoiceHintCandidates } from "../../core/spaces/voiceHints";
 import {
@@ -1787,6 +1788,8 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 ? getRoomName(selectedSpaceRoom)
                 : "People";
     const isActiveRoomDirect = Boolean(activeRoom && directRoomIds.has(activeRoom.roomId));
+    const activeDirectPartnerId =
+        activeRoom && isActiveRoomDirect ? getOneToOnePartnerId(activeRoom, client.getUserId() ?? "") : null;
     const shouldShowReadReceipts =
         userSettings.privacy.showReadReceipts && selectedSpaceId === PEOPLE_SPACE_ID && isActiveRoomDirect;
     const isActiveRoomVoiceChannel = isRoomVoiceChannel(activeRoom);
@@ -2724,6 +2727,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 <ChannelHeader
                     room={activeRoom}
                     isDirectMessage={isActiveRoomDirect}
+                    isOneToOneDirect={activeDirectPartnerId !== null}
                     showHashPrefix={shouldPrefixRoomWithHash}
                     sidebarMode={rightSidebarMode}
                     searchQuery={sidebarSearchQuery}
@@ -2819,6 +2823,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     activeSpaceRoom={selectedSpaceId === PEOPLE_SPACE_ID ? null : selectedSpaceRoom}
                     mode={panelMode}
                     roomMode={rightSidebarMode}
+                    directPartnerId={activeDirectPartnerId}
                     searchQuery={sidebarSearchQuery}
                     onSearchQueryChange={setSidebarSearchQuery}
                     onSelectUser={selectUser}
