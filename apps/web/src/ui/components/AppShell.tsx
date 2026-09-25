@@ -2823,6 +2823,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     onSearchQueryChange={setSidebarSearchQuery}
                     onSelectUser={selectUser}
                     onBackToRoom={clearSelectedUser}
+                    onCloseRoomPanel={() => selectSidebarMode("closed")}
                     onOpenRoomSettings={() => openRoomSettingsFor(activeRoom?.roomId ?? null)}
                     onCopyRoomLink={copyActiveRoomLink}
                     onLeaveRoom={leaveActiveRoom}
