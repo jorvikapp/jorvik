@@ -22,7 +22,7 @@ interface ChannelHeaderProps {
     onLeaveRoom: () => Promise<void>;
 }
 
-type HeaderIconKind = "search" | "pins" | "members" | "info" | "more";
+type HeaderIconKind = "search" | "pins" | "members" | "more";
 
 function getRoomName(room: Room | null): string {
     if (!room) {
@@ -73,21 +73,12 @@ function HeaderIcon({ kind }: { kind: HeaderIconKind }): React.ReactElement {
         );
     }
 
-    if (kind === "members") {
-        return (
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="9" cy="9" r="2.5" />
-                <circle cx="16.5" cy="10.5" r="2" />
-                <path d="M4.5 18c0-2.5 2.2-4 4.5-4s4.5 1.5 4.5 4" />
-                <path d="M14 17.5c.5-1.8 1.7-2.8 3.5-3.2" />
-            </svg>
-        );
-    }
-
     return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 8.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 1 0 12 8.5z" />
-            <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a2 2 0 1 1-4 0v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a2 2 0 1 1 0-4h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V4a2 2 0 1 1 4 0v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6H20a2 2 0 1 1 0 4h-.2a1 1 0 0 0-.4.1z" />
+            <circle cx="9" cy="9" r="2.5" />
+            <circle cx="16.5" cy="10.5" r="2" />
+            <path d="M4.5 18c0-2.5 2.2-4 4.5-4s4.5 1.5 4.5 4" />
+            <path d="M14 17.5c.5-1.8 1.7-2.8 3.5-3.2" />
         </svg>
     );
 }
@@ -233,16 +224,6 @@ export function ChannelHeader({
                 >
                     <HeaderIcon kind="members" />
                 </button>
-                <button
-                    type="button"
-                    className={`channel-header-icon-btn${sidebarMode === "info" ? " is-active" : ""}`}
-                    aria-label="Channel info panel"
-                    title="Channel info"
-                    onClick={() => toggleMode("info")}
-                    disabled={!room}
-                >
-                    <HeaderIcon kind="info" />
-                </button>
 
                 <div className="channel-header-menu" ref={menuRef}>
                     <button
@@ -303,6 +284,18 @@ export function ChannelHeader({
                                 }}
                             >
                                 Invite users
+                            </button>
+                            <button
+                                type="button"
+                                className="channel-header-menu-item"
+                                role="menuitem"
+                                disabled={!room}
+                                onClick={() => {
+                                    toggleMode("info");
+                                    setMenuOpen(false);
+                                }}
+                            >
+                                {sidebarMode === "info" ? "Hide channel info" : "Channel info"}
                             </button>
                             <button
                                 type="button"
