@@ -8,6 +8,7 @@ interface SecurityRecoveryViewProps {
     onPrepareSetup: () => Promise<string>;
     onCompleteSetup: () => Promise<void>;
     onRestore: (credential: string) => Promise<void>;
+    onCompleteCrossSigning: (credential: string) => Promise<void>;
     onSkip: () => void;
 }
 
@@ -17,6 +18,7 @@ export function SecurityRecoveryView({
     onPrepareSetup,
     onCompleteSetup,
     onRestore,
+    onCompleteCrossSigning,
     onSkip,
 }: SecurityRecoveryViewProps): React.ReactElement {
     const [credential, setCredential] = useState("");
@@ -29,10 +31,6 @@ export function SecurityRecoveryView({
     const [setupError, setSetupError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (flow !== "restore") {
-            return;
-        }
-
         setCredential("");
     }, [flow]);
 
@@ -72,7 +70,7 @@ export function SecurityRecoveryView({
             return;
         }
 
-        await onRestore(credential);
+        await (flow === "cross_signing" ? onCompleteCrossSigning(credential) : onRestore(credential));
     };
 
     const handleGenerateSetupKey = async (): Promise<void> => {
@@ -224,8 +222,22 @@ export function SecurityRecoveryView({
     return (
         <div className="login-view">
             <form className="login-card security-card" onSubmit={handleSubmit}>
-                <h1>Recover encrypted history</h1>
-                <p className="login-subtitle">This account has encrypted key backup. Enter your security key to decrypt older messages.</p>
+                {flow === "cross_signing" ? (
+                    <>
+                        <h1>Finish securing your account</h1>
+                        <p className="login-subtitle">
+                            Enter your security key to finish setting up this session. It also lets your other apps, like
+                            Element, verify you.
+                        </p>
+                    </>
+                ) : (
+                    <>
+                        <h1>Recover encrypted history</h1>
+                        <p className="login-subtitle">
+                            This account has encrypted key backup. Enter your security key to decrypt older messages.
+                        </p>
+                    </>
+                )}
 
                 <label>
                     Security key
@@ -257,12 +269,18 @@ export function SecurityRecoveryView({
 
                 <div className="security-actions">
                     <button type="submit" disabled={!canSubmit}>
-                        Restore keys
+                        {flow === "cross_signing" ? "Continue" : "Restore keys"}
                     </button>
                     <button type="button" className="security-skip" onClick={onSkip}>
                         Skip for now
                     </button>
                 </div>
+
+                {flow === "cross_signing" ? (
+                    <p className="security-generated-key-hint">
+                        Lost your security key? Skip for now, then make a new one in Settings under Encryption.
+                    </p>
+                ) : null}
             </form>
         </div>
     );

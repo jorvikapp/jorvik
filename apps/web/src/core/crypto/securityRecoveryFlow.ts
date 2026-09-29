@@ -3,9 +3,16 @@ import { decodeRecoveryKey } from "matrix-js-sdk/src/crypto-api/recovery-key";
 import type { MatrixClient, Room } from "matrix-js-sdk/src/matrix";
 
 import { withSecretStorageKeyProvider } from "../client/cryptoCallbacks";
+import { getCrossSigningSituation } from "./crossSigning";
 
 export type RecoveryCredentialType = "recovery_key";
-export type SecurityRecoveryFlow = "restore" | "setup";
+/**
+ * restore: backup needs the recovery key. setup: no secret storage yet, make a
+ * key. cross_signing: secret storage exists and the existing recovery key is
+ * needed to finish this session: create, import or save the cross-signing
+ * keys, or add a missing backup. Never makes a new key.
+ */
+export type SecurityRecoveryFlow = "restore" | "setup" | "cross_signing";
 
 export type AutomaticRecoveryStatus = "not_supported" | "no_backup" | "restored" | "needs_recovery_key";
 
@@ -239,6 +246,8 @@ export async function bootstrapSecretStorageSetup(
     }
 
     const backupInfo = await crypto.getKeyBackupInfo();
+    // Only for an account without any: keys held elsewhere are never replaced.
+    const crossSigningMissing = (await getCrossSigningSituation(client)) === "missing";
     await withSecretStorageKeyProvider(
         async ({ keyIds }) => {
             const firstRequestedKeyId = keyIds[0];
@@ -254,6 +263,23 @@ export async function bootstrapSecretStorageSetup(
                 setupNewSecretStorage: true,
                 setupNewKeyBackup: !backupInfo?.version,
             });
+            // Jorvik used to stop here, leaving accounts without cross-signing.
+            // Created after the new secret storage so the keys are saved in it;
+            // a first upload needs no password (MSC3967). Not fatal: the key
+            // already exists now, and the next screen retries with it rather
+            // than this one offering to make another.
+            if (crossSigningMissing) {
+                try {
+                    await crypto.bootstrapCrossSigning({
+                        setupNewCrossSigning: true,
+                        authUploadDeviceSigningKeys: async (makeRequest) => {
+                            await makeRequest(null);
+                        },
+                    });
+                } catch {
+                    // Retried by the cross-signing step after setup.
+                }
+            }
         },
     );
 }

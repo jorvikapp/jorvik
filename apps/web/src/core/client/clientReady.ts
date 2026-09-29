@@ -47,3 +47,31 @@ export async function waitForClientReady(client: MatrixClient): Promise<void> {
         client.on(ClientEvent.Sync, onSync);
     });
 }
+
+/**
+ * True once a /sync from the server has been processed. Ready can come from the
+ * cached sync alone, whose account data may be minutes old: too old to decide
+ * whether the account has a security key.
+ */
+export async function waitForLiveSync(client: MatrixClient, timeoutMs = CLIENT_READY_TIMEOUT_MS): Promise<boolean> {
+    if (normalizeSyncState(client.getSyncState?.()) === "SYNCING") {
+        return true;
+    }
+
+    return new Promise<boolean>((resolve) => {
+        const timeoutId = window.setTimeout(() => {
+            client.removeListener(ClientEvent.Sync, onSync);
+            resolve(false);
+        }, timeoutMs);
+
+        const onSync = (state: unknown): void => {
+            if (normalizeSyncState(state) === "SYNCING") {
+                client.removeListener(ClientEvent.Sync, onSync);
+                window.clearTimeout(timeoutId);
+                resolve(true);
+            }
+        };
+
+        client.on(ClientEvent.Sync, onSync);
+    });
+}

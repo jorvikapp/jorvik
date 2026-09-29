@@ -10,6 +10,8 @@ interface VerificationDialogProps {
     client: MatrixClient;
     open: boolean;
     target?: VerificationTarget | null;
+    /** A request another of our sessions sent: answered instead of sending a new one. */
+    incomingRequest?: IncomingVerificationRequest | null;
     onClose: () => void;
     onCompleted?: () => void;
 }
@@ -31,6 +33,7 @@ const VERIFIER_SHOW_SAS_EVENT = "show_sas";
 const VERIFIER_SHOW_RECIPROCATE_QR_EVENT = "show_reciprocate_qr";
 const VERIFIER_CANCEL_EVENT = "cancel";
 const VERIFICATION_METHOD_SAS = "m.sas.v1";
+const VERIFICATION_METHOD_QR_SCAN = "m.qr_code.scan.v1";
 
 const VerificationPhase = {
     Unsent: 1,
@@ -64,6 +67,8 @@ interface Verifier {
     off: (event: string, listener: (...args: unknown[]) => void) => void;
 }
 
+export type IncomingVerificationRequest = VerificationRequest;
+
 interface VerificationRequest {
     initiatedByMe: boolean;
     phase: VerificationPhaseValue;
@@ -74,6 +79,7 @@ interface VerificationRequest {
     startVerification: (method: string) => Promise<Verifier>;
     scanQRCode: (qrCodeData: Uint8ClampedArray) => Promise<Verifier>;
     generateQRCode: () => Promise<Uint8ClampedArray | undefined>;
+    otherPartySupportsMethod?: (method: string) => boolean;
     on: (event: string, listener: (...args: unknown[]) => void) => void;
     off: (event: string, listener: (...args: unknown[]) => void) => void;
 }
@@ -141,6 +147,7 @@ export function VerificationDialog({
     client,
     open,
     target,
+    incomingRequest,
     onClose,
     onCompleted,
 }: VerificationDialogProps): React.ReactElement | null {
@@ -157,6 +164,7 @@ export function VerificationDialog({
     const [qrPayload, setQrPayload] = useState<string | null>(null);
     const [scanQrInput, setScanQrInput] = useState("");
     const completionReportedRef = useRef(false);
+    const qrGeneratedForRef = useRef<VerificationRequest | null>(null);
 
     const notifyCompleted = useCallback((): void => {
         if (completionReportedRef.current) {
@@ -180,6 +188,7 @@ export function VerificationDialog({
 
     const resetState = useCallback((): void => {
         completionReportedRef.current = false;
+        qrGeneratedForRef.current = null;
         setRequest(null);
         setVerifier(null);
         setPhase(null);
@@ -232,9 +241,10 @@ export function VerificationDialog({
                 }
 
                 const createdRequest =
-                    target?.deviceId && target.userId
+                    incomingRequest ??
+                    (target?.deviceId && target.userId
                         ? ((await crypto.requestDeviceVerification(target.userId, target.deviceId)) as VerificationRequest)
-                        : ((await crypto.requestOwnUserVerification()) as VerificationRequest);
+                        : ((await crypto.requestOwnUserVerification()) as VerificationRequest));
 
                 if (cancelled) {
                     return;
@@ -242,7 +252,7 @@ export function VerificationDialog({
 
                 setRequest(createdRequest);
                 setPhase(createdRequest.phase);
-                setStatusMessage("Waiting for the other device...");
+                setStatusMessage(incomingRequest ? "Another of your sessions wants to verify." : "Waiting for the other device...");
             } catch (startError) {
                 if (cancelled) {
                     return;
@@ -262,7 +272,7 @@ export function VerificationDialog({
         return () => {
             cancelled = true;
         };
-    }, [client, open, resetState, target]);
+    }, [client, incomingRequest, open, resetState, target]);
 
     useEffect(() => {
         if (!open) {
@@ -297,7 +307,14 @@ export function VerificationDialog({
             setPhase(request.phase);
             setStatusMessage(`Status: ${phaseLabel(request.phase)}`);
 
-            if (request.phase === VerificationPhase.Ready) {
+            // Once per request: generating a code fires another change, and a
+            // second code makes the SDK cancel the first, ending the whole flow.
+            if (
+                request.phase === VerificationPhase.Ready &&
+                qrGeneratedForRef.current !== request &&
+                (request.otherPartySupportsMethod?.(VERIFICATION_METHOD_QR_SCAN) ?? false)
+            ) {
+                qrGeneratedForRef.current = request;
                 try {
                     const generatedQr = await request.generateQRCode();
                     if (!generatedQr || isDisposed) {
@@ -566,6 +583,9 @@ export function VerificationDialog({
         return null;
     }
 
+    // Starting before the other session accepts fails ("other device is unknown").
+    const waitingForOtherSession = Boolean(request?.initiatedByMe) && phase === VerificationPhase.Requested;
+
     return (
         <div className="verification-dialog-overlay" role="dialog" aria-modal="true" aria-label="Device verification">
             <div className="verification-dialog">
@@ -617,12 +637,15 @@ export function VerificationDialog({
                     (phase === VerificationPhase.Requested || phase === VerificationPhase.Ready || phase === VerificationPhase.Started) ? (
                         <div className="verification-method-card">
                             <h3>Methods</h3>
+                            {waitingForOtherSession ? (
+                                <p className="verification-inline-note">Accept the request on your other session first.</p>
+                            ) : null}
                             <div className="verification-actions-row">
                                 <button
                                     type="button"
                                     className="verification-primary"
                                     onClick={() => void startSasVerification()}
-                                    disabled={pendingAction !== null || completed}
+                                    disabled={pendingAction !== null || completed || waitingForOtherSession}
                                 >
                                     {pendingAction === "start_sas" ? "Starting..." : "Start Emoji Verification"}
                                 </button>
@@ -668,7 +691,7 @@ export function VerificationDialog({
                                     type="button"
                                     className="verification-secondary"
                                     onClick={() => void startQrScanVerification()}
-                                    disabled={pendingAction !== null || scanQrInput.trim().length === 0 || completed}
+                                    disabled={pendingAction !== null || scanQrInput.trim().length === 0 || completed || waitingForOtherSession}
                                 >
                                     {pendingAction === "start_scan" ? "Starting..." : "Start QR Scan Flow"}
                                 </button>

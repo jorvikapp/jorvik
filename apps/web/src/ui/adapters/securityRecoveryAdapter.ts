@@ -13,3 +13,14 @@ export type {
     RecoveryCredentialType,
     SecurityRecoveryFlow,
 } from "../../core/crypto/securityRecoveryFlow";
+export {
+    completeCrossSigningWithRecoveryKey,
+    createKeyBackupWithRecoveryKey,
+    finishSetupWithRecoveryKey,
+    getCrossSigningSituation,
+    requestCrossSigningKeysFromOtherSessions,
+    resetCrossSigningIdentity,
+    StaleCrossSigningKeysError,
+    waitForCrossSigningKeys,
+} from "../../core/crypto/crossSigning";
+export type { CrossSigningSituation } from "../../core/crypto/crossSigning";

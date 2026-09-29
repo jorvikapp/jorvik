@@ -12,17 +12,24 @@ import {
     normalizeHomeserverUrl,
     shouldTryFallbackLogin,
 } from "../adapters/loginAdapter";
-import { waitForClientReady } from "../../core/client/clientReady";
+import { waitForClientReady, waitForLiveSync } from "../../core/client/clientReady";
 import { getDefaultIdentityServer, getFallbackHomeserver } from "../../core/config/serverDefaults";
 import {
     attemptAutomaticKeyBackupRestore,
     bootstrapSecretStorageSetup,
     createSecretStorageSetupKey,
+    type CrossSigningSituation,
+    finishSetupWithRecoveryKey,
+    getCrossSigningSituation,
     type RecoveryCredentialType,
+    requestCrossSigningKeysFromOtherSessions,
+    resetCrossSigningIdentity,
     type SecurityRecoveryFlow,
+    StaleCrossSigningKeysError,
     restoreKeyBackupWithRecoveryKey,
     restoreKeyBackupWithSecretStorageCredential,
     triggerRoomHistoryDecryption,
+    waitForCrossSigningKeys,
 } from "../adapters/securityRecoveryAdapter";
 import { subscribeAccessTokenRotated } from "../../core/lifecycle/tokenEvents";
 import { syncMediaServiceWorkerAuthState } from "../serviceWorker/registerMediaServiceWorker";
@@ -133,6 +140,11 @@ interface MatrixContextValue extends MatrixState {
     prepareSecurityRecoverySetup: () => Promise<string>;
     completeSecurityRecoverySetup: () => Promise<void>;
     completeSecurityRecovery: (credential: string) => Promise<void>;
+    completeCrossSigning: (credential: string) => Promise<void>;
+    /** Throws with a message to show next to the form, which stays filled in. */
+    resetIdentity: (password: string, securityKey: string) => Promise<void>;
+    /** After another session verified this one while in use: collect the signing keys it sends. */
+    collectKeysAfterVerification: () => Promise<void>;
     skipSecurityRecovery: () => void;
 }
 
@@ -301,24 +313,85 @@ async function shouldForceDeviceVerification(client: MatrixClient, config: CoreC
     return !(await isCrossSigningReady(client));
 }
 
-interface PostLoginState {
+interface RecoveryPostLoginState {
     status: "ready" | "security_recovery" | "security_verification";
     error: string | null;
     recoveryFlow: SecurityRecoveryFlow;
     recoveryMode: RecoveryCredentialType;
     recoveryBackupVersion: string | null;
+}
+
+interface PostLoginState extends RecoveryPostLoginState {
     localDeviceVerified: boolean;
 }
 
-interface RecoveryPostLoginState {
-    status: "ready" | "security_recovery";
-    error: string | null;
-    recoveryFlow: SecurityRecoveryFlow;
-    recoveryMode: RecoveryCredentialType;
-    recoveryBackupVersion: string | null;
+interface SessionSecurityOptions {
+    /** False once verification was skipped this run, so Skip does not bring it straight back. */
+    promptVerification: boolean;
 }
 
-async function resolveRecoveryPostLoginState(client: MatrixClient): Promise<RecoveryPostLoginState> {
+const READY_STATE: RecoveryPostLoginState = {
+    status: "ready",
+    error: null,
+    recoveryFlow: "restore",
+    recoveryMode: "recovery_key",
+    recoveryBackupVersion: null,
+};
+
+async function readCrossSigningSituation(client: MatrixClient): Promise<CrossSigningSituation | null> {
+    try {
+        return await getCrossSigningSituation(client);
+    } catch {
+        // Unknown means no prompt: keys are never created or replaced on a guess.
+        return null;
+    }
+}
+
+/**
+ * What this session still needs once the backup is sorted: a security key if
+ * the account has none, verification if only another session has the signing
+ * keys, or the existing security key to finish cross-signing or add a backup.
+ * An account that already has a security key is never given a new one here.
+ */
+async function resolveSessionSecurity(client: MatrixClient, options: SessionSecurityOptions): Promise<RecoveryPostLoginState> {
+    try {
+        const crypto = client.getCrypto();
+        // A stale "no security key" would offer to make a second one.
+        if (crypto && (await waitForLiveSync(client))) {
+            if (!(await client.secretStorage.hasKey())) {
+                return {
+                    ...READY_STATE,
+                    status: "security_recovery",
+                    error: "Set up a security key now so encrypted history can be restored on new sessions.",
+                    recoveryFlow: "setup",
+                };
+            }
+
+            const situation = await readCrossSigningSituation(client);
+            if (situation === "on_other_device" && options.promptVerification && !(await isLocalDeviceVerified(client))) {
+                return { ...READY_STATE, status: "security_verification" };
+            }
+
+            const noBackup = !(await crypto.getKeyBackupInfo())?.version;
+            if (noBackup || situation === "missing" || situation === "in_secret_storage" || situation === "unsaved") {
+                return { ...READY_STATE, status: "security_recovery", recoveryFlow: "cross_signing" };
+            }
+        }
+    } catch {
+        // Best effort, like the backup restore: never block startup on it.
+    }
+
+    triggerRoomHistoryDecryption(client);
+    return READY_STATE;
+}
+
+async function resolveRecoveryPostLoginState(client: MatrixClient, options: SessionSecurityOptions): Promise<RecoveryPostLoginState> {
+    if (!(await waitForLiveSync(client))) {
+        // Offline or stuck: no prompts on account data that may be stale.
+        triggerRoomHistoryDecryption(client);
+        return READY_STATE;
+    }
+
     try {
         const recovery = await attemptAutomaticKeyBackupRestore(client);
         if (recovery.status === "needs_recovery_key") {
@@ -331,31 +404,20 @@ async function resolveRecoveryPostLoginState(client: MatrixClient): Promise<Reco
                 recoveryBackupVersion: recovery.backupVersion,
             };
         }
-
-        if (recovery.status === "no_backup") {
-            return {
-                status: "security_recovery",
-                error: "Set up a security key now so encrypted history can be restored on new sessions.",
-                recoveryFlow: "setup",
-                recoveryMode: "recovery_key",
-                recoveryBackupVersion: null,
-            };
-        }
     } catch {
         // Automatic recovery is best effort and should not block normal app startup.
+        triggerRoomHistoryDecryption(client);
+        return READY_STATE;
     }
 
-    triggerRoomHistoryDecryption(client);
-    return {
-        status: "ready",
-        error: null,
-        recoveryFlow: "restore",
-        recoveryMode: "recovery_key",
-        recoveryBackupVersion: null,
-    };
+    return resolveSessionSecurity(client, options);
 }
 
-async function resolvePostLoginState(client: MatrixClient, config: CoreConfig | null): Promise<PostLoginState> {
+async function resolvePostLoginState(
+    client: MatrixClient,
+    config: CoreConfig | null,
+    options: SessionSecurityOptions,
+): Promise<PostLoginState> {
     const localDeviceVerified = await isLocalDeviceVerified(client);
 
     if (await shouldForceDeviceVerification(client, config)) {
@@ -369,7 +431,7 @@ async function resolvePostLoginState(client: MatrixClient, config: CoreConfig | 
         };
     }
 
-    const recoveryState = await resolveRecoveryPostLoginState(client);
+    const recoveryState = await resolveRecoveryPostLoginState(client, options);
     return {
         ...recoveryState,
         localDeviceVerified,
@@ -379,6 +441,11 @@ async function resolvePostLoginState(client: MatrixClient, config: CoreConfig | 
 export function MatrixProvider({ children }: React.PropsWithChildren): React.ReactElement {
     const [state, dispatch] = useReducer(reducer, initialState);
     const pendingSetupKeyRef = useRef<GeneratedSecretStorageKey | null>(null);
+    const verificationSkippedRef = useRef(false);
+    const securityOptions = useCallback(
+        (): SessionSecurityOptions => ({ promptVerification: !verificationSkippedRef.current }),
+        [],
+    );
 
     const clearPendingSetupKey = useCallback((): void => {
         const pendingKey = pendingSetupKeyRef.current;
@@ -407,6 +474,14 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
             error: postLoginState.error,
         });
     }, []);
+
+    const applySessionSecurity = useCallback(
+        async (client: MatrixClient): Promise<void> => {
+            const recoveryState = await resolveSessionSecurity(client, securityOptions());
+            applyPostLoginState({ ...recoveryState, localDeviceVerified: await isLocalDeviceVerified(client) });
+        },
+        [applyPostLoginState, securityOptions],
+    );
 
     useEffect(() => {
         return () => {
@@ -478,7 +553,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
                 }
 
                 dispatch({ type: "set_client", client });
-                const postLoginState = await resolvePostLoginState(client, result.config);
+                const postLoginState = await resolvePostLoginState(client, result.config, securityOptions());
                 if (isCancelled) {
                     return;
                 }
@@ -502,7 +577,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
         return () => {
             isCancelled = true;
         };
-    }, [applyPostLoginState]);
+    }, [applyPostLoginState, securityOptions]);
 
     useEffect(() => {
         const client = state.client;
@@ -578,6 +653,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
             }
 
             dispatch({ type: "set_status", status: "starting", error: null });
+            verificationSkippedRef.current = false;
 
             try {
                 let client: MatrixClient;
@@ -605,7 +681,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
                 }
 
                 dispatch({ type: "set_client", client });
-                const postLoginState = await resolvePostLoginState(client, state.config);
+                const postLoginState = await resolvePostLoginState(client, state.config, securityOptions());
                 applyPostLoginState(postLoginState);
             } catch (error) {
                 dispatch({ type: "set_client", client: null });
@@ -618,7 +694,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
                 throw error;
             }
         },
-        [applyPostLoginState, state.config, state.core],
+        [applyPostLoginState, securityOptions, state.config, state.core],
     );
 
     const login = useCallback(
@@ -732,9 +808,21 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
             return;
         }
 
+        // Asked for explicitly, so an earlier Skip no longer applies.
+        verificationSkippedRef.current = false;
         try {
-            const postLoginState = await resolvePostLoginState(state.client, state.config);
-            applyPostLoginState(postLoginState);
+            // Just verified from another session: ask it for the signing keys,
+            // which the security key then saves where other apps find them.
+            if ((await readCrossSigningSituation(state.client)) === "on_other_device" && (await isLocalDeviceVerified(state.client))) {
+                await requestCrossSigningKeysFromOtherSessions(state.client);
+                await waitForCrossSigningKeys(state.client, 15_000);
+            }
+            const postLoginState = await resolvePostLoginState(state.client, state.config, securityOptions());
+            applyPostLoginState(
+                postLoginState.status === "security_verification" && !postLoginState.error
+                    ? { ...postLoginState, error: "This session is not verified yet." }
+                    : postLoginState,
+            );
         } catch (error) {
             dispatch({
                 type: "set_status",
@@ -742,7 +830,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
                 error: formatLoginError(error),
             });
         }
-    }, [applyPostLoginState, state.client, state.config]);
+    }, [applyPostLoginState, securityOptions, state.client, state.config]);
 
     const skipDeviceVerification = useCallback(async (): Promise<void> => {
         if (!state.client) {
@@ -759,13 +847,9 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
             return;
         }
 
+        verificationSkippedRef.current = true;
         try {
-            const recoveryState = await resolveRecoveryPostLoginState(state.client);
-            const localVerified = await isLocalDeviceVerified(state.client);
-            applyPostLoginState({
-                ...recoveryState,
-                localDeviceVerified: localVerified,
-            });
+            await applySessionSecurity(state.client);
         } catch (error) {
             dispatch({
                 type: "set_status",
@@ -773,7 +857,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
                 error: formatLoginError(error),
             });
         }
-    }, [applyPostLoginState, state.client, state.config]);
+    }, [applySessionSecurity, state.client, state.config]);
 
     const prepareSecurityRecoverySetup = useCallback(
         async (): Promise<string> => {
@@ -825,18 +909,22 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
         dispatch({ type: "set_status", status: "starting", error: null });
 
         try {
-            await bootstrapSecretStorageSetup(state.client, pendingSetupKey);
-            triggerRoomHistoryDecryption(state.client);
+            // Set up from another session meanwhile: use that key, never make a second.
+            if (!(await state.client.secretStorage.hasKey())) {
+                await bootstrapSecretStorageSetup(state.client, pendingSetupKey);
+            }
             clearPendingSetupKey();
-            dispatch({ type: "set_status", status: "ready", error: null });
         } catch (error) {
             dispatch({
                 type: "set_status",
                 status: "security_recovery",
                 error: formatLoginError(error),
             });
+            return;
         }
-    }, [clearPendingSetupKey, state.client]);
+        // Signing keys held only by another session still need verification.
+        await applySessionSecurity(state.client);
+    }, [applySessionSecurity, clearPendingSetupKey, state.client]);
 
     const completeSecurityRecovery = useCallback(
         async (credential: string): Promise<void> => {
@@ -867,17 +955,92 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
                 }
                 triggerRoomHistoryDecryption(state.client);
                 clearPendingSetupKey();
-                dispatch({ type: "set_status", status: "ready", error: null });
             } catch (error) {
                 dispatch({
                     type: "set_status",
                     status: "security_recovery",
                     error: formatSecurityRecoveryError(error),
                 });
+                return;
             }
+
+            // The same key unlocks secret storage, so finish cross-signing now
+            // instead of asking for it twice. A failure here is shown on the
+            // next screen; the history is already restored.
+            let finishError: string | null = null;
+            try {
+                await finishSetupWithRecoveryKey(state.client, credential);
+            } catch (error) {
+                if (error instanceof StaleCrossSigningKeysError) {
+                    applyPostLoginState({ ...READY_STATE, status: "security_verification", error: error.message, localDeviceVerified: false });
+                    return;
+                }
+                finishError = formatSecurityRecoveryError(error);
+            }
+            const recoveryState = await resolveSessionSecurity(state.client, securityOptions());
+            applyPostLoginState({
+                ...recoveryState,
+                error: finishError && recoveryState.status !== "ready" ? finishError : recoveryState.error,
+                localDeviceVerified: await isLocalDeviceVerified(state.client),
+            });
         },
-        [clearPendingSetupKey, state.client, state.securityRecoveryBackupVersion],
+        [applyPostLoginState, clearPendingSetupKey, securityOptions, state.client, state.securityRecoveryBackupVersion],
     );
+
+    const completeCrossSigning = useCallback(
+        async (credential: string): Promise<void> => {
+            if (!state.client) {
+                dispatch({ type: "set_status", status: "login_required", error: "Session expired. Please sign in again." });
+                return;
+            }
+
+            if (credential.trim().length === 0) {
+                dispatch({ type: "set_status", status: "security_recovery", error: "Security key is required." });
+                return;
+            }
+
+            dispatch({ type: "set_status", status: "starting", error: null });
+            try {
+                await finishSetupWithRecoveryKey(state.client, credential);
+            } catch (error) {
+                dispatch({
+                    type: "set_status",
+                    // Only verification or a reset (on that screen) can fix stale keys.
+                    status: error instanceof StaleCrossSigningKeysError ? "security_verification" : "security_recovery",
+                    error: formatSecurityRecoveryError(error),
+                });
+                return;
+            }
+            await applySessionSecurity(state.client);
+        },
+        [applySessionSecurity, state.client],
+    );
+
+    const resetIdentity = useCallback(
+        async (password: string, securityKey: string): Promise<void> => {
+            if (!state.client) {
+                dispatch({ type: "set_status", status: "login_required", error: "Session expired. Please sign in again." });
+                return;
+            }
+
+            await resetCrossSigningIdentity(state.client, password, securityKey);
+            await applySessionSecurity(state.client);
+        },
+        [applySessionSecurity, state.client],
+    );
+
+    const collectKeysAfterVerification = useCallback(async (): Promise<void> => {
+        const client = state.client;
+        if (!client || (await readCrossSigningSituation(client)) !== "on_other_device" || !(await isLocalDeviceVerified(client))) {
+            return;
+        }
+
+        await requestCrossSigningKeysFromOtherSessions(client);
+        // Only interrupt the app to save keys that actually arrived.
+        if ((await waitForCrossSigningKeys(client, 15_000)) === "unsaved" && (await client.secretStorage.hasKey())) {
+            applyPostLoginState({ ...READY_STATE, status: "security_recovery", recoveryFlow: "cross_signing", localDeviceVerified: true });
+        }
+    }, [applyPostLoginState, state.client]);
 
     const skipSecurityRecovery = useCallback((): void => {
         if (!state.client) {
@@ -900,6 +1063,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
         try {
             await state.core.session.logout(true);
             clearPendingSetupKey();
+            verificationSkippedRef.current = false;
             dispatch({ type: "set_client", client: null });
             dispatch({ type: "set_local_device_verified", verified: false });
             dispatch({ type: "set_status", status: "login_required", error: null });
@@ -925,6 +1089,9 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
             prepareSecurityRecoverySetup,
             completeSecurityRecoverySetup,
             completeSecurityRecovery,
+            completeCrossSigning,
+            resetIdentity,
+            collectKeysAfterVerification,
             skipSecurityRecovery,
         }),
         [
@@ -938,6 +1105,9 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
             prepareSecurityRecoverySetup,
             completeSecurityRecoverySetup,
             completeSecurityRecovery,
+            completeCrossSigning,
+            resetIdentity,
+            collectKeysAfterVerification,
             skipSecurityRecovery,
         ],
     );

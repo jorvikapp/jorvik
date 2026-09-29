@@ -5,6 +5,7 @@ import { AppShell } from "./components/AppShell";
 import { DeviceVerificationView } from "./components/DeviceVerificationView";
 import { LoginView } from "./components/LoginView";
 import { SecurityRecoveryView } from "./components/SecurityRecoveryView";
+import { IncomingVerificationDialog } from "./components/verification/IncomingVerificationDialog";
 import { MatrixProvider, useMatrix } from "./providers/MatrixProvider";
 import "./styles/App.css";
 import "./styles/composer.css";
@@ -54,6 +55,7 @@ function AppRouter(): React.ReactElement {
                 onPrepareSetup={matrix.prepareSecurityRecoverySetup}
                 onCompleteSetup={matrix.completeSecurityRecoverySetup}
                 onRestore={matrix.completeSecurityRecovery}
+                onCompleteCrossSigning={matrix.completeCrossSigning}
                 onSkip={matrix.skipSecurityRecovery}
             />
         );
@@ -72,13 +74,19 @@ function AppRouter(): React.ReactElement {
                 canSkip={!matrix.forceVerificationEnabled}
                 onRefreshStatus={matrix.refreshDeviceVerification}
                 onSkip={matrix.skipDeviceVerification}
+                onResetIdentity={matrix.resetIdentity}
                 onLogout={matrix.logout}
             />
         );
     }
 
     if (matrix.status === "ready" && matrix.client) {
-        return <AppShell client={matrix.client} onLogout={matrix.logout} />;
+        return (
+            <>
+                <AppShell client={matrix.client} onLogout={matrix.logout} />
+                <IncomingVerificationDialog client={matrix.client} onCompleted={() => void matrix.collectKeysAfterVerification()} />
+            </>
+        );
     }
 
     return (

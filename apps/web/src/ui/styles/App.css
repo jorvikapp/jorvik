@@ -397,6 +397,22 @@ textarea {
     padding: 14px 22px 20px;
 }
 
+.verification-gate-reset {
+    display: grid;
+    gap: 12px;
+    padding: 16px 22px 20px;
+    border-top: 1px solid var(--border);
+}
+
+.verification-gate-reset h2 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.login-card button.security-danger {
+    background: var(--danger);
+}
+
 .verification-dialog-overlay {
     position: fixed;
     inset: 0;
