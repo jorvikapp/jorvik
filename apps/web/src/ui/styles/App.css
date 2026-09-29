@@ -4632,19 +4632,29 @@ img.voice-ctrl-icon {
 }
 }
 
+/* Narrower columns rather than hiding the right panel: it holds the member
+   list and profiles, and hiding it meant clicking either did nothing visible.
+   At the desktop minWidth of 960 this still leaves the chat 416px. */
 @media (max-width: 1200px) {
     .app-shell {
+        grid-template-columns: 64px 240px minmax(0, 1fr) 240px !important;
+}
+
+    .app-shell.right-panel-collapsed {
         grid-template-columns: 64px 240px minmax(0, 1fr) !important;
 }
 
-    .members-sidebar,
-    .right-panel {
+    .members-sidebar {
         display: none;
 }
 }
 
 @media (max-width: 860px) {
     .app-shell {
+        grid-template-columns: 64px minmax(0, 1fr) 240px !important;
+}
+
+    .app-shell.right-panel-collapsed {
         grid-template-columns: 64px minmax(0, 1fr) !important;
 }
 

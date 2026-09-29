@@ -840,14 +840,3 @@
     display: grid;
     gap: 8px;
 }
-
-@media (max-width: 1200px) {
-    .right-panel {
-        display: none;
-    }
-}
-
-
-
-
-
