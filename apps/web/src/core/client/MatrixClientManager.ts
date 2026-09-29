@@ -5,6 +5,8 @@ import {
     type TokenRefreshFunction,
     MemoryStore,
     PendingEventOrdering,
+    type User,
+    UserEvent,
 } from "matrix-js-sdk/src/matrix";
 import { logger } from "matrix-js-sdk/src/logger";
 
@@ -19,6 +21,32 @@ import { coreCryptoCallbacks } from "./cryptoCallbacks";
  * can actually run.
  */
 const STORE_STARTUP_TIMEOUT_MS = 15_000;
+
+const ownUsersForwarded = new WeakSet<User>();
+
+/**
+ * startClient stores our own User as a bare `new User(userId)`, whereas every
+ * other User comes from User.createUser, which re-emits its events on the
+ * client. So our own presence changes never reached client-level listeners:
+ * choosing Idle updated the User, but the member list and profiles kept
+ * showing the old status until something else re-rendered them.
+ */
+export function forwardOwnUserEvents(client: MatrixClient): void {
+    const userId = client.getUserId();
+    const user = userId ? client.getUser(userId) : null;
+    if (!user || ownUsersForwarded.has(user)) {
+        return;
+    }
+
+    ownUsersForwarded.add(user);
+    client.reEmitter.reEmit(user, [
+        UserEvent.AvatarUrl,
+        UserEvent.DisplayName,
+        UserEvent.Presence,
+        UserEvent.CurrentlyActive,
+        UserEvent.LastPresenceTs,
+    ]);
+}
 
 async function startupWithTimeout(startup: () => Promise<void>, timeoutMs: number): Promise<void> {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -132,7 +160,9 @@ export class MatrixClientManager {
 
     public async start(assignOpts: MatrixClientAssignOpts = {}): Promise<void> {
         const opts = await this.assign(assignOpts);
-        await this.safeGet().startClient(opts);
+        const client = this.safeGet();
+        await client.startClient(opts);
+        forwardOwnUserEvents(client);
     }
 
     private createClient(creds: MatrixCredentials, tokenRefreshFunction?: TokenRefreshFunction): void {
