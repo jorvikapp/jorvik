@@ -37,6 +37,7 @@
     }
   ],
   "afterPack": "scripts/electron-builder-after-pack.cjs",
+  "artifactBuildCompleted": "scripts/electron-builder-artifact-build-completed.cjs",
   "win": {
     "target": [
       "nsis"

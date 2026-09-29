@@ -60,7 +60,7 @@ jobs:
         if: matrix.artifact == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm
+          sudo apt-get install -y rpm zsync
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @heorot/desktop run ${{ matrix.target }}
       - name: Verify packaged Linux icon
@@ -85,6 +85,11 @@ jobs:
           # above. build/ is gitignored, so a missing build/icons makes Electron
           # Builder fall back to its stock icon without failing the build.
           cmp squashfs-root/usr/share/icons/hicolor/256x256/apps/jorvik.png build/icons/256x256.png
+          # AppImageUpdate needs both the embedded update information and the
+          # .zsync beside the AppImage; without either, users silently get no
+          # updates.
+          test -n "$("$appimage" --appimage-updateinformation)"
+          test -f "${appimage}.zsync"
           ls -lh dist-electron/*.AppImage
       - name: Verify Linux package set
         if: matrix.artifact == 'linux'
@@ -145,7 +150,7 @@ jobs:
           # and elevate.exe on every release up to v1.0.5.
           find release-assets -type f ! -path '*-unpacked/*' \
             \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.zip' \
-               -o -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' -o -name '*.snap' \) \
+               -o -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' -o -name '*.snap' -o -name '*.AppImage.zsync' \) \
             -exec cp {} release-files/ \;
           ls -lh release-files/
           # A layout change upstream must not quietly publish an empty release.

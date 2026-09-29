@@ -14,8 +14,11 @@ releases is normal.
    `release/*` branches were deleted once they were all identical to `main`.
 3. **Tag and push the tag**: `git tag -a vX.Y.Z -m "Jorvik X.Y.Z" && git push origin vX.Y.Z`.
 4. **Watch the run.** Windows, macOS and Linux build in parallel, then a publish
-   job attaches the assets. Seven are expected: `.exe`, `.dmg`, `-mac.zip`,
-   `.AppImage`, `.deb`, `.rpm`, `.tar.gz`.
+   job attaches the assets. These are expected: `.exe`, `.dmg`, `-mac.zip`,
+   `.AppImage`, `.AppImage.zsync`, `.deb`, `.rpm`, `.tar.gz`, `.snap`.
+   The `.zsync` is what AppImageUpdate, Gear Lever and AppImageLauncher fetch
+   to update the AppImage; a build hook writes it and embeds the matching
+   update information (`scripts/electron-builder-artifact-build-completed.cjs`).
 5. **The snap publishes itself.** On a tag, the Linux job uploads
    `Jorvik-<version>.snap` to the Snap Store stable channel using the
    `SNAPCRAFT_STORE_CREDENTIALS` repository secret. Nothing to do, but if that
