@@ -19,6 +19,7 @@ import {
 import { useMatrix } from "../providers/MatrixProvider";
 import { formatUserIdForDisplay } from "../../core/users/formatUserId";
 import { isPresenceEnabledForClient } from "../presence/presenceConfig";
+import { useAutoIdle } from "../presence/useAutoIdle";
 import { usePresenceSelection } from "../presence/usePresenceSelection";
 import { StatusMenu } from "./presence/StatusMenu";
 import { ensureDirectRoomMapping, getDirectRoomIds } from "../adapters/dmAdapter";
@@ -1105,7 +1106,8 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         () => isPresenceEnabledForClient(coreConfig, client),
         [client, coreConfig],
     );
-    const presenceControl = usePresenceSelection(client, presenceEnabled);
+    const userAway = useAutoIdle(presenceEnabled ? userSettings.privacy.autoIdleMinutes * 60_000 : 0);
+    const presenceControl = usePresenceSelection(client, presenceEnabled, userAway);
     useEffect(() => {
         const desktopBadge = window.heorotDesktop?.setBadgeCount;
         if (!desktopBadge) {
@@ -2679,10 +2681,14 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                                     aria-haspopup="menu"
                                     aria-expanded={statusMenuOpen}
                                     onClick={() => setStatusMenuOpen((open) => !open)}
-                                    title="Set your status"
+                                    title={
+                                        presenceControl.autoIdle
+                                            ? "Idle while you're away. Set your status"
+                                            : "Set your status"
+                                    }
                                 >
                                     <span
-                                        className={`status-menu-dot is-${presenceControl.selection.choice}`}
+                                        className={`status-menu-dot is-${presenceControl.effectiveChoice}`}
                                         aria-hidden="true"
                                     />
                                 </button>
@@ -2779,6 +2785,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                             activeSpaceId={selectedSpaceId === PEOPLE_SPACE_ID ? null : selectedSpaceId}
                             customReactionImagesEnabled={renderReactionImages}
                             showReadReceipts={shouldShowReadReceipts}
+                            userAway={userAway}
                         />
                         <div className="main-chat-composer">
                             <Composer

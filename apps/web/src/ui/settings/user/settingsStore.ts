@@ -20,7 +20,12 @@ export interface NotificationsSettings {
 export interface PrivacySettings {
     showReadReceipts: boolean;
     allowDmsFromServerMembers: boolean;
+    /** Minutes without activity before an Online status shows as Idle; 0 turns it off. */
+    autoIdleMinutes: number;
 }
+
+export const AUTO_IDLE_MINUTE_CHOICES = [0, 5, 10, 15, 30, 60] as const;
+const DEFAULT_AUTO_IDLE_MINUTES = 10;
 
 export interface AudioSettings {
     preferredAudioInputId: string;
@@ -61,6 +66,7 @@ const DEFAULT_SETTINGS: UserLocalSettings = {
     privacy: {
         showReadReceipts: true,
         allowDmsFromServerMembers: true,
+        autoIdleMinutes: DEFAULT_AUTO_IDLE_MINUTES,
     },
     audio: {
         preferredAudioInputId: "default",
@@ -127,6 +133,9 @@ function normalizeSettings(raw: unknown): UserLocalSettings {
         privacy: {
             showReadReceipts: privacy.showReadReceipts !== false,
             allowDmsFromServerMembers: privacy.allowDmsFromServerMembers !== false,
+            autoIdleMinutes: (AUTO_IDLE_MINUTE_CHOICES as readonly unknown[]).includes(privacy.autoIdleMinutes)
+                ? (privacy.autoIdleMinutes as number)
+                : DEFAULT_AUTO_IDLE_MINUTES,
         },
         audio: {
             preferredAudioInputId:

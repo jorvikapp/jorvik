@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClientEvent, SyncState, type MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import {
@@ -13,6 +13,9 @@ import {
 
 export interface PresenceSelectionController {
     selection: PresenceSelection;
+    /** What is published: the selection, or Idle while auto-idle applies. */
+    effectiveChoice: PresenceChoice;
+    autoIdle: boolean;
     setChoice: (choice: PresenceChoice) => void;
     setStatusMessage: (statusMessage: string) => void;
     error: string | null;
@@ -24,15 +27,26 @@ export interface PresenceSelectionController {
  * The selection is re-applied after every reconnect: a fresh sync makes the
  * server assert its own view of presence, which would otherwise quietly undo
  * "Invisible" or "Idle" the first time the connection drops.
+ *
+ * While `away` is true an Online selection is published as Idle, without
+ * changing or saving the selection itself; the other choices are left alone.
  */
 export function usePresenceSelection(
     client: MatrixClient | null,
     enabled: boolean,
+    away = false,
 ): PresenceSelectionController {
     const [selection, setSelection] = useState<PresenceSelection>(() => loadPresenceSelection());
     const [error, setError] = useState<string | null>(null);
     const selectionRef = useRef(selection);
     selectionRef.current = selection;
+    const autoIdle = away && selection.choice === "online";
+    const effective = useMemo<PresenceSelection>(
+        () => (autoIdle ? { ...selection, choice: "idle" } : selection),
+        [autoIdle, selection],
+    );
+    const effectiveRef = useRef(effective);
+    effectiveRef.current = effective;
 
     const publish = useCallback(
         (next: PresenceSelection): void => {
@@ -59,13 +73,16 @@ export function usePresenceSelection(
         [client, enabled],
     );
 
-    // Apply the stored selection on startup, and again after any reconnect.
+    // Publish on startup and whenever the choice, the message or auto-idle changes.
+    useEffect(() => {
+        publish(effective);
+    }, [effective, publish]);
+
+    // Apply it again after any reconnect.
     useEffect(() => {
         if (!client || !enabled) {
             return;
         }
-
-        publish(selectionRef.current);
 
         let wasDisconnected = false;
         const onSync = (state: SyncState): void => {
@@ -75,7 +92,7 @@ export function usePresenceSelection(
             }
             if (state === SyncState.Syncing && wasDisconnected) {
                 wasDisconnected = false;
-                publish(selectionRef.current);
+                publish(effectiveRef.current);
             }
         };
 
@@ -91,9 +108,8 @@ export function usePresenceSelection(
             const next: PresenceSelection = { ...selectionRef.current, choice };
             setSelection(next);
             savePresenceSelection(next);
-            publish(next);
         },
-        [publish],
+        [],
     );
 
     const setStatusMessage = useCallback(
@@ -104,10 +120,9 @@ export function usePresenceSelection(
             };
             setSelection(next);
             savePresenceSelection(next);
-            publish(next);
         },
-        [publish],
+        [],
     );
 
-    return { selection, setChoice, setStatusMessage, error };
+    return { selection, effectiveChoice: effective.choice, autoIdle, setChoice, setStatusMessage, error };
 }

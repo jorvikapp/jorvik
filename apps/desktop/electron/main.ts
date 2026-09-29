@@ -10,6 +10,7 @@ import {
     nativeImage,
     net,
     Notification as ElectronNotification,
+    powerMonitor,
     protocol,
     session,
     Tray,
@@ -636,6 +637,10 @@ function registerIpc(): void {
     // build-time constant comes from whatever built the web bundle, which is
     // not necessarily the installer the user actually has.
     ipcMain.handle("heorot:getAppVersion", () => app.getVersion());
+
+    // Seconds since the last input anywhere on the system, so auto-idle can
+    // tell someone gaming or browsing from someone away from the computer.
+    ipcMain.handle("heorot:getSystemIdleSeconds", () => powerMonitor.getSystemIdleTime());
 }
 
 async function bootstrap(): Promise<void> {

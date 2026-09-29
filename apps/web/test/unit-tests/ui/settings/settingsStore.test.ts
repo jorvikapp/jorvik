@@ -29,6 +29,7 @@ function createSettings(partial?: Partial<UserLocalSettings>): UserLocalSettings
         privacy: {
             showReadReceipts: true,
             allowDmsFromServerMembers: true,
+            autoIdleMinutes: 10,
         },
         audio: {
             preferredAudioInputId: "default",
@@ -111,6 +112,21 @@ describe("settingsStore", () => {
         expect(settings.privacy.showReadReceipts).toBe(false);
         expect(settings.audio.preferredAudioInputId).toBe("mic-1");
         expect(settings.audio.micProfile).toBe("music");
+    });
+
+    it("defaults auto-idle to 10 minutes and keeps only the offered choices", () => {
+        const load = (autoIdleMinutes: unknown): number => {
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ privacy: { autoIdleMinutes } }));
+            return loadUserLocalSettings().privacy.autoIdleMinutes;
+        };
+
+        window.localStorage.removeItem(STORAGE_KEY);
+        expect(loadUserLocalSettings().privacy.autoIdleMinutes).toBe(10);
+        expect(load(0)).toBe(0);
+        expect(load(30)).toBe(30);
+        expect(load(7)).toBe(10);
+        expect(load("15")).toBe(10);
+        expect(load(null)).toBe(10);
     });
 
     it("saveUserLocalSettings writes JSON into local storage", () => {

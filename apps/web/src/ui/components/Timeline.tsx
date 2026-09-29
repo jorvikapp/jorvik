@@ -37,6 +37,8 @@ interface TimelineProps {
     activeSpaceId: string | null;
     customReactionImagesEnabled: boolean;
     showReadReceipts: boolean;
+    /** Auto-idle says the user is away: hold read receipts until they are back. */
+    userAway?: boolean;
 }
 
 interface LightboxState {
@@ -1248,6 +1250,7 @@ export function Timeline({
     activeSpaceId,
     customReactionImagesEnabled,
     showReadReceipts,
+    userAway = false,
 }: TimelineProps): React.ReactElement {
     const decryptTuning = useMemo<DecryptTuning>(() => loadDecryptTuning(), []);
     const [events, setEvents] = useState<MatrixEvent[]>(() => extractMessageEvents(room));
@@ -1968,7 +1971,10 @@ export function Timeline({
         if (!container || !room || events.length === 0) {
             return;
         }
-        if (!isTimelineUserVisible()) {
+        // A message arriving while the user is away was not read. The receipt
+        // would also make Synapse put an idle device back online, so the
+        // status would flash Online with every message.
+        if (!isTimelineUserVisible() || userAway) {
             return;
         }
 
@@ -1976,7 +1982,7 @@ export function Timeline({
         if (stickToBottomRef.current || distanceFromBottom <= READ_MARK_BOTTOM_THRESHOLD_PX) {
             void markActiveRoomReadToLatest();
         }
-    }, [events, markActiveRoomReadToLatest, room]);
+    }, [events, markActiveRoomReadToLatest, room, userAway]);
 
     useEffect(() => {
         markReadIfAtBottom();
