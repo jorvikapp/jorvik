@@ -1264,6 +1264,9 @@ export function Timeline({
 
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const stickToBottomRef = useRef(true);
+    // Where the timeline last scrolled to, so a scroll event can tell the user
+    // moving up from content growing underneath a pinned view.
+    const lastScrollTopRef = useRef(0);
     const decryptedMediaUrlsRef = useRef<Record<string, string | null>>({});
     const inFlightDecryptionsRef = useRef<Set<string>>(new Set());
     const queuedDecryptionsRef = useRef<Set<string>>(new Set());
@@ -1890,6 +1893,7 @@ export function Timeline({
         }
 
         container.scrollTop = container.scrollHeight;
+        lastScrollTopRef.current = container.scrollTop;
     }, [events]);
 
     useEffect(() => {
@@ -1904,6 +1908,7 @@ export function Timeline({
                 return;
             }
             container.scrollTop = container.scrollHeight;
+            lastScrollTopRef.current = container.scrollTop;
         };
 
         scrollToBottom();
@@ -2000,7 +2005,12 @@ export function Timeline({
         }
 
         const distanceFromBottom = container.scrollHeight - (container.scrollTop + container.clientHeight);
-        stickToBottomRef.current = distanceFromBottom < 100;
+        // A scroll event arrives a frame late, and an image that finished in
+        // between can leave a view that was pinned well short of the bottom.
+        // Only moving up means the user left it.
+        const movedUp = container.scrollTop < lastScrollTopRef.current;
+        lastScrollTopRef.current = container.scrollTop;
+        stickToBottomRef.current = distanceFromBottom < 100 || (stickToBottomRef.current && !movedUp);
         if (distanceFromBottom <= READ_MARK_BOTTOM_THRESHOLD_PX) {
             void markActiveRoomReadToLatest();
         }
@@ -2054,6 +2064,30 @@ export function Timeline({
                 : new Map<string, ReadReceiptEntry[]>(),
         [client, events, ownUserId, room, showReadReceipts],
     );
+
+    // Images, decrypted media and link previews reserve no space and arrive
+    // well after the scrolls above, so a room with pictures near the end opened
+    // above its last message. Follow every size change while pinned instead.
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container || typeof ResizeObserver === "undefined") {
+            return undefined;
+        }
+
+        const observer = new ResizeObserver(() => {
+            if (stickToBottomRef.current) {
+                container.scrollTop = container.scrollHeight;
+                lastScrollTopRef.current = container.scrollTop;
+            }
+        });
+        observer.observe(container);
+        for (const child of Array.from(container.children)) {
+            observer.observe(child);
+        }
+        return () => {
+            observer.disconnect();
+        };
+    }, [renderEvents]);
 
     if (!room) {
         return <div className="timeline-empty">Pick a room to start chatting.</div>;
