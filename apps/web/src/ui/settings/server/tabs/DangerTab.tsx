@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import type { MatrixClient, Room } from "matrix-js-sdk/src/matrix";
+import { EventType, type MatrixClient, type Room } from "matrix-js-sdk/src/matrix";
 
 import type { ToastState } from "../../../components/Toast";
+import { DeleteSpaceDialog } from "./DeleteSpaceDialog";
 
 interface DangerTabProps {
     client: MatrixClient;
@@ -12,7 +13,13 @@ interface DangerTabProps {
 
 export function DangerTab({ client, spaceRoom, onLeftSpace, onToast }: DangerTabProps): React.ReactElement {
     const [leaving, setLeaving] = useState(false);
+    const [deleteOpen, setDeleteOpen] = useState(false);
     const spaceName = spaceRoom.name || spaceRoom.getCanonicalAlias() || spaceRoom.roomId;
+    const myUserId = client.getUserId() ?? "";
+    const myLevel = spaceRoom.getMember(myUserId)?.powerLevel ?? 0;
+    const canDelete =
+        spaceRoom.currentState.maySendStateEvent(EventType.RoomJoinRules, myUserId) &&
+        spaceRoom.currentState.hasSufficientPowerLevelFor("kick", myLevel);
 
     const leaveSpace = async (): Promise<void> => {
         const confirmed = window.confirm(`Leave "${spaceName}"?`);
@@ -59,13 +66,42 @@ export function DangerTab({ client, spaceRoom, onLeftSpace, onToast }: DangerTab
 
             <div className="settings-danger-card">
                 <div>
-                    <h3>Delete server (TODO)</h3>
-                    <p>Not implemented in UI yet.</p>
+                    <h3>Delete server</h3>
+                    <p>
+                        {canDelete
+                            ? "Removes everyone from this server and its channels, closes them so nobody can rejoin, and leaves. Messages stay on servers that already have them."
+                            : "Only someone who can remove members and change settings in this server can delete it."}
+                    </p>
                 </div>
-                <button type="button" className="settings-button settings-button-secondary" disabled>
+                <button
+                    type="button"
+                    className="settings-button settings-button-danger"
+                    onClick={() => setDeleteOpen(true)}
+                    disabled={!canDelete || leaving}
+                >
                     Delete server
                 </button>
             </div>
+
+            <DeleteSpaceDialog
+                client={client}
+                spaceRoom={spaceRoom}
+                spaceName={spaceName}
+                open={deleteOpen}
+                onClose={() => setDeleteOpen(false)}
+                onDeleted={({ remaining }) => {
+                    setDeleteOpen(false);
+                    onLeftSpace(spaceRoom.roomId);
+                    onToast(
+                        remaining.length === 0
+                            ? { type: "success", message: `Deleted ${spaceName}.` }
+                            : {
+                                  type: "info",
+                                  message: `Deleted ${spaceName}, but ${remaining.length} ${remaining.length === 1 ? "person" : "people"} could not be removed and still have access.`,
+                              },
+                    );
+                }}
+            />
         </div>
     );
 }

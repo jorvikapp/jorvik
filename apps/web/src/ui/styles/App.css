@@ -2116,6 +2116,11 @@ textarea {
     background: var(--status-dnd);
 }
 
+.delete-space-list {
+    margin: 6px 0 0;
+    padding-left: 18px;
+}
+
 .settings-blocked-list {
     list-style: none;
     margin: 0;
