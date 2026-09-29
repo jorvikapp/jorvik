@@ -26,6 +26,8 @@ interface RightPanelProps {
     onLeaveRoom: () => Promise<void>;
     onOpenRoom: (roomId: string) => void;
     onToast?: (toast: { type: "success" | "error" | "info"; message: string }) => void;
+    onStartCall?: (userId: string) => void;
+    onAddToRoom?: (userId: string) => void;
 }
 
 export function RightPanel({
@@ -45,6 +47,8 @@ export function RightPanel({
     onLeaveRoom,
     onOpenRoom,
     onToast,
+    onStartCall,
+    onAddToRoom,
 }: RightPanelProps): React.ReactElement {
     if (!room) {
         return (
@@ -65,6 +69,8 @@ export function RightPanel({
                     onBack={onBackToRoom}
                     onOpenRoom={onOpenRoom}
                     onToast={onToast}
+                    onStartCall={onStartCall}
+                    onAddToRoom={onAddToRoom}
                 />
             ) : (
                 <>
@@ -77,6 +83,8 @@ export function RightPanel({
                             onBack={onCloseRoomPanel}
                             onOpenRoom={onOpenRoom}
                             onToast={onToast}
+                            onStartCall={onStartCall}
+                            onAddToRoom={onAddToRoom}
                         />
                     ) : null}
                     {roomMode === "members" && !directPartnerId ? (

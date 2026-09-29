@@ -62,6 +62,9 @@ import { CreateSpaceDialog } from "./rooms/CreateSpaceDialog";
 import { ImportJsonWizard } from "./rooms/ImportJsonWizard";
 import { CreateDirectChatDialog } from "./rooms/CreateDirectChatDialog";
 import { InviteDialog } from "./rooms/InviteDialog";
+import { AddToRoomDialog } from "./rooms/AddToRoomDialog";
+import { IncomingCallPrompt } from "./calls/IncomingCallPrompt";
+import { useCallController } from "../calls/useCallController";
 import { JoinRoomDialog } from "./rooms/JoinRoomDialog";
 import { RoomModerationDialog } from "./rooms/RoomModerationDialog";
 import { RoomSettingsDialog } from "./rooms/RoomSettingsDialog";
@@ -937,6 +940,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const [voiceSessionRoomId, setVoiceSessionRoomId] = useState<string | null>(null);
     const [voiceSessionStatus, setVoiceSessionStatus] = useState<VoiceSessionStatus>("disconnected");
     const [voiceAutoJoinNonce, setVoiceAutoJoinNonce] = useState(0);
+    const [addToRoomUserId, setAddToRoomUserId] = useState<string | null>(null);
     const [voiceControlState, setVoiceControlState] = useState<VoiceControlState>(DEFAULT_VOICE_CONTROL_STATE);
     const [voiceSpeakingByRoomId, setVoiceSpeakingByRoomId] = useState<Map<string, Set<string>>>(new Map());
     const [voiceScreenShareByRoomId, setVoiceScreenShareByRoomId] = useState<Map<string, Set<string>>>(new Map());
@@ -1775,6 +1779,8 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         userSettings.privacy.showReadReceipts && selectedSpaceId === PEOPLE_SPACE_ID && isActiveRoomDirect;
     const isActiveRoomVoiceChannel = isRoomVoiceChannel(activeRoom);
     const shouldShowVoicePanel = Boolean(activeRoom && isActiveRoomVoiceChannel && voiceSessionRoomId === activeRoom.roomId);
+    // A call in a DM shows above the chat instead of replacing it.
+    const shouldShowCallPanel = Boolean(activeRoom && !isActiveRoomVoiceChannel && voiceSessionRoomId === activeRoom.roomId);
     const shouldPrefixRoomWithHash = selectedSpaceId !== PEOPLE_SPACE_ID;
     const activeVoiceSessionRoom = useMemo(
         () => (voiceSessionRoomId ? roomById.get(voiceSessionRoomId) ?? client.getRoom(voiceSessionRoomId) ?? null : null),
@@ -2109,6 +2115,27 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         [client, directRoomIds, openRoomAtBottom, spaces],
     );
 
+    // A call is a voice session on the DM room, started the way picking a voice channel starts one.
+    const startVoiceSession = useCallback((roomId: string): void => {
+        setVoiceSessionRoomId(roomId);
+        setVoiceSessionStatus("joining");
+        setVoiceAutoJoinNonce((value) => value + 1);
+    }, []);
+    const leaveVoiceSession = useCallback((): void => {
+        runVoiceRoomAction((voiceRoom) => voiceRoom.leave(), "Unable to leave the call.");
+    }, [runVoiceRoomAction]);
+    const calls = useCallController({
+        client,
+        doNotDisturb: presenceEnabled && presenceControl.selection.choice === "dnd",
+        voiceSessionRoomId,
+        voiceSessionStatus,
+        voiceParticipantsByRoomId,
+        startVoiceSession,
+        leaveVoiceSession,
+        openRoom: focusRoom,
+        notify: pushToast,
+    });
+
     const requestJoinRoom = useCallback(
         async (target: string, options?: { viaServers?: string[]; preferredSpaceId?: string | null }): Promise<string> => {
             const joinedRoom = await joinRoomWithRetry(client, target, { viaServers: options?.viaServers });
@@ -2414,6 +2441,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             inviteOpen ||
             roomSettingsRoomId ||
             roomModerationOpen ||
+            addToRoomUserId ||
             settingsState,
     );
 
@@ -2731,10 +2759,20 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     onCopyRoomLink={copyActiveRoomLink}
                     onLeaveRoom={leaveActiveRoom}
                 />
+                {calls.outgoingCall && !calls.outgoingCall.answered && activeRoom?.roomId === calls.outgoingCall.roomId ? (
+                    <div className="call-status-bar" role="status">
+                        <span>
+                            Calling {client.getUser(calls.outgoingCall.calleeId)?.displayName || calls.outgoingCall.calleeId}...
+                        </span>
+                        <button type="button" className="call-status-cancel" onClick={leaveVoiceSession}>
+                            Cancel
+                        </button>
+                    </div>
+                ) : null}
                 {hasActiveVoiceSession && voiceSessionRoomId ? (
                     <div
-                        className={`main-voice-slot${shouldShowVoicePanel ? "" : " voice-room-hidden"}`}
-                        aria-hidden={!shouldShowVoicePanel}
+                        className={`main-voice-slot${shouldShowVoicePanel ? "" : shouldShowCallPanel ? " is-call" : " voice-room-hidden"}`}
+                        aria-hidden={!shouldShowVoicePanel && !shouldShowCallPanel}
                     >
                         <VoiceRoom
                             ref={voiceRoomRef}
@@ -2821,6 +2859,8 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     onLeaveRoom={leaveActiveRoom}
                     onOpenRoom={focusRoom}
                     onToast={pushToast}
+                    onStartCall={(userId) => void calls.startCall(userId)}
+                    onAddToRoom={setAddToRoomUserId}
                 />
             ) : null}
             {emojiUploadOpen && emojiUploadTarget ? (
@@ -2902,6 +2942,20 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     pushToast({ type: "success", message: "Joined room." });
                 }}
             />
+            <AddToRoomDialog
+                client={client}
+                userId={addToRoomUserId}
+                onClose={() => setAddToRoomUserId(null)}
+                onInvited={(message) => pushToast({ type: "success", message })}
+            />
+            {calls.incomingCall ? (
+                <IncomingCallPrompt
+                    client={client}
+                    call={calls.incomingCall}
+                    onAccept={calls.acceptIncomingCall}
+                    onDecline={calls.declineIncomingCall}
+                />
+            ) : null}
             <InviteDialog
                 client={client}
                 room={inviteTargetRoom}

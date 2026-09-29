@@ -17,6 +17,8 @@ interface ProfileHeaderProps {
     onCopyMxid: () => Promise<void>;
     onCopyUserId: () => Promise<void>;
     onMessage?: () => Promise<void>;
+    onCall?: () => void;
+    onAdd?: () => void;
 }
 
 function hashToHue(value: string): number {
@@ -37,6 +39,8 @@ export function ProfileHeader({
     onCopyMxid,
     onCopyUserId,
     onMessage,
+    onCall,
+    onAdd,
 }: ProfileHeaderProps): React.ReactElement {
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement | null>(null);
@@ -101,12 +105,16 @@ export function ProfileHeader({
                         Message
                     </button>
                 ) : null}
-                <button type="button" className="rp-icon-btn" disabled>
-                    Call
-                </button>
-                <button type="button" className="rp-icon-btn" disabled>
-                    Add
-                </button>
+                {onCall ? (
+                    <button type="button" className="rp-icon-btn" onClick={onCall}>
+                        Call
+                    </button>
+                ) : null}
+                {onAdd ? (
+                    <button type="button" className="rp-icon-btn" onClick={onAdd} title="Invite to a space or channel">
+                        Add
+                    </button>
+                ) : null}
                 <div className="rp-profile-menu" ref={menuRef}>
                     <button
                         type="button"

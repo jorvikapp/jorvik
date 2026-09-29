@@ -198,6 +198,28 @@ function playScreenShareStopTone(): Promise<void> {
     });
 }
 
+/**
+ * Rings (two notes every two seconds) until the returned function is called.
+ * One AudioContext for the whole ring, so stopping silences it at once.
+ */
+export function startRingtone(): () => void {
+    const context = getAudioContext();
+    if (!context) return () => undefined;
+    void context.resume().catch(() => undefined);
+
+    const ringOnce = (): void => {
+        const now = context.currentTime;
+        makeOscillator(context, 784, now, now + 0.35, 0.09, "sine");
+        makeOscillator(context, 988, now + 0.4, now + 0.75, 0.09, "sine");
+    };
+    ringOnce();
+    const intervalId = window.setInterval(ringOnce, 2000);
+    return () => {
+        window.clearInterval(intervalId);
+        void context.close().catch(() => undefined);
+    };
+}
+
 export async function playNotificationSound(customSoundUrl: string | null): Promise<void> {
     stopActiveAudio();
 

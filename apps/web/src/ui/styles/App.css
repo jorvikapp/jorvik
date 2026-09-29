@@ -2018,6 +2018,160 @@ textarea {
     flex: 1;
 }
 
+/* A call in a DM: the voice panel sits above the chat instead of replacing it. */
+.main-voice-slot.is-call {
+    flex: 0 0 auto;
+    height: min(40%, 320px);
+    border-bottom: 1px solid var(--border);
+}
+
+.call-status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-pane);
+    color: var(--text-main);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.call-status-cancel {
+    border: 0;
+    border-radius: 6px;
+    padding: 5px 10px;
+    background: var(--status-dnd);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.incoming-call {
+    position: fixed;
+    top: calc(16px + var(--desktop-titlebar-overlay-height, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2100;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 320px;
+    max-width: calc(100vw - 32px);
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-pane);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.incoming-call-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+}
+
+.incoming-call-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.incoming-call-name {
+    font-weight: 700;
+    color: var(--text-main);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.incoming-call-label {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.incoming-call-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.incoming-call-accept,
+.incoming-call-decline {
+    border: 0;
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.incoming-call-accept {
+    background: var(--status-online);
+}
+
+.incoming-call-decline {
+    background: var(--status-dnd);
+}
+
+.add-to-room-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 320px;
+    overflow-y: auto;
+    margin-top: 10px;
+}
+
+.add-to-room-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    border: 0;
+    border-radius: 8px;
+    padding: 9px 10px;
+    background: var(--bg-input);
+    color: var(--text-main);
+    text-align: left;
+    cursor: pointer;
+}
+
+.add-to-room-item:hover:not(:disabled) {
+    background: var(--bg-hover);
+}
+
+.add-to-room-item:disabled {
+    cursor: default;
+    opacity: 0.7;
+}
+
+.add-to-room-label {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.add-to-room-detail {
+    color: var(--text-muted);
+    font-size: 12px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.add-to-room-action {
+    margin-left: auto;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+}
+
 .main-chat-stack {
     flex: 1;
     min-height: 0;
