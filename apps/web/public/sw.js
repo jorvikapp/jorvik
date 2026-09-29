@@ -5,6 +5,13 @@ const PICKLE_KEY_STORE_NAME = "pickleKey";
 const DB_NAME = "heorot-core";
 const DB_VERSION = 1;
 const SERVER_SUPPORT_TTL_MS = 2 * 60 * 60 * 1000;
+// Opening a member list starts dozens of avatar requests at once. Each used to
+// ask the page for user info (which waits for the page's main thread, busy
+// rendering the very view that wants the avatars), read IndexedDB, decrypt the
+// token and, after the worker had idled, probe /versions -- per image. Sharing
+// one result for a short while makes the rest of the burst free. A 401 drops
+// it early, so a rotated token costs one retry rather than broken images.
+const AUTH_DATA_TTL_MS = 5 * 60 * 1000;
 const V3_MEDIA_PATH_PREFIX = "/_matrix/media/v3/";
 const AUTH_MEDIA_PATH_PREFIX = "/_matrix/client/v1/media/";
 const V3_DOWNLOAD_PATH_PREFIX = "/_matrix/media/v3/download";
@@ -13,6 +20,8 @@ const AUTH_DOWNLOAD_PATH_PREFIX = "/_matrix/client/v1/media/download";
 const AUTH_THUMBNAIL_PATH_PREFIX = "/_matrix/client/v1/media/thumbnail";
 
 const serverSupportMap = {};
+const serverSupportProbes = {};
+let authDataCache = null;
 let dbPromise;
 let cachedUserInfo = null;
 
@@ -76,7 +85,17 @@ self.addEventListener("message", (event) => {
         return;
     }
 
-    setCachedUserInfo(event.data);
+    const previous = cachedUserInfo;
+    const next = setCachedUserInfo(event.data);
+    // The page also sends this after answering every handshake, so only a real
+    // change (login, logout, another account) may drop the shared auth data.
+    if (
+        previous?.userId !== next?.userId ||
+        previous?.deviceId !== next?.deviceId ||
+        previous?.homeserver !== next?.homeserver
+    ) {
+        authDataCache = null;
+    }
 });
 
 self.addEventListener("install", (event) => {
@@ -116,7 +135,7 @@ async function handleMediaRequest(event, url) {
         await new Promise((resolve) => setTimeout(resolve, Math.random() * 10));
 
         const client = event.clientId ? await self.clients.get(event.clientId) : null;
-        authData = await getAuthData(client);
+        authData = await getSharedAuthData(client);
         const homeserverOrigin = new URL(authData.homeserver).origin;
 
         if (requestUrl.origin !== homeserverOrigin) {
@@ -141,7 +160,23 @@ async function handleMediaRequest(event, url) {
         requestUrl.pathname = `${V3_MEDIA_PATH_PREFIX}${requestUrl.pathname.slice(AUTH_MEDIA_PATH_PREFIX.length)}`;
     }
 
-    const response = await fetch(requestUrl, fetchConfigForToken(authData?.accessToken));
+    let response = await fetch(requestUrl, fetchConfigForToken(authData?.accessToken));
+
+    // The shared token may have rotated since it was read. Read it afresh once
+    // before falling back.
+    if (response.status === 401 && authData?.accessToken) {
+        authDataCache = null;
+        try {
+            const client = event.clientId ? await self.clients.get(event.clientId) : null;
+            const freshAuthData = await getSharedAuthData(client);
+            if (freshAuthData.accessToken !== authData.accessToken) {
+                authData = freshAuthData;
+                response = await fetch(requestUrl, fetchConfigForToken(authData.accessToken));
+            }
+        } catch (error) {
+            console.warn("SW: Unable to refresh auth data after a 401.", error);
+        }
+    }
 
     // A rewritten request can 401 on a token that has rotated since we were
     // handed it. The original URL is unauthenticated and works on servers that
@@ -166,6 +201,16 @@ async function tryUpdateServerSupportMap(origin, accessToken) {
         return;
     }
 
+    // Concurrent requests share one probe instead of each sending their own.
+    if (!serverSupportProbes[origin]) {
+        serverSupportProbes[origin] = probeServerSupport(origin, accessToken).finally(() => {
+            delete serverSupportProbes[origin];
+        });
+    }
+    await serverSupportProbes[origin];
+}
+
+async function probeServerSupport(origin, accessToken) {
     const config = fetchConfigForToken(accessToken);
     const versions = await (await fetch(`${origin}/_matrix/client/versions`, config)).json();
     const supportsAuthedMedia =
@@ -206,6 +251,20 @@ function generateResponseKey() {
     }
 
     return out;
+}
+
+async function getSharedAuthData(client) {
+    if (!authDataCache || authDataCache.expiresAtMs <= Date.now()) {
+        const promise = getAuthData(client);
+        const entry = { promise, expiresAtMs: Date.now() + AUTH_DATA_TTL_MS };
+        authDataCache = entry;
+        promise.catch(() => {
+            if (authDataCache === entry) {
+                authDataCache = null;
+            }
+        });
+    }
+    return await authDataCache.promise;
 }
 
 async function getAuthData(client) {
