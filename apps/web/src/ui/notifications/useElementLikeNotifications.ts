@@ -23,6 +23,8 @@ interface UseElementLikeNotificationsOptions {
     activeRoomId: string | null;
     hasOpenDialog: boolean;
     settings: NotificationsSettings;
+    /** The user's status is Do Not Disturb. */
+    doNotDisturb: boolean;
 }
 
 const MAX_PENDING_ENCRYPTED = 20;
@@ -143,8 +145,11 @@ export function useElementLikeNotifications({
     activeRoomId,
     hasOpenDialog,
     settings,
+    doNotDisturb,
 }: UseElementLikeNotificationsOptions): void {
     const settingsRef = useRef(settings);
+    const doNotDisturbRef = useRef(doNotDisturb);
+    doNotDisturbRef.current = doNotDisturb;
     const activeRoomIdRef = useRef(activeRoomId);
     const hasOpenDialogRef = useRef(hasOpenDialog);
     const pendingEncryptedEventIdsRef = useRef<string[]>([]);
@@ -344,6 +349,15 @@ export function useElementLikeNotifications({
             const isViewingEventTimeline = activeRoomIdRef.current === room.roomId && !threadId;
 
             if (isViewingEventTimeline && userActiveRecently() && !hasOpenDialogRef.current) {
+                return;
+            }
+
+            // Do Not Disturb silences the popup and the sound for everything,
+            // mentions and DMs included, like Discord. Unread counts and the
+            // badge are worked out elsewhere and keep updating. The event is
+            // already marked processed, so nothing replays when DND ends.
+            if (doNotDisturbRef.current) {
+                console.log("[jorvik-notification] renderer suppressed by do not disturb");
                 return;
             }
 

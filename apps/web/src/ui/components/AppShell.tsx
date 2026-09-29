@@ -2422,6 +2422,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         activeRoomId,
         hasOpenDialog,
         settings: userSettings.notifications,
+        doNotDisturb: presenceEnabled && presenceControl.selection.choice === "dnd",
     });
 
     return (

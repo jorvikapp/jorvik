@@ -1,5 +1,5 @@
 import { SetPresence } from "matrix-js-sdk/src/sync";
-import type { MatrixClient } from "matrix-js-sdk/src/matrix";
+import { Method, type MatrixClient } from "matrix-js-sdk/src/matrix";
 
 /** What the user picked, independent of how Matrix encodes it. */
 export type PresenceChoice = "online" | "idle" | "dnd" | "invisible";
@@ -143,9 +143,21 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 
 async function sendPresence(client: MatrixClient, selection: PresenceSelection): Promise<void> {
     const statusMessage = sanitizeStatusMessage(selection.statusMessage);
+    const presence = toPresenceValue(selection.choice);
+    const statusMsg = statusMessage.length > 0 ? statusMessage : undefined;
+
+    // client.setPresence only accepts online, unavailable and offline, and
+    // throws "Bad presence value" for busy before sending anything, so Do Not
+    // Disturb never reached the server. Send that one directly.
+    if (presence === BUSY_PRESENCE) {
+        const path = `/presence/${encodeURIComponent(client.getSafeUserId())}/status`;
+        await client.http.authedRequest(Method.Put, path, undefined, { presence, status_msg: statusMsg });
+        return;
+    }
+
     await client.setPresence({
-        presence: toPresenceValue(selection.choice) as Parameters<MatrixClient["setPresence"]>[0]["presence"],
-        status_msg: statusMessage.length > 0 ? statusMessage : undefined,
+        presence: presence as Parameters<MatrixClient["setPresence"]>[0]["presence"],
+        status_msg: statusMsg,
     });
 }
 
