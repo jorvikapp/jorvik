@@ -2096,7 +2096,7 @@ export function Composer({
                         </div>
                     ) : null
                 }
-                gifPicker={gifPickerOpen && room ? <div className="composer-emoji-picker-popover"><GifPicker onClose={() => setGifPickerOpen(false)} onSelect={(url, title) => void handleGifSelection(url, title)} /></div> : null}
+                gifPicker={gifPickerOpen && room ? <div className="composer-emoji-picker-popover"><GifPicker client={client} onClose={() => setGifPickerOpen(false)} onSelect={(url, title) => void handleGifSelection(url, title)} /></div> : null}
             />
             {composerPreview.hasCustomEmoji ? (
                 <div className="composer-live-preview" role="status" aria-live="polite">
