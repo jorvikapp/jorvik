@@ -12,6 +12,8 @@ interface MessageContextMenuProps {
     canEdit: boolean;
     canDelete: boolean;
     canCopyText: boolean;
+    canReport: boolean;
+    onReport: () => void;
     onClose: () => void;
     onReact: () => void;
     onReply: () => void;
@@ -28,6 +30,8 @@ export function MessageContextMenu({
     canEdit,
     canDelete,
     canCopyText,
+    canReport,
+    onReport,
     onClose,
     onReact,
     onReply,
@@ -126,6 +130,15 @@ export function MessageContextMenu({
                     onClick={() => clickAction(onDelete)}
                 >
                     Delete
+                </button>
+            ) : null}
+            {canReport ? (
+                <button
+                    type="button"
+                    className="message-context-menu-item message-context-menu-item-danger"
+                    onClick={() => clickAction(onReport)}
+                >
+                    Report message
                 </button>
             ) : null}
             <button type="button" className="message-context-menu-item" onClick={() => clickAction(onCopyLink)}>

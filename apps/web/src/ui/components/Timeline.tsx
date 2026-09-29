@@ -2058,9 +2058,27 @@ export function Timeline({
         };
     }, [lightbox]);
 
+    // Blocking stops new events from that user arriving; hide what is already here too.
+    const [ignoredUsersRevision, setIgnoredUsersRevision] = useState(0);
+    useEffect(() => {
+        const onAccountData = (accountDataEvent: MatrixEvent): void => {
+            if (accountDataEvent.getType() === EventType.IgnoredUserList) {
+                setIgnoredUsersRevision((revision) => revision + 1);
+            }
+        };
+        client.on(ClientEvent.AccountData, onAccountData);
+        return () => {
+            client.removeListener(ClientEvent.AccountData, onAccountData);
+        };
+    }, [client]);
+    const visibleEvents = useMemo(() => {
+        const ignored = new Set(client.getIgnoredUsers());
+        return ignored.size === 0 ? events : events.filter((event) => !ignored.has(event.getSender() ?? ""));
+    }, [client, events, ignoredUsersRevision]);
+
     const renderEvents = useMemo(
-        () => toRenderEvents(client, room, events, latestEditEventsByTarget),
-        [client, events, latestEditEventsByTarget, room],
+        () => toRenderEvents(client, room, visibleEvents, latestEditEventsByTarget),
+        [client, visibleEvents, latestEditEventsByTarget, room],
     );
     const ownUserId = client.getUserId() ?? null;
     const readReceiptsByEventId = useMemo<Map<string, ReadReceiptEntry[]>>(

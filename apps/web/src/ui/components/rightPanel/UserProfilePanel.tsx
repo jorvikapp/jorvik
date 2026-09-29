@@ -7,6 +7,10 @@ import { useMatrix } from "../../providers/MatrixProvider";
 import { isPresenceEnabledForClient } from "../../presence/presenceConfig";
 import { usePresenceVm } from "../../presence/usePresence";
 import { memberAvatarSources } from "../../adapters/avatar";
+import { isUserOnOwnServer, reportUser, serverNameOf } from "../../../core/moderation/reports";
+import { useIgnoredUsers } from "../../moderation/useIgnoredUsers";
+import { ReportDialog } from "../moderation/ReportDialog";
+import { RoomDialog } from "../rooms/RoomDialog";
 import { ProfileHeader } from "./ProfileHeader";
 import { AboutCard } from "./cards/AboutCard";
 import { RolesCard } from "./cards/RolesCard";
@@ -114,6 +118,11 @@ export function UserProfilePanel({
     const directRoomIds = getDirectRoomIds(client);
     const isCurrentRoomDmWithUser = directRoomIds.has(room.roomId) && Boolean(room.getMember(userId));
     const canMessage = !isCurrentRoomDmWithUser && ownUserId !== userId;
+    const ignoredUsers = useIgnoredUsers(client);
+    const blocked = ignoredUsers.isIgnored(userId);
+    const [confirmBlockOpen, setConfirmBlockOpen] = useState(false);
+    const [reportOpen, setReportOpen] = useState(false);
+    const reportable = isUserOnOwnServer(client, userId);
 
     useEffect(() => {
         let cancelled = false;
@@ -231,14 +240,76 @@ export function UserProfilePanel({
 
             <RolesCard roleLabel={role.label} roleBadgeClass={role.badgeClass} mutualRoomsCount={mutualRoomsCount} />
 
-            <section className="rp-card rp-footer-actions">
-                <button type="button" className="rp-row-button" disabled>
-                    Block / Ignore
-                </button>
-                <button type="button" className="rp-row-button" disabled>
-                    Report
-                </button>
-            </section>
+            {ownUserId !== userId ? (
+                <section className="rp-card rp-footer-actions">
+                    <button
+                        type="button"
+                        className="rp-row-button"
+                        onClick={() => {
+                            if (!blocked) {
+                                setConfirmBlockOpen(true);
+                                return;
+                            }
+                            void ignoredUsers.setIgnored(userId, false).then(
+                                () => onToast?.({ type: "success", message: `Unblocked ${displayName}.` }),
+                                () => onToast?.({ type: "error", message: "Could not unblock. Try again." }),
+                            );
+                        }}
+                    >
+                        {blocked ? "Unblock" : "Block / Ignore"}
+                    </button>
+                    <button type="button" className="rp-row-button" onClick={() => setReportOpen(true)}>
+                        Report
+                    </button>
+                </section>
+            ) : null}
+
+            <RoomDialog
+                open={confirmBlockOpen}
+                title={`Block ${displayName}?`}
+                onClose={() => setConfirmBlockOpen(false)}
+                footer={
+                    <>
+                        <button type="button" className="room-dialog-button room-dialog-button-secondary" onClick={() => setConfirmBlockOpen(false)}>
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            className="room-dialog-button room-dialog-button-danger"
+                            onClick={() => {
+                                setConfirmBlockOpen(false);
+                                void ignoredUsers.setIgnored(userId, true).then(
+                                    () => onToast?.({ type: "success", message: `Blocked ${displayName}.` }),
+                                    () => onToast?.({ type: "error", message: "Could not block. Try again." }),
+                                );
+                            }}
+                        >
+                            Block
+                        </button>
+                    </>
+                }
+            >
+                <p className="room-dialog-muted">
+                    You will not see their messages, invites or calls anywhere, and they are not told. You can unblock
+                    them from their profile or from Settings, Privacy &amp; Safety.
+                </p>
+            </RoomDialog>
+
+            <ReportDialog
+                open={reportOpen}
+                title={`Report ${displayName}`}
+                canSubmit={reportable}
+                note={
+                    reportable
+                        ? `Your report goes to the admins of ${serverNameOf(userId)}.`
+                        : `${displayName} is on ${serverNameOf(userId)}, and your server only keeps reports about its own users. Report one of their messages instead: right-click it and choose Report message.`
+                }
+                onClose={() => setReportOpen(false)}
+                onSubmit={async (reason) => {
+                    await reportUser(client, userId, reason);
+                    onToast?.({ type: "success", message: `Reported ${displayName}. The admins will review it.` });
+                }}
+            />
         </div>
     );
 }

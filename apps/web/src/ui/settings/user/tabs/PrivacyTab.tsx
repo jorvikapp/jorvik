@@ -1,13 +1,20 @@
 import React from "react";
+import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
+import type { ToastState } from "../../../components/Toast";
+import { useIgnoredUsers } from "../../../moderation/useIgnoredUsers";
 import { AUTO_IDLE_MINUTE_CHOICES, type PrivacySettings } from "../settingsStore";
 
 interface PrivacyTabProps {
+    client: MatrixClient;
+    onToast: (toast: Omit<ToastState, "id">) => void;
     settings: PrivacySettings;
     onChange: (settings: PrivacySettings) => void;
 }
 
-export function PrivacyTab({ settings, onChange }: PrivacyTabProps): React.ReactElement {
+export function PrivacyTab({ client, onToast, settings, onChange }: PrivacyTabProps): React.ReactElement {
+    const ignoredUsers = useIgnoredUsers(client);
+
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Privacy & Safety</h2>
@@ -54,6 +61,39 @@ export function PrivacyTab({ settings, onChange }: PrivacyTabProps): React.React
                     active again. The desktop app also counts activity in other apps where your system reports
                     it; the web app only counts activity in Jorvik.
                 </p>
+            </div>
+
+            <div className="settings-section-card">
+                <h3>Blocked users</h3>
+                {ignoredUsers.ignoredUserIds.length === 0 ? (
+                    <p className="settings-inline-note">You have not blocked anyone.</p>
+                ) : (
+                    <ul className="settings-blocked-list">
+                        {ignoredUsers.ignoredUserIds.map((userId) => {
+                            const name = client.getUser(userId)?.displayName || userId;
+                            return (
+                                <li key={userId} className="settings-blocked-item">
+                                    <span className="settings-blocked-name">
+                                        {name}
+                                        {name !== userId ? <span className="settings-blocked-id">{userId}</span> : null}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="settings-button"
+                                        onClick={() =>
+                                            void ignoredUsers.setIgnored(userId, false).then(
+                                                () => onToast({ type: "success", message: `Unblocked ${name}.` }),
+                                                () => onToast({ type: "error", message: "Could not unblock. Try again." }),
+                                            )
+                                        }
+                                    >
+                                        Unblock
+                                    </button>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
             </div>
         </div>
     );

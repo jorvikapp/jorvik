@@ -6,6 +6,8 @@ import type { ToastState } from "../Toast";
 import { ReactionPicker } from "../ReactionPicker";
 import { MessageContextMenu } from "./MessageContextMenu";
 import { useMessageActions } from "../../hooks/useMessageActions";
+import { reportMessage } from "../../../core/moderation/reports";
+import { ReportDialog } from "../moderation/ReportDialog";
 
 interface Position {
     x: number;
@@ -49,6 +51,8 @@ export function MessageActionsBar({
     } = useMessageActions({ client, room, event });
 
     const [barReactionPickerOpen, setBarReactionPickerOpen] = useState(false);
+    const [reportOpen, setReportOpen] = useState(false);
+    const canReport = Boolean(event.getId()) && event.getSender() !== client.getUserId();
     const [menuReactionPickerPosition, setMenuReactionPickerPosition] = useState<Position | null>(null);
     const moreButtonRef = useRef<HTMLButtonElement | null>(null);
     const barReactButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -292,6 +296,8 @@ export function MessageActionsBar({
                 canEdit={canEdit}
                 canDelete={canDelete}
                 canCopyText={Boolean(plainTextBody && plainTextBody.trim().length > 0)}
+                canReport={canReport}
+                onReport={() => setReportOpen(true)}
                 onClose={onCloseContextMenu}
                 onReact={openReactFromContextMenu}
                 onReply={() => onReply(event)}
@@ -307,6 +313,17 @@ export function MessageActionsBar({
                 }}
                 onCopyEventId={() => {
                     void withToast(() => copyEventId(), "Copied event ID.", "Failed to copy event ID.", true);
+                }}
+            />
+            <ReportDialog
+                open={reportOpen}
+                title="Report message"
+                canSubmit={true}
+                note="Your report goes to the admins of your server, with a link to this message."
+                onClose={() => setReportOpen(false)}
+                onSubmit={async (reason) => {
+                    await reportMessage(client, room.roomId, event.getId()!, reason);
+                    onToast({ type: "success", message: "Reported. The admins will review it." });
                 }}
             />
 
