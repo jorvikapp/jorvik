@@ -2825,6 +2825,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                             customReactionImagesEnabled={renderReactionImages}
                             showReadReceipts={shouldShowReadReceipts}
                             userAway={userAway}
+                            linkPreviewsInEncrypted={userSettings.privacy.linkPreviewsInEncrypted}
                         />
                         <div className="main-chat-composer">
                             <Composer

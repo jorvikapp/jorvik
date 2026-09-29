@@ -30,6 +30,7 @@ function createSettings(partial?: Partial<UserLocalSettings>): UserLocalSettings
             showReadReceipts: true,
             allowDmsFromServerMembers: true,
             autoIdleMinutes: 10,
+            linkPreviewsInEncrypted: true,
         },
         audio: {
             preferredAudioInputId: "default",

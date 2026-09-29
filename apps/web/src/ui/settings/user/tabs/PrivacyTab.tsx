@@ -41,6 +41,22 @@ export function PrivacyTab({ client, onToast, settings, onChange }: PrivacyTabPr
             </label>
 
             <div className="settings-section-card">
+                <h3>Link previews</h3>
+                <label className="settings-toggle">
+                    <input
+                        type="checkbox"
+                        checked={settings.linkPreviewsInEncrypted}
+                        onChange={(event) => onChange({ ...settings, linkPreviewsInEncrypted: event.target.checked })}
+                    />
+                    Show link previews in encrypted chats
+                </label>
+                <p className="settings-inline-note">
+                    Your server fetches a link to build its preview, so with this on it also sees links from encrypted
+                    chats, and they appear in its logs. Previews in other chats are not affected.
+                </p>
+            </div>
+
+            <div className="settings-section-card">
                 <h3>Status</h3>
                 <label className="settings-field">
                     <span>Show me as Idle after I'm inactive for</span>

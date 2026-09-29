@@ -39,6 +39,8 @@ interface TimelineProps {
     showReadReceipts: boolean;
     /** Auto-idle says the user is away: hold read receipts until they are back. */
     userAway?: boolean;
+    /** Previews make the server fetch the link, so encrypted rooms can opt out. */
+    linkPreviewsInEncrypted?: boolean;
 }
 
 interface LightboxState {
@@ -97,6 +99,10 @@ interface UrlPreviewData {
     imageUrl: string | null;
     siteName: string | null;
     host: string | null;
+    /** A video page (og:type video.*, e.g. YouTube): big thumbnail with a play mark. */
+    isVideo: boolean;
+    /** A wide image worth showing large under the text rather than beside it. */
+    largeImage: boolean;
 }
 
 interface DecryptQueueItem {
@@ -133,7 +139,9 @@ interface MessageContent {
 type EncryptedAttachmentFile = encrypt.IEncryptedFile & { url: string };
 type MediaMsgType = MsgType.Image | MsgType.Audio | MsgType.Video | MsgType.File;
 
-const MESSAGE_LINK_PATTERN = /((?:https?:\/\/|ftp:\/\/|mailto:|matrix:)[^\s<>()]+|www\.[^\s<>()]+)/gi;
+// Parentheses are allowed so links like .../wiki/Matrix_(protocol) stay whole;
+// splitTrailingUrlDecoration drops an unbalanced closing one, as in "(see https://x.com)".
+const MESSAGE_LINK_PATTERN = /((?:https?:\/\/|ftp:\/\/|mailto:|matrix:)[^\s<>]+|www\.[^\s<>]+)/gi;
 const SHORTCODE_TOKEN_PATTERN = /:[a-zA-Z0-9_+-]{2,}:/g;
 const TRAILING_URL_PUNCTUATION = ".,!?;:";
 const DEFAULT_DECRYPT_CONCURRENCY = 3;
@@ -930,7 +938,7 @@ function toLinkHref(urlText: string): string {
     return urlText.startsWith("www.") ? `https://${urlText}` : urlText;
 }
 
-function tokenizeMessage(body: string): MessageSegment[] {
+export function tokenizeMessage(body: string): MessageSegment[] {
     const segments: MessageSegment[] = [];
     let nextStart = 0;
     let match: RegExpExecArray | null;
@@ -1017,13 +1025,42 @@ function resolvePreviewImageUrl(client: MatrixClient, payload: Record<string, un
     return null;
 }
 
+/**
+ * Without an og:description Synapse falls back to the page's text, which for
+ * MediaWiki starts with its navigation ("Jump to content ... From Wikipedia,
+ * the free encyclopedia"). Keep what reads as a summary.
+ */
+function cleanPreviewDescription(description: string | null, title: string | null): string | null {
+    if (!description) {
+        return null;
+    }
+    let cleaned = description.replace(/\s+/g, " ").trim();
+    cleaned = cleaned.replace(/^Jump to content\s*/i, "");
+    const boilerplateEnd = cleaned.indexOf("From Wikipedia, the free encyclopedia");
+    if (boilerplateEnd >= 0) {
+        cleaned = cleaned.slice(boilerplateEnd + "From Wikipedia, the free encyclopedia".length).trim();
+    }
+    if (!cleaned || cleaned === title) {
+        return null;
+    }
+    return cleaned.length > 350 ? `${cleaned.slice(0, 347).trimEnd()}...` : cleaned;
+}
+
+function readPreviewNumber(payload: Record<string, unknown>, key: string): number | null {
+    const value = payload[key];
+    return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+}
+
 function normalizeUrlPreview(
     client: MatrixClient,
     url: string,
     payload: Record<string, unknown>,
 ): UrlPreviewData | null {
     const title = readPreviewField(payload, "og:title") || readPreviewField(payload, "title");
-    const description = readPreviewField(payload, "og:description") || readPreviewField(payload, "description");
+    const description = cleanPreviewDescription(
+        readPreviewField(payload, "og:description") || readPreviewField(payload, "description"),
+        title,
+    );
     const siteName = readPreviewField(payload, "og:site_name");
     const imageUrl = resolvePreviewImageUrl(client, payload);
     const host = toHost(url);
@@ -1032,6 +1069,12 @@ function normalizeUrlPreview(
         return null;
     }
 
+    const isVideo = Boolean(imageUrl) && (readPreviewField(payload, "og:type") ?? "").startsWith("video");
+    const imageWidth = readPreviewNumber(payload, "og:image:width");
+    const imageHeight = readPreviewNumber(payload, "og:image:height");
+    const largeImage =
+        Boolean(imageUrl) && (isVideo || (imageWidth !== null && imageHeight !== null && imageWidth >= 400 && imageWidth / imageHeight >= 1.5));
+
     return {
         url,
         title,
@@ -1039,6 +1082,8 @@ function normalizeUrlPreview(
         imageUrl,
         siteName,
         host,
+        isVideo,
+        largeImage,
     };
 }
 
@@ -1251,6 +1296,7 @@ export function Timeline({
     customReactionImagesEnabled,
     showReadReceipts,
     userAway = false,
+    linkPreviewsInEncrypted = true,
 }: TimelineProps): React.ReactElement {
     const decryptTuning = useMemo<DecryptTuning>(() => loadDecryptTuning(), []);
     const [events, setEvents] = useState<MatrixEvent[]>(() => extractMessageEvents(room));
@@ -1765,7 +1811,12 @@ export function Timeline({
         };
     }, [room?.roomId]);
 
+    const linkPreviewsAllowed = linkPreviewsInEncrypted || !room?.hasEncryptionStateEvent();
+
     useEffect(() => {
+        if (!linkPreviewsAllowed) {
+            return undefined;
+        }
         let cancelled = false;
 
         const fetchLinkPreview = async (url: string): Promise<void> => {
@@ -1818,7 +1869,7 @@ export function Timeline({
         return () => {
             cancelled = true;
         };
-    }, [client, events, latestEditEventsByTarget]);
+    }, [client, events, latestEditEventsByTarget, linkPreviewsAllowed]);
 
     useEffect(() => {
         if (!room) {
@@ -2143,7 +2194,7 @@ export function Timeline({
                     const hasTextBody = body.trim().length > 0;
                     const imageAlt = hasTextBody ? body : "image";
                     const previewUrl = hasTextBody && !mediaMsgType ? getFirstPreviewableUrl(body) : null;
-                    const linkPreview = previewUrl ? linkPreviewByUrlRef.current[previewUrl] : null;
+                    const linkPreview = previewUrl && linkPreviewsAllowed ? linkPreviewByUrlRef.current[previewUrl] : null;
                     const format = typeof content.format === "string" ? content.format : undefined;
                     const formattedBody = typeof content.formatted_body === "string" ? content.formatted_body : undefined;
                     const hasFormattedBody = format === "org.matrix.custom.html" && typeof formattedBody === "string";
@@ -2408,16 +2459,6 @@ export function Timeline({
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
-                                            {linkPreview.imageUrl ? (
-                                                <img
-                                                    className="timeline-link-preview-image"
-                                                    src={linkPreview.imageUrl}
-                                                    alt=""
-                                                    loading="lazy"
-                                                    decoding="async"
-                                                    onError={retryImageLoadOnce}
-                                                />
-                                            ) : null}
                                             <span className="timeline-link-preview-body">
                                                 {linkPreview.siteName ? (
                                                     <span className="timeline-link-preview-site">{linkPreview.siteName}</span>
@@ -2430,10 +2471,29 @@ export function Timeline({
                                                         {linkPreview.description}
                                                     </span>
                                                 ) : null}
-                                                <span className="timeline-link-preview-host">
-                                                    {linkPreview.host || linkPreview.url}
-                                                </span>
                                             </span>
+                                            {linkPreview.imageUrl ? (
+                                                <span
+                                                    className={
+                                                        linkPreview.largeImage
+                                                            ? `timeline-link-preview-media${linkPreview.isVideo ? " is-video" : ""}`
+                                                            : "timeline-link-preview-thumb"
+                                                    }
+                                                >
+                                                    <img
+                                                        src={linkPreview.imageUrl}
+                                                        alt=""
+                                                        loading="lazy"
+                                                        decoding="async"
+                                                        onError={retryImageLoadOnce}
+                                                    />
+                                                    {linkPreview.isVideo ? (
+                                                        <span className="timeline-link-preview-play" aria-label="Play video">
+                                                            ▶
+                                                        </span>
+                                                    ) : null}
+                                                </span>
+                                            ) : null}
                                         </a>
                                     ) : null}
                                 </>

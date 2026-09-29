@@ -22,6 +22,8 @@ export interface PrivacySettings {
     allowDmsFromServerMembers: boolean;
     /** Minutes without activity before an Online status shows as Idle; 0 turns it off. */
     autoIdleMinutes: number;
+    /** The server fetches previewed links, so it sees links from encrypted chats too. */
+    linkPreviewsInEncrypted: boolean;
 }
 
 export const AUTO_IDLE_MINUTE_CHOICES = [0, 5, 10, 15, 30, 60] as const;
@@ -67,6 +69,7 @@ const DEFAULT_SETTINGS: UserLocalSettings = {
         showReadReceipts: true,
         allowDmsFromServerMembers: true,
         autoIdleMinutes: DEFAULT_AUTO_IDLE_MINUTES,
+        linkPreviewsInEncrypted: true,
     },
     audio: {
         preferredAudioInputId: "default",
@@ -136,6 +139,7 @@ function normalizeSettings(raw: unknown): UserLocalSettings {
             autoIdleMinutes: (AUTO_IDLE_MINUTE_CHOICES as readonly unknown[]).includes(privacy.autoIdleMinutes)
                 ? (privacy.autoIdleMinutes as number)
                 : DEFAULT_AUTO_IDLE_MINUTES,
+            linkPreviewsInEncrypted: privacy.linkPreviewsInEncrypted !== false,
         },
         audio: {
             preferredAudioInputId:
