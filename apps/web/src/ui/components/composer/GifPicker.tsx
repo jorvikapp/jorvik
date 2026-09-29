@@ -18,6 +18,12 @@ function readStoredTab(): GifTab {
     }
 }
 
+// The relay spends our KLIPY quota on every GIF request, so it wants to know who asks.
+function authHeaders(client: MatrixClient): Record<string, string> {
+    const accessToken = client.getAccessToken();
+    return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+}
+
 export function GifPicker({ client, onSelect, onClose }: GifPickerProps): React.ReactElement {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<GifItem[]>([]);
@@ -35,7 +41,7 @@ export function GifPicker({ client, onSelect, onClose }: GifPickerProps): React.
         const timer = window.setTimeout(async () => {
             setLoading(true); setError(null);
             try {
-                const response = await fetch(`${GIF_API}/search?q=${encodeURIComponent(value)}`, { signal: controller.signal });
+                const response = await fetch(`${GIF_API}/search?q=${encodeURIComponent(value)}`, { signal: controller.signal, headers: authHeaders(client) });
                 const payload = await response.json() as { results?: GifItem[]; error?: string };
                 if (!response.ok) throw new Error(payload.error || "GIF search failed");
                 setResults(Array.isArray(payload.results) ? payload.results : []);
@@ -44,7 +50,7 @@ export function GifPicker({ client, onSelect, onClose }: GifPickerProps): React.
             } finally { setLoading(false); }
         }, 300);
         return () => { controller.abort(); window.clearTimeout(timer); };
-    }, [query]);
+    }, [client, query]);
 
     // Fetched once per opening, the first time the Trending tab shows.
     useEffect(() => {
@@ -52,7 +58,7 @@ export function GifPicker({ client, onSelect, onClose }: GifPickerProps): React.
         const controller = new AbortController();
         void (async () => {
             try {
-                const response = await fetch(`${GIF_API}/trending`, { signal: controller.signal });
+                const response = await fetch(`${GIF_API}/trending`, { signal: controller.signal, headers: authHeaders(client) });
                 const payload = await response.json() as { results?: GifItem[] };
                 if (!response.ok) throw new Error("trending failed");
                 setTrending(Array.isArray(payload.results) ? payload.results : []);
@@ -61,7 +67,7 @@ export function GifPicker({ client, onSelect, onClose }: GifPickerProps): React.
             }
         })();
         return () => controller.abort();
-    }, [tab, trending]);
+    }, [client, tab, trending]);
 
     const selectTab = (next: GifTab): void => {
         setTab(next);

@@ -19,6 +19,7 @@ function makeClient() {
     const emitter = new EventEmitter();
     let saved: unknown = undefined;
     const client = Object.assign(emitter, {
+        getAccessToken: () => "syt_token",
         getAccountData: (type: string) =>
             type === GIF_FAVOURITES_EVENT_TYPE && saved ? new MatrixEvent({ type, content: saved as object }) : undefined,
         setAccountData: vi.fn(async (type: string, content: unknown) => {
@@ -66,7 +67,10 @@ describe("GifPicker", () => {
         const client = makeClient();
         act(() => root.render(<GifPicker client={client as never} onSelect={vi.fn()} onClose={vi.fn()} />));
         await flush();
-        expect(fetch).toHaveBeenCalledWith("https://matrix.jorvik.app/gif/trending", expect.anything());
+        expect(fetch).toHaveBeenCalledWith(
+            "https://matrix.jorvik.app/gif/trending",
+            expect.objectContaining({ headers: { Authorization: "Bearer syt_token" } }),
+        );
         expect(tiles()).toEqual(["Taco", "Cat"]);
     });
 
