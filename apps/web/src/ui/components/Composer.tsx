@@ -8,6 +8,7 @@ import {
     type MatrixEvent,
     type Room,
 } from "matrix-js-sdk/src/matrix";
+import { formatUserIdForDisplay } from "../../core/users/formatUserId";
 import { getDirectRoomIds } from "../adapters/dmAdapter";
 import { loadAvailableEmojis, resolveEmojiShortcode } from "../emoji/EmojiResolver";
 import { subscribeEmojiPackUpdated } from "../emoji/emojiEvents";
@@ -2119,7 +2120,7 @@ export function Composer({
                             }}
                         >
                             <span className="composer-mention-name">{candidate.displayName}</span>
-                            <span className="composer-mention-id">{candidate.userId}</span>
+                            <span className="composer-mention-id">{formatUserIdForDisplay(candidate.userId, client.getDomain())}</span>
                         </button>
                     ))}
                 </div>

@@ -5,6 +5,8 @@ import type { RightSidebarMode } from "../rightPanel/types";
 
 interface ChannelHeaderProps {
     room: Room | null;
+    /** A one-to-one DM's name (the person's), used instead of the room's. */
+    directName?: string | null;
     isDirectMessage: boolean;
     isOneToOneDirect: boolean;
     showHashPrefix: boolean;
@@ -95,6 +97,7 @@ function HeaderIcon({ kind }: { kind: HeaderIconKind }): React.ReactElement {
 
 export function ChannelHeader({
     room,
+    directName,
     isDirectMessage,
     isOneToOneDirect,
     showHashPrefix,
@@ -116,7 +119,7 @@ export function ChannelHeader({
     const menuRef = useRef<HTMLDivElement | null>(null);
     const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-    const roomName = getRoomName(room);
+    const roomName = directName ?? getRoomName(room);
     const topic = getRoomTopic(room);
     const encrypted = isEncrypted(room);
     const titlePrefix = room

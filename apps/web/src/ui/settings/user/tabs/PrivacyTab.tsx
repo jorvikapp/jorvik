@@ -1,6 +1,7 @@
 import React from "react";
 import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
+import { formatUserIdForDisplay } from "../../../../core/users/formatUserId";
 import type { ToastState } from "../../../components/Toast";
 import { useIgnoredUsers } from "../../../moderation/useIgnoredUsers";
 import { AUTO_IDLE_MINUTE_CHOICES, type PrivacySettings } from "../settingsStore";
@@ -86,12 +87,13 @@ export function PrivacyTab({ client, onToast, settings, onChange }: PrivacyTabPr
                 ) : (
                     <ul className="settings-blocked-list">
                         {ignoredUsers.ignoredUserIds.map((userId) => {
-                            const name = client.getUser(userId)?.displayName || userId;
+                            const shortId = formatUserIdForDisplay(userId, client.getDomain());
+                            const name = client.getUser(userId)?.displayName || shortId;
                             return (
                                 <li key={userId} className="settings-blocked-item">
                                     <span className="settings-blocked-name">
                                         {name}
-                                        {name !== userId ? <span className="settings-blocked-id">{userId}</span> : null}
+                                        {name !== shortId ? <span className="settings-blocked-id">{shortId}</span> : null}
                                     </span>
                                     <button
                                         type="button"

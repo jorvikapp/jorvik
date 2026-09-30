@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EventType, JoinRule, RoomEvent, type MatrixClient, type MatrixEvent, type Room, type RoomMember } from "matrix-js-sdk/src/matrix";
 
+import { formatUserIdForDisplay } from "../../../core/users/formatUserId";
 import { memberAvatarSources } from "../../adapters/avatar";
 import { getDirectRoomIds } from "../../adapters/dmAdapter";
 import { useMatrix } from "../../providers/MatrixProvider";
@@ -314,7 +315,7 @@ export function RoomInfoPanel({
                                     />
                                     <span className="rp-member-row-meta">
                                         <span className="rp-member-row-name">{displayName}</span>
-                                        <span className="rp-member-row-id">{member.userId}</span>
+                                        <span className="rp-member-row-id">{formatUserIdForDisplay(member.userId, client.getDomain())}</span>
                                     </span>
                                 </button>
                             );

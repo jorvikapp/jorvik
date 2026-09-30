@@ -1,6 +1,7 @@
 import React from "react";
 
-import { describeAccount, getDefaultHomeserver, getDefaultIdentityServer, isCustomHomeserverDisabled } from "../core/config/serverDefaults";
+import { getDefaultHomeserver, getDefaultIdentityServer, isCustomHomeserverDisabled } from "../core/config/serverDefaults";
+import { formatUserIdForDisplay } from "../core/users/formatUserId";
 import { AppShell } from "./components/AppShell";
 import { DeviceVerificationView } from "./components/DeviceVerificationView";
 import { LoginView } from "./components/LoginView";
@@ -25,7 +26,7 @@ function LoadingView({ label }: { label: string }): React.ReactElement {
 function AppRouter(): React.ReactElement {
     const matrix = useMatrix();
     const ownUserId = matrix.client?.getUserId();
-    const accountLabel = ownUserId ? describeAccount(ownUserId, matrix.config) : null;
+    const accountLabel = ownUserId ? formatUserIdForDisplay(ownUserId, matrix.client?.getDomain()) : null;
 
     if (matrix.status === "booting") {
         return <LoadingView label="Starting Jorvik..." />;

@@ -7,6 +7,7 @@ import {
     isValidMatrixUserId,
     qualifyMatrixUserId,
 } from "../../adapters/dmAdapter";
+import { formatUserIdForDisplay } from "../../../core/users/formatUserId";
 import { mediaFromMxc, thumbnailFromMxc } from "../../adapters/media";
 import { Avatar } from "../Avatar";
 import { RoomDialog } from "./RoomDialog";
@@ -36,6 +37,15 @@ interface UserDirectoryResult {
 
 interface UserDirectoryResponse {
     results?: UserDirectoryResult[];
+}
+
+/**
+ * A member's own display name. Not RoomMember.name, which the SDK turns into
+ * "Name (@name:server)" when two people in a room share a display name;
+ * rawDisplayName falls back to the user ID when none is set.
+ */
+function memberDisplayName(member: { rawDisplayName: string; userId: string }): string | null {
+    return member.rawDisplayName && member.rawDisplayName !== member.userId ? member.rawDisplayName : null;
 }
 
 function toDisplayName(displayName: string | null | undefined, userId: string): string {
@@ -91,7 +101,7 @@ function collectLocalSuggestions(client: MatrixClient, ownUserId: string, term: 
                 continue;
             }
 
-            const displayName = toDisplayName(roomMember.name, userId);
+            const displayName = toDisplayName(memberDisplayName(roomMember), userId);
             const searchable = `${userId} ${displayName}`.toLocaleLowerCase();
             if (normalizedTerm.length > 0 && !searchable.includes(normalizedTerm)) {
                 continue;
@@ -127,7 +137,7 @@ function findLocalSuggestionByUserId(client: MatrixClient, ownUserId: string, us
 
         return {
             userId: normalizedUserId,
-            displayName: toDisplayName(member.name, normalizedUserId),
+            displayName: toDisplayName(memberDisplayName(member), normalizedUserId),
             avatarMxc: member.getMxcAvatarUrl() || null,
             source: "local",
         };
@@ -675,7 +685,9 @@ export function CreateDirectChatDialog({
                                 />
                                 <span className="room-dialog-autocomplete-main">
                                     <span className="room-dialog-autocomplete-name">{suggestion.displayName}</span>
-                                    <span className="room-dialog-autocomplete-id">{suggestion.userId}</span>
+                                    <span className="room-dialog-autocomplete-id">
+                                        {formatUserIdForDisplay(suggestion.userId, client.getDomain())}
+                                    </span>
                                 </span>
                             </button>
                         );

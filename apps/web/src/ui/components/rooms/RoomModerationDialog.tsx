@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { EventType, KnownMembership, type MatrixClient, type Room } from "matrix-js-sdk/src/matrix";
 
+import { formatUserIdForDisplay } from "../../../core/users/formatUserId";
 import { RoomDialog } from "./RoomDialog";
 import {
     getActionPowerLevel,
@@ -260,7 +261,7 @@ export function RoomModerationDialog({
                         <div className="room-moderation-item" key={member.userId}>
                             <div className="room-moderation-item-main">
                                 <span className="room-moderation-item-name">{displayName}</span>
-                                <span className="room-moderation-item-meta">{member.userId}</span>
+                                <span className="room-moderation-item-meta">{formatUserIdForDisplay(member.userId, client.getDomain())}</span>
                             </div>
                             <div className="room-moderation-item-actions">
                                 <button

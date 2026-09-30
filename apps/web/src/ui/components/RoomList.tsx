@@ -36,6 +36,7 @@ import {
 } from "../stores/CategoryStore";
 import { isVoiceChannelRoom } from "../voice/voiceChannel";
 import { Avatar } from "./Avatar";
+import { getOneToOneDirectName } from "./rightPanel/directPartner";
 import micMuteIcon from "./icons/mic-02.svg";
 import volumeMuteIcon from "./icons/volume-mute-02.svg";
 
@@ -273,6 +274,7 @@ export function RoomList({
     const manualOrderingEnabled = orderingMode === "manual";
     const orderingControlsEnabled = manualOrderingEnabled && showOrderingControls;
     const ownUserId = client.getUserId() ?? "";
+    const localDomain = client.getDomain();
     const presenceEnabled = useMemo(() => isPresenceEnabledForClient(config, client), [client, config]);
     const showChannelSettingsButton = Boolean(onOpenRoomSettings);
     const [draggedRoomId, setDraggedRoomId] = useState<string | null>(null);
@@ -828,7 +830,8 @@ export function RoomList({
         const unreadCount = getServerUnreadCount(room);
         const showActivityDot = unreadCount === 0 && ownUserId ? hasUnreadActivity(room, ownUserId) : false;
         const isActive = room.roomId === activeRoomId;
-        const roomName = getRoomName(room);
+        // In the DM list (no # prefix) a one-to-one DM is named after the person.
+        const roomName = (!showHashPrefix ? getOneToOneDirectName(room, ownUserId, localDomain) : null) ?? getRoomName(room);
         const allowMemberAvatarFallback = !showHashPrefix;
         const roomAvatarList = roomAvatarSources(client, room, 64, allowMemberAvatarFallback);
         const roomAvatarUrl = roomAvatarList[0] ?? null;

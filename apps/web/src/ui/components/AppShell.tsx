@@ -29,7 +29,7 @@ import { Composer } from "./Composer";
 import { EmojiUploadDialog } from "./EmojiUploadDialog";
 import { ChannelHeader } from "./header/ChannelHeader";
 import { RightPanel } from "./rightPanel/RightPanel";
-import { getOneToOnePartnerId } from "./rightPanel/directPartner";
+import { getOneToOneDirectName, getOneToOnePartnerId } from "./rightPanel/directPartner";
 import { useRightSidebarMode } from "./rightPanel/useRightSidebarMode";
 import { sharedStateEventDeduperFor } from "../../core/net/stateEventDeduper";
 import { rootChildrenState, selectVoiceHintCandidates } from "../../core/spaces/voiceHints";
@@ -1774,6 +1774,8 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const isActiveRoomDirect = Boolean(activeRoom && directRoomIds.has(activeRoom.roomId));
     const activeDirectPartnerId =
         activeRoom && isActiveRoomDirect ? getOneToOnePartnerId(activeRoom, client.getUserId() ?? "") : null;
+    const activeDirectName =
+        activeRoom && activeDirectPartnerId ? getOneToOneDirectName(activeRoom, client.getUserId() ?? "", localDomain) : null;
     const [rightSidebarMode, setRightSidebarMode] = useRightSidebarMode(isActiveRoomDirect);
     const shouldShowReadReceipts =
         userSettings.privacy.showReadReceipts && selectedSpaceId === PEOPLE_SPACE_ID && isActiveRoomDirect;
@@ -2311,7 +2313,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             return;
         }
 
-        const roomLabel = getRoomName(activeRoom);
+        const roomLabel = activeDirectName ?? getRoomName(activeRoom);
         if (!window.confirm(`Leave "${roomLabel}"?`)) {
             return;
         }
@@ -2328,7 +2330,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             const message = leaveError instanceof Error ? leaveError.message : "Failed to leave room.";
             pushToast({ type: "error", message });
         }
-    }, [activeRoom, client, pushToast]);
+    }, [activeDirectName, activeRoom, client, pushToast]);
 
     const openRoomSettingsFor = useCallback(
         (roomId: string | null): void => {
@@ -2740,6 +2742,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             <section className="main-pane">
                 <ChannelHeader
                     room={activeRoom}
+                    directName={activeDirectName}
                     isDirectMessage={isActiveRoomDirect}
                     isOneToOneDirect={activeDirectPartnerId !== null}
                     showHashPrefix={shouldPrefixRoomWithHash}
