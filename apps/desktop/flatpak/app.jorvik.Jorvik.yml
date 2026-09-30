@@ -5,10 +5,10 @@
 # scripts/build-flatpak.sh.
 id: app.jorvik.Jorvik
 runtime: org.freedesktop.Platform
-runtime-version: "24.08"
+runtime-version: "26.08"
 sdk: org.freedesktop.Sdk
 base: org.electronjs.Electron2.BaseApp
-base-version: "24.08"
+base-version: "26.08"
 command: jorvik
 separate-locales: false
 finish-args:
@@ -18,19 +18,17 @@ finish-args:
   - --socket=fallback-x11
   # Voice channels and calls.
   - --socket=pulseaudio
-  # GPU, and cameras for video.
-  - --device=all
-  - --talk-name=org.freedesktop.Notifications
+  # GPU only: cameras go through the camera portal (see jorvik.sh), and
+  # notifications through the notification portal.
+  - --device=dri
   # Tray icon and its unread badge.
   - --talk-name=org.kde.StatusNotifierWatcher
   - --talk-name=com.canonical.Unity
-  # Chromium keeps its cookie encryption key in the system keyring.
-  - --talk-name=org.freedesktop.secrets
-  - --talk-name=org.kde.kwalletd5
-  - --talk-name=org.kde.kwalletd6
   - --filesystem=xdg-download
   # The window and taskbar entry match the desktop file (Wayland app id).
   - --env=CHROME_DESKTOP=app.jorvik.Jorvik.desktop
+  # The user's cursor theme under Wayland.
+  - --env=XCURSOR_PATH=/run/host/user-share/icons:/run/host/share/icons
 modules:
   - name: jorvik
     buildsystem: simple

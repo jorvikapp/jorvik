@@ -11,7 +11,7 @@ test -d dist-electron/linux-unpacked || { echo "no dist-electron/linux-unpacked:
 test -f build/icons/512x512.png || { echo "no build/icons: run the desktop build first" >&2; exit 1; }
 
 docker run --rm --privileged -v "$PWD:/desktop" -w /desktop \
-    ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-24.08 \
+    ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08 \
     bash -euo pipefail -c "
         flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
         flatpak-builder --user --install-deps-from=flathub --force-clean --disable-rofiles-fuse \
