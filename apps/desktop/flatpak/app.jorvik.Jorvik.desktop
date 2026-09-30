@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Jorvik
+Comment=Jorvik Desktop Client
+Exec=jorvik %U
+Icon=app.jorvik.Jorvik
+Terminal=false
+Type=Application
+Categories=Network;InstantMessaging;Chat;
+StartupWMClass=jorvik

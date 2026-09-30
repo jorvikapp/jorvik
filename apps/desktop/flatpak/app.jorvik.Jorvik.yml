@@ -1,0 +1,62 @@
+# Flatpak build of the Jorvik desktop app, published as a .flatpak bundle on
+# GitHub releases. It packages the Electron app electron-builder already
+# built (dist-electron/linux-unpacked), so run `pnpm --filter @heorot/desktop
+# run dist:linux` first; CI builds it with the Flathub build container, see
+# scripts/build-flatpak.sh.
+id: app.jorvik.Jorvik
+runtime: org.freedesktop.Platform
+runtime-version: "24.08"
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: "24.08"
+command: jorvik
+separate-locales: false
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  # Voice channels and calls.
+  - --socket=pulseaudio
+  # GPU, and cameras for video.
+  - --device=all
+  - --talk-name=org.freedesktop.Notifications
+  # Tray icon and its unread badge.
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=com.canonical.Unity
+  # Chromium keeps its cookie encryption key in the system keyring.
+  - --talk-name=org.freedesktop.secrets
+  - --talk-name=org.kde.kwalletd5
+  - --talk-name=org.kde.kwalletd6
+  - --filesystem=xdg-download
+  # The window and taskbar entry match the desktop file (Wayland app id).
+  - --env=CHROME_DESKTOP=app.jorvik.Jorvik.desktop
+modules:
+  - name: jorvik
+    buildsystem: simple
+    sources:
+      - type: dir
+        path: ../dist-electron/linux-unpacked
+        dest: app
+      - type: file
+        path: jorvik.sh
+      - type: file
+        path: app.jorvik.Jorvik.desktop
+      - type: file
+        path: ../metainfo/app.jorvik.Jorvik.metainfo.xml
+      - type: dir
+        path: ../build/icons
+        dest: icons
+    build-commands:
+      # Plain -R: -a would also try to copy ACLs, which the build dir rejects.
+      - cp -R app /app/jorvik
+      # zypak gives Chromium its sandbox here; the setuid helper can't work.
+      # usr/ is the AppImage's copy of the metainfo, installed properly below.
+      - rm -rf /app/jorvik/chrome-sandbox /app/jorvik/usr
+      - install -Dm755 jorvik.sh /app/bin/jorvik
+      - install -Dm644 app.jorvik.Jorvik.desktop /app/share/applications/app.jorvik.Jorvik.desktop
+      - sed 's|<launchable type="desktop-id">jorvik.desktop</launchable>|<launchable type="desktop-id">app.jorvik.Jorvik.desktop</launchable>|'
+        app.jorvik.Jorvik.metainfo.xml > app.jorvik.Jorvik.metainfo.patched.xml
+      - install -Dm644 app.jorvik.Jorvik.metainfo.patched.xml /app/share/metainfo/app.jorvik.Jorvik.metainfo.xml
+      - for size in 16 24 32 48 64 128 256 512; do install -Dm644 "icons/${size}x${size}.png"
+        "/app/share/icons/hicolor/${size}x${size}/apps/app.jorvik.Jorvik.png"; done

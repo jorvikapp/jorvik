@@ -91,12 +91,18 @@ jobs:
           test -n "$("$appimage" --appimage-updateinformation)"
           test -f "${appimage}.zsync"
           ls -lh dist-electron/*.AppImage
+      - name: Build the Flatpak
+        # Wraps the linux-unpacked app electron-builder just made, in the
+        # Flathub build container (Docker), into a single-file .flatpak bundle.
+        if: matrix.artifact == 'linux'
+        working-directory: apps/desktop
+        run: scripts/build-flatpak.sh "$HEOROT_DESKTOP_VERSION"
       - name: Verify Linux package set
         if: matrix.artifact == 'linux'
         working-directory: apps/desktop
         shell: bash
         run: |
-          for ext in AppImage deb rpm tar.gz snap; do
+          for ext in AppImage deb rpm tar.gz snap flatpak; do
             found=$(find dist-electron -maxdepth 1 -name "*.${ext}" -print -quit)
             if [[ -z "$found" ]]; then
               echo "::error::no .${ext} produced by dist:linux"
@@ -150,7 +156,8 @@ jobs:
           # and elevate.exe on every release up to v1.0.5.
           find release-assets -type f ! -path '*-unpacked/*' \
             \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.zip' \
-               -o -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' -o -name '*.snap' -o -name '*.AppImage.zsync' \) \
+               -o -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' -o -name '*.snap' -o -name '*.AppImage.zsync' \
+               -o -name '*.flatpak' \) \
             -exec cp {} release-files/ \;
           ls -lh release-files/
           # A layout change upstream must not quietly publish an empty release.

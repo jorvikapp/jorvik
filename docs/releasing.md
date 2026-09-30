@@ -15,7 +15,10 @@ releases is normal.
 3. **Tag and push the tag**: `git tag -a vX.Y.Z -m "Jorvik X.Y.Z" && git push origin vX.Y.Z`.
 4. **Watch the run.** Windows, macOS and Linux build in parallel, then a publish
    job attaches the assets. These are expected: `.exe`, `.dmg`, `-mac.zip`,
-   `.AppImage`, `.AppImage.zsync`, `.deb`, `.rpm`, `.tar.gz`, `.snap`.
+   `.AppImage`, `.AppImage.zsync`, `.deb`, `.rpm`, `.tar.gz`, `.snap`,
+   `.flatpak`. The Flatpak wraps the same Linux build in the Flathub container
+   (`apps/desktop/scripts/build-flatpak.sh`, manifest in `apps/desktop/flatpak/`)
+   and shows the newest version in the metainfo's `<releases>` (step 7).
    The `.zsync` is what AppImageUpdate, Gear Lever and AppImageLauncher fetch
    to update the AppImage; a build hook writes it and embeds the matching
    update information (`scripts/electron-builder-artifact-build-completed.cjs`).

@@ -4,3 +4,6 @@ dist-electron/
 web/
 *.log
 
+.flatpak-builder/
+.flatpak-build/
+.flatpak-repo/

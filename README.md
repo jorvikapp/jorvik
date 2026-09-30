@@ -46,7 +46,13 @@ yay -S jorvik-bin        # or jorvik-git to build from main
 # Fedora
 sudo dnf copr enable xuruh/Jorvik
 sudo dnf install jorvik
+
+# Flatpak: download Jorvik-<version>-x86_64.flatpak from the releases page
+flatpak install --user Jorvik-<version>-x86_64.flatpak
 ```
+
+The Flatpak fetches its runtime from Flathub the first time. It does not update
+itself yet: install a newer release's file the same way.
 
 Debian and RPM packages, an AppImage and a plain tarball are attached to every
 release if you would rather not add a repository.
