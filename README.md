@@ -46,6 +46,7 @@ yay -S jorvik-bin        # or jorvik-git to build from main
 # Fedora
 sudo dnf copr enable xuruh/Jorvik
 sudo dnf install jorvik
+# A new release not showing up yet? sudo dnf upgrade --refresh
 
 # Flatpak: download Jorvik-<version>-x86_64.flatpak from the releases page
 flatpak install --user Jorvik-<version>-x86_64.flatpak

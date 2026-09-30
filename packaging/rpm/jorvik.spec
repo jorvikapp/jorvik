@@ -4,7 +4,7 @@
 # are produced here.
 Name:           jorvik
 Version:        1.0.15
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Chat and voice for Matrix
 
 License:        AGPL-3.0-only
@@ -87,6 +87,15 @@ DESKTOP
 install -Dm644 %{SOURCE2} \
     %{buildroot}%{_datadir}/metainfo/app.jorvik.Jorvik.metainfo.xml
 
+# COPR's generated repo file sets no metadata_expire, so dnf looks for new
+# releases only every 48 hours. dnf5 applies this override to that repository
+# (and ignores it if the repository is removed), so releases show up within 6.
+install -d %{buildroot}%{_datadir}/dnf5/repos.override.d
+cat > %{buildroot}%{_datadir}/dnf5/repos.override.d/80-jorvik-copr.repo <<'OVERRIDE'
+[copr:copr.fedorainfracloud.org:xuruh:Jorvik]
+metadata_expire=6h
+OVERRIDE
+
 %check
 desktop-file-validate %{buildroot}%{_datadir}/applications/jorvik.desktop
 appstream-util validate-relax --nonet \
@@ -99,8 +108,12 @@ appstream-util validate-relax --nonet \
 %{_datadir}/applications/jorvik.desktop
 %{_datadir}/icons/hicolor/*/apps/jorvik.png
 %{_datadir}/metainfo/app.jorvik.Jorvik.metainfo.xml
+%{_datadir}/dnf5/repos.override.d/80-jorvik-copr.repo
 
 %changelog
+* Wed Sep 30 2026 Jorvik contributors <admin@jorvik.app> - 1.0.15-2
+- Check the COPR repository for new releases every 6 hours instead of 48
+
 * Wed Sep 30 2026 Jorvik contributors <admin@jorvik.app> - 1.0.15-1
 - Update to 1.0.15
 
