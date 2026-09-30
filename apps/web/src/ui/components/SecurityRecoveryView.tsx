@@ -11,7 +11,7 @@ interface SecurityRecoveryViewProps {
     onCompleteCrossSigning: (credential: string) => Promise<void>;
     onSkip: () => void;
     /** Shown so it's clear which account the key is for. */
-    userId?: string | null;
+    accountLabel?: string | null;
 }
 
 export function SecurityRecoveryView({
@@ -22,7 +22,7 @@ export function SecurityRecoveryView({
     onRestore,
     onCompleteCrossSigning,
     onSkip,
-    userId,
+    accountLabel,
 }: SecurityRecoveryViewProps): React.ReactElement {
     const [credential, setCredential] = useState("");
     const [showCredential, setShowCredential] = useState(false);
@@ -155,9 +155,9 @@ export function SecurityRecoveryView({
         }
     };
 
-    const signedInAs = userId ? (
+    const signedInAs = accountLabel ? (
         <p className="security-signed-in">
-            Signed in as <strong>{userId}</strong>
+            Signed in as <strong>{accountLabel}</strong>
         </p>
     ) : null;
 

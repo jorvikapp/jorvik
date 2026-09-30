@@ -33,3 +33,26 @@ export function getFallbackHomeserver(config: CoreConfig | null): string | null 
 export function isCustomHomeserverDisabled(config: CoreConfig | null): boolean {
     return config?.disable_custom_urls === true;
 }
+
+/** The server name in the IDs of the default homeserver's users (@name:server). */
+export function getDefaultServerName(config: CoreConfig | null): string | null {
+    const serverConfig = config?.default_server_config;
+    const homeserver =
+        serverConfig && typeof serverConfig === "object"
+            ? (serverConfig["m.homeserver"] as { server_name?: string } | undefined)
+            : undefined;
+
+    return homeserver?.server_name ?? config?.default_server_name ?? null;
+}
+
+/**
+ * How to name an account: "@admin" on the app's own server, the full ID
+ * elsewhere, where the name alone could be anyone's.
+ */
+export function describeAccount(userId: string, config: CoreConfig | null): string {
+    const serverName = getDefaultServerName(config);
+    if (serverName && userId.startsWith("@") && userId.endsWith(`:${serverName}`)) {
+        return userId.slice(0, userId.length - serverName.length - 1);
+    }
+    return userId;
+}

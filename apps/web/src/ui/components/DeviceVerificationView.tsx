@@ -14,6 +14,8 @@ interface DeviceVerificationViewProps {
     onSkip: () => Promise<void>;
     onResetIdentity: (password: string, securityKey: string) => Promise<void>;
     onLogout: () => Promise<void>;
+    /** Which account this is, e.g. "@admin". */
+    accountLabel?: string | null;
 }
 
 type ActionState = "refresh" | "skip" | "logout" | "reset" | null;
@@ -27,6 +29,7 @@ export function DeviceVerificationView({
     onSkip,
     onResetIdentity,
     onLogout,
+    accountLabel,
 }: DeviceVerificationViewProps): React.ReactElement {
     const [pendingAction, setPendingAction] = useState<ActionState>(null);
     const [verificationOpen, setVerificationOpen] = useState(false);
@@ -78,9 +81,11 @@ export function DeviceVerificationView({
                 <div className="verification-gate-banner">
                     <h1>Verify this session</h1>
                     <p>Confirm it's you from another session where you're signed in.</p>
-                    <p className="security-signed-in">
-                        Signed in as <strong>{client.getUserId()}</strong>
-                    </p>
+                    {accountLabel ? (
+                        <p className="security-signed-in">
+                            Signed in as <strong>{accountLabel}</strong>
+                        </p>
+                    ) : null}
                 </div>
 
                 <div className="verification-gate-body">

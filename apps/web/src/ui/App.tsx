@@ -1,6 +1,6 @@
 import React from "react";
 
-import { getDefaultHomeserver, getDefaultIdentityServer, isCustomHomeserverDisabled } from "../core/config/serverDefaults";
+import { describeAccount, getDefaultHomeserver, getDefaultIdentityServer, isCustomHomeserverDisabled } from "../core/config/serverDefaults";
 import { AppShell } from "./components/AppShell";
 import { DeviceVerificationView } from "./components/DeviceVerificationView";
 import { LoginView } from "./components/LoginView";
@@ -24,6 +24,8 @@ function LoadingView({ label }: { label: string }): React.ReactElement {
 
 function AppRouter(): React.ReactElement {
     const matrix = useMatrix();
+    const ownUserId = matrix.client?.getUserId();
+    const accountLabel = ownUserId ? describeAccount(ownUserId, matrix.config) : null;
 
     if (matrix.status === "booting") {
         return <LoadingView label="Starting Jorvik..." />;
@@ -57,7 +59,7 @@ function AppRouter(): React.ReactElement {
                 onRestore={matrix.completeSecurityRecovery}
                 onCompleteCrossSigning={matrix.completeCrossSigning}
                 onSkip={matrix.skipSecurityRecovery}
-                userId={matrix.client?.getUserId() ?? null}
+                accountLabel={accountLabel}
             />
         );
     }
@@ -76,6 +78,7 @@ function AppRouter(): React.ReactElement {
                 onRefreshStatus={matrix.refreshDeviceVerification}
                 onSkip={matrix.skipDeviceVerification}
                 onResetIdentity={matrix.resetIdentity}
+                accountLabel={accountLabel}
                 onLogout={matrix.logout}
             />
         );
