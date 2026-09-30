@@ -10,6 +10,8 @@ interface SecurityRecoveryViewProps {
     onRestore: (credential: string) => Promise<void>;
     onCompleteCrossSigning: (credential: string) => Promise<void>;
     onSkip: () => void;
+    /** Shown so it's clear which account the key is for. */
+    userId?: string | null;
 }
 
 export function SecurityRecoveryView({
@@ -20,6 +22,7 @@ export function SecurityRecoveryView({
     onRestore,
     onCompleteCrossSigning,
     onSkip,
+    userId,
 }: SecurityRecoveryViewProps): React.ReactElement {
     const [credential, setCredential] = useState("");
     const [showCredential, setShowCredential] = useState(false);
@@ -152,6 +155,12 @@ export function SecurityRecoveryView({
         }
     };
 
+    const signedInAs = userId ? (
+        <p className="security-signed-in">
+            Signed in as <strong>{userId}</strong>
+        </p>
+    ) : null;
+
     if (flow === "setup") {
         const effectiveSetupError = setupError ?? error;
 
@@ -162,6 +171,7 @@ export function SecurityRecoveryView({
                     <p className="login-subtitle">
                         Use a security key so encrypted history can be restored on new sessions.
                     </p>
+                    {signedInAs}
 
                     {generatedSetupKey ? (
                         <div className="security-generated-key">
@@ -238,6 +248,7 @@ export function SecurityRecoveryView({
                         </p>
                     </>
                 )}
+                {signedInAs}
 
                 <label>
                     Security key

@@ -57,6 +57,7 @@ function AppRouter(): React.ReactElement {
                 onRestore={matrix.completeSecurityRecovery}
                 onCompleteCrossSigning={matrix.completeCrossSigning}
                 onSkip={matrix.skipSecurityRecovery}
+                userId={matrix.client?.getUserId() ?? null}
             />
         );
     }

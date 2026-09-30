@@ -227,16 +227,6 @@ function formatSecurityRecoveryError(error: unknown): string {
     return message.length > 0 ? message : "Unable to recover encryption keys.";
 }
 
-function buildSecurityRecoveryPrompt(error: string | undefined): string {
-    const baseMessage = "Enter your security key to decrypt older encrypted messages.";
-
-    if (!error || error.length === 0) {
-        return baseMessage;
-    }
-
-    return `${baseMessage} (${error})`;
-}
-
 const MUST_VERIFY_DEVICE_KEY = "must_verify_device";
 
 function getDesktopBridge(): Window["heorotDesktop"] | null {
@@ -362,7 +352,7 @@ async function resolveSessionSecurity(client: MatrixClient, options: SessionSecu
                 return {
                     ...READY_STATE,
                     status: "security_recovery",
-                    error: "Set up a security key now so encrypted history can be restored on new sessions.",
+                    error: null,
                     recoveryFlow: "setup",
                 };
             }
@@ -395,10 +385,11 @@ async function resolveRecoveryPostLoginState(client: MatrixClient, options: Sess
     try {
         const recovery = await attemptAutomaticKeyBackupRestore(client);
         if (recovery.status === "needs_recovery_key") {
-            const formattedRecoveryError = recovery.error ? formatSecurityRecoveryError(recovery.error) : undefined;
+            // The screen says what to do; the SDK's reason ("No secret storage
+            // key is currently available...") only looked like an error.
             return {
                 status: "security_recovery",
-                error: buildSecurityRecoveryPrompt(formattedRecoveryError),
+                error: null,
                 recoveryFlow: "restore",
                 recoveryMode: "recovery_key",
                 recoveryBackupVersion: recovery.backupVersion,

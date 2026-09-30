@@ -302,6 +302,17 @@ textarea {
     gap: 10px;
 }
 
+.security-signed-in {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.security-signed-in strong {
+    color: var(--text-main);
+    font-weight: 600;
+}
+
 .security-key-valid,
 .security-key-invalid {
     margin: 0;

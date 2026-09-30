@@ -78,6 +78,9 @@ export function DeviceVerificationView({
                 <div className="verification-gate-banner">
                     <h1>Verify this session</h1>
                     <p>Confirm it's you from another session where you're signed in.</p>
+                    <p className="security-signed-in">
+                        Signed in as <strong>{client.getUserId()}</strong>
+                    </p>
                 </div>
 
                 <div className="verification-gate-body">
