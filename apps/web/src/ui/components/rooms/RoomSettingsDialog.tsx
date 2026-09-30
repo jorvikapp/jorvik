@@ -7,6 +7,8 @@ import {
     type Room,
 } from "matrix-js-sdk/src/matrix";
 
+import { getDirectRoomIds } from "../../adapters/dmAdapter";
+import { getOneToOneDirectName } from "../rightPanel/directPartner";
 import { RoomDialog } from "./RoomDialog";
 import { getRoomDisplayName } from "./roomAdminUtils";
 
@@ -63,7 +65,10 @@ export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: R
     const [deleting, setDeleting] = useState(false);
 
     const myUserId = client.getUserId() ?? "";
-    const roomLabel = room ? getRoomDisplayName(room) : "room";
+    const isDirect = Boolean(room && getDirectRoomIds(client).has(room.roomId));
+    const roomLabel = room
+        ? (isDirect ? getOneToOneDirectName(room, myUserId, client.getDomain()) : null) ?? getRoomDisplayName(room)
+        : "room";
     const currentlyEncrypted = useMemo(() => (room ? isRoomEncrypted(room) : false), [room]);
 
     const canEditName = Boolean(room && myUserId && room.currentState.maySendStateEvent(EventType.RoomName, myUserId));
@@ -80,10 +85,17 @@ export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: R
     const powerLevels = room?.currentState.getStateEvents(EventType.RoomPowerLevels, "")?.getContent() as
         | { ban?: number; users?: Record<string, number>; users_default?: number }
         | undefined;
+    // The member's power level from the SDK also counts room v12 creators,
+    // who have unlimited power and are not listed in the power levels.
     const myPowerLevel = room && myUserId
-        ? (powerLevels?.users?.[myUserId] ?? powerLevels?.users_default ?? 0)
+        ? (room.getMember(myUserId)?.powerLevel ?? powerLevels?.users?.[myUserId] ?? powerLevels?.users_default ?? 0)
         : 0;
-    const canDeleteChannel = Boolean(room && room.getMyMembership() === "join" && myPowerLevel >= (powerLevels?.ban ?? 50));
+    // Deleting is leaving, which needs no power: any DM can be deleted, even
+    // one the other person created (where you hold none). A channel still
+    // takes moderator rights.
+    const canDeleteChannel = Boolean(
+        room && room.getMyMembership() === "join" && (isDirect || myPowerLevel >= (powerLevels?.ban ?? 50)),
+    );
 
     useEffect(() => {
         if (!open || !room) {
@@ -162,11 +174,18 @@ export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: R
 
     const deleteChannel = async (): Promise<void> => {
         if (!room || !canDeleteChannel || deleting) return;
-        if (!window.confirm(`Delete “${roomLabel}”? You will leave this channel and lose access to its history.`)) return;
+        const question = isDirect
+            ? `Delete your chat with “${roomLabel}”? You will leave it and it disappears from your list.`
+            : `Delete “${roomLabel}”? You will leave this channel and lose access to its history.`;
+        if (!window.confirm(question)) return;
         setDeleting(true);
         setError(null);
         try {
             await client.leave(room.roomId);
+            // A left DM would otherwise stay on the account; forgetting removes it.
+            if (isDirect) {
+                await client.forget(room.roomId).catch(() => undefined);
+            }
             await onDeleted?.(room.roomId);
             onClose();
         } catch (deleteError) {
@@ -263,9 +282,13 @@ export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: R
             {canDeleteChannel ? (
                 <div className="room-dialog-danger-zone">
                     <strong>Danger zone</strong>
-                    <p className="room-dialog-warning">Delete this channel by leaving it. This cannot be undone from here.</p>
+                    <p className="room-dialog-warning">
+                        {isDirect
+                            ? "Delete this chat by leaving it. It disappears from your list; the other person keeps their copy."
+                            : "Delete this channel by leaving it. This cannot be undone from here."}
+                    </p>
                     <button type="button" className="room-dialog-button room-dialog-button-danger" onClick={() => void deleteChannel()} disabled={saving || deleting}>
-                        {deleting ? "Deleting..." : "Delete channel"}
+                        {deleting ? "Deleting..." : isDirect ? "Delete chat" : "Delete channel"}
                     </button>
                 </div>
             ) : null}
