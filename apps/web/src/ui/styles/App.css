@@ -2052,6 +2052,11 @@ textarea {
     border-bottom: 1px solid var(--border);
 }
 
+/* Room for the voice settings while they're open during a call. */
+.main-voice-slot.is-call:has(.voice-settings-panel) {
+    height: min(75%, 560px);
+}
+
 .call-status-bar {
     display: flex;
     align-items: center;
@@ -4037,9 +4042,11 @@ img.voice-ctrl-icon {
     color: inherit;
 }
 
-/* Settings panel */
+/* Settings panel. It shrinks to the space left (a call's panel is short) and
+   scrolls; with flex-shrink 0 it overflowed and the clipped part was unreachable. */
 .voice-settings-panel {
-    flex-shrink: 0;
+    flex-shrink: 1;
+    min-height: 0;
     border-top: 1px solid var(--border);
     padding: 12px 14px;
     display: flex;
@@ -5138,7 +5145,8 @@ select,
 .composer-input-shell,
 .settings-sidebar,
 .settings-content,
-.settings-table-wrap {
+.settings-table-wrap,
+.voice-room-panel {
     -webkit-app-region: no-drag;
 }
 
