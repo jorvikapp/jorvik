@@ -12,7 +12,7 @@ Runs as a web app or a native desktop client (Windows · macOS · Linux).
 <details>
 <summary>More screenshots</summary>
 
-![Voice channels](docs/voice.png)
+![Voice calls](docs/voice.png)
 ![Custom emoji](docs/emoji.png)
 
 </details>
