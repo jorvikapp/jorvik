@@ -5,7 +5,7 @@
 Name:           jorvik
 Version:        1.0.14
 Release:        1%{?dist}
-Summary:        Self-hosted Matrix client built to feel like Discord
+Summary:        Chat and voice for Matrix
 
 License:        AGPL-3.0-only
 URL:            https://github.com/jorvikapp/jorvik
@@ -75,7 +75,7 @@ install -d %{buildroot}%{_datadir}/applications
 cat > %{buildroot}%{_datadir}/applications/jorvik.desktop <<'DESKTOP'
 [Desktop Entry]
 Name=Jorvik
-Comment=Jorvik Desktop Client
+Comment=Chat and voice for Matrix
 Exec=jorvik %U
 Icon=jorvik
 Terminal=false

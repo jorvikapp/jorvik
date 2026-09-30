@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "author": "Jorvik contributors <admin@jorvik.app>",
-  "description": "Jorvik Desktop Client",
+  "description": "Chat and voice for Matrix",
   "homepage": "https://chat.jorvik.app",
   "license": "AGPL-3.0-only",
   "main": "dist/electron/main.js",

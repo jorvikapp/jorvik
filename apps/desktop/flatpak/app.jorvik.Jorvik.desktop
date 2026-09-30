@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Jorvik
-Comment=Jorvik Desktop Client
+Comment=Chat and voice for Matrix
 Exec=jorvik %U
 Icon=app.jorvik.Jorvik
 Terminal=false
