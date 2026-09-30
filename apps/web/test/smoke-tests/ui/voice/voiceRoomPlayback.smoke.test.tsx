@@ -280,7 +280,8 @@ describe("voice room smoke", () => {
         }));
 
         vi.doMock("../../../../src/ui/components/Avatar", () => ({
-            Avatar: ({ name }: { name?: string }) => React.createElement("div", { "data-avatar": "1" }, name ?? ""),
+            Avatar: ({ name, src }: { name?: string; src?: string | null }) =>
+                React.createElement("div", { "data-avatar": "1", "data-src": src ?? "" }, name ?? ""),
         }));
 
         vi.doMock("../../../../src/ui/components/rooms/RoomDialog", () => ({
@@ -353,6 +354,56 @@ describe("voice room smoke", () => {
         expect(attachedSids).toContain("aud-initial");
         expect(attachedSids).toContain("aud-late");
         expect(playAttempts).toContain("aud-late");
+    });
+
+    it("shows an avatar on every participant tile, your own included", async () => {
+        seededRemotePublications.push({
+            participantIdentity: "@alice:example.org::device-a",
+            participantSid: "remote-a",
+            publication: createAudioPublication("aud-alice"),
+        });
+        const avatars: Record<string, string> = {
+            "@self:example.org": "mxc://example.org/self-avatar",
+            "@alice:example.org": "mxc://example.org/alice-avatar",
+        };
+
+        const ref = createRef<VoiceRoomHandle>();
+
+        await act(async () => {
+            root.render(
+                React.createElement(VoiceRoom, {
+                    ref,
+                    client: {
+                        getUserId: () => "@self:example.org",
+                        getUser: () => null,
+                        mxcUrlToHttp: (mxc: string) => `https://hs.example/${mxc.slice("mxc://".length)}`,
+                    },
+                    matrixRoomId: "!dm:example.org",
+                    matrixRoom: {
+                        getMember: (userId: string) => ({
+                            userId,
+                            rawDisplayName: userId,
+                            getMxcAvatarUrl: () => avatars[userId],
+                        }),
+                    },
+                    audioSettings: createAudioSettings(),
+                    onAudioSettingsChange: () => undefined,
+                }),
+            );
+        });
+
+        await act(async () => {
+            await ref.current?.join();
+        });
+
+        const tileAvatars = Array.from(
+            container.querySelectorAll(".voice-room-participants-list > li [data-avatar]"),
+        ).map((node) => node.getAttribute("data-src"));
+
+        expect(tileAvatars).toEqual([
+            "https://hs.example/example.org/self-avatar",
+            "https://hs.example/example.org/alice-avatar",
+        ]);
     });
 });
 

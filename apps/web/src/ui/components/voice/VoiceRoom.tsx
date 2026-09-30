@@ -12,12 +12,13 @@ import {
     type RemoteTrack,
     type RemoteTrackPublication,
 } from "livekit-client";
-import type { MatrixClient, Room as MatrixRoom } from "matrix-js-sdk/src/matrix";
+import type { MatrixClient, Room as MatrixRoom, RoomMember } from "matrix-js-sdk/src/matrix";
 
 import { Avatar } from "../Avatar";
 import micMutedIcon from "../icons/mic-02.svg";
 import volumeMutedIcon from "../icons/volume-mute-02.svg";
 
+import { memberAvatarSources } from "../../adapters/avatar";
 import { fetchLiveKitToken, updateVoiceParticipantState } from "../../adapters/voiceAdapter";
 import {
     playVoiceJoinSound,
@@ -93,6 +94,8 @@ const PARTICIPANT_VOLUME_STORAGE_KEY_PREFIX = "heorot.voice.participant_volume.v
 const PARTICIPANT_VOLUME_DEFAULT_PERCENT = 100;
 const PARTICIPANT_VOLUME_MIN_PERCENT = 0;
 const PARTICIPANT_VOLUME_MAX_PERCENT = 100;
+// The tile avatar's size in App.css (.voice-room-participant-avatar).
+const PARTICIPANT_AVATAR_SIZE = 106;
 type ParticipantVolumeMap = Record<string, number>;
 
 type ScreenShareQualityProfileId = "720p30" | "1080p30" | "1080p60" | "1440p60";
@@ -227,18 +230,18 @@ function getParticipantDisplayInfo(
     matrixUserId: string | undefined,
     isLocal: boolean,
     ownDisplayName?: string,
-): { displayName: string; avatarMxc?: string; userId?: string } {
+): { displayName: string; member?: RoomMember; userId?: string } {
     const userId = matrixUserId ?? parseMatrixUserIdFromIdentity(identity);
+    // Looked up for the local participant too, or your own tile has no avatar.
+    const member = userId ? (matrixRoom?.getMember(userId) ?? undefined) : undefined;
     if (isLocal && ownDisplayName) {
-        return { displayName: ownDisplayName, userId };
+        return { displayName: ownDisplayName, member, userId };
     }
     if (!userId) {
         return { displayName: identity };
     }
-    const member = matrixRoom?.getMember(userId);
     const displayName = member?.rawDisplayName || member?.name || userId;
-    const avatarMxc = member?.getMxcAvatarUrl?.() ?? undefined;
-    return { displayName, avatarMxc, userId };
+    return { displayName, member, userId };
 }
 
 function isParticipantScreenSharing(participant: Participant | LocalParticipant): boolean {
@@ -1968,9 +1971,12 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                                 ownDisplayName,
                             );
                             const isYou = p.isLocal || p.matrixUserId === ownUserId;
-                            const avatarSrc = info.avatarMxc
-                                ? (client.mxcUrlToHttp(info.avatarMxc, 240, 240, "crop") ?? null)
-                                : null;
+                            const avatarSources = memberAvatarSources(
+                                client,
+                                info.member,
+                                PARTICIPANT_AVATAR_SIZE,
+                                "crop",
+                            );
                             const participantVolumeKey = resolveVolumeParticipantKey(p.matrixUserId, p.identity);
                             const participantVolumePercent = getParticipantVolumePercent(participantVolumeKey);
                             return (
@@ -1982,7 +1988,8 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                                         <Avatar
                                             className="voice-room-participant-avatar avatar"
                                             name={info.displayName}
-                                            src={avatarSrc}
+                                            src={avatarSources[0] ?? null}
+                                            sources={avatarSources}
                                             seed={info.userId}
                                             userId={info.userId}
                                         />
