@@ -8,6 +8,7 @@ import {
     qualifyMatrixUserId,
 } from "../../adapters/dmAdapter";
 import { formatUserIdForDisplay } from "../../../core/users/formatUserId";
+import { plainUserDisplayName } from "../../../core/users/userDisplayName";
 import { mediaFromMxc, thumbnailFromMxc } from "../../adapters/media";
 import { Avatar } from "../Avatar";
 import { RoomDialog } from "./RoomDialog";
@@ -255,7 +256,7 @@ export function CreateDirectChatDialog({
             }
 
             const user = client.getUser(targetUserId);
-            let displayName = user?.displayName ?? targetUserId;
+            let displayName = plainUserDisplayName(user) ?? targetUserId;
             let avatarMxc = user?.avatarUrl ?? null;
 
             try {

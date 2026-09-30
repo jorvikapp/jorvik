@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { MatrixClient, Room } from "matrix-js-sdk/src/matrix";
 
+import { plainUserDisplayName } from "../../../core/users/userDisplayName";
 import { getDirectRoomIds } from "../../adapters/dmAdapter";
 import { inviteUsersToRoom } from "../../adapters/inviteAdapter";
 import { RoomDialog } from "./RoomDialog";
@@ -75,7 +76,7 @@ export function AddToRoomDialog({ client, userId, onClose, onInvited }: AddToRoo
         return null;
     }
 
-    const name = client.getUser(userId)?.displayName || userId;
+    const name = plainUserDisplayName(client.getUser(userId)) || userId;
     const needle = filter.trim().toLowerCase();
     const shown = needle
         ? candidates.filter((candidate) => `${candidate.label} ${candidate.detail ?? ""}`.toLowerCase().includes(needle))

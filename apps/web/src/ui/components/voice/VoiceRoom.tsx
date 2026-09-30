@@ -18,6 +18,7 @@ import { Avatar } from "../Avatar";
 import micMutedIcon from "../icons/mic-02.svg";
 import volumeMutedIcon from "../icons/volume-mute-02.svg";
 
+import { plainUserDisplayName } from "../../../core/users/userDisplayName";
 import { memberAvatarSources } from "../../adapters/avatar";
 import { fetchLiveKitToken, updateVoiceParticipantState } from "../../adapters/voiceAdapter";
 import {
@@ -1765,7 +1766,7 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
     const connected = connectionState === ConnectionState.Connected;
 
     const ownUser = ownUserId ? client.getUser(ownUserId) ?? undefined : undefined;
-    const ownDisplayName = ownUser?.displayName ?? ownUserId ?? "You";
+    const ownDisplayName = plainUserDisplayName(ownUser) ?? ownUserId ?? "You";
     const activeScreenShareParticipant = screenShareParticipants.find(
         (participant) => participant.identity === activeScreenShareIdentity,
     );

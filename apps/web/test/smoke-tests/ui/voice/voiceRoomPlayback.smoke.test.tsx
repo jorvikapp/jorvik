@@ -405,5 +405,42 @@ describe("voice room smoke", () => {
             "https://hs.example/example.org/alice-avatar",
         ]);
     });
+
+    it("names your own tile without the store's (@id) disambiguation", async () => {
+        const ref = createRef<VoiceRoomHandle>();
+
+        await act(async () => {
+            root.render(
+                React.createElement(VoiceRoom, {
+                    ref,
+                    client: {
+                        getUserId: () => "@self:example.org",
+                        // What the SDK store leaves on the User after a room
+                        // where someone else is also called "Self".
+                        getUser: () => ({
+                            userId: "@self:example.org",
+                            displayName: "Self (@self:example.org)",
+                            rawDisplayName: "Self",
+                        }),
+                        mxcUrlToHttp: () => null,
+                    },
+                    matrixRoomId: "!dm:example.org",
+                    matrixRoom: null,
+                    audioSettings: createAudioSettings(),
+                    onAudioSettingsChange: () => undefined,
+                }),
+            );
+        });
+
+        await act(async () => {
+            await ref.current?.join();
+        });
+
+        const ownTileName = container.querySelector(
+            ".voice-room-participants-list > li .voice-room-participant-name",
+        )?.textContent;
+
+        expect(ownTileName).toBe("Self");
+    });
 });
 

@@ -18,6 +18,7 @@ import {
 
 import { useMatrix } from "../providers/MatrixProvider";
 import { formatUserIdForDisplay } from "../../core/users/formatUserId";
+import { plainUserDisplayName } from "../../core/users/userDisplayName";
 import { isPresenceEnabledForClient } from "../presence/presenceConfig";
 import { useAutoIdle } from "../presence/useAutoIdle";
 import { usePresenceSelection } from "../presence/usePresenceSelection";
@@ -1701,7 +1702,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     // change re-rendered the shell.
     const [ownProfile, setOwnProfile] = useState<{ displayName: string; avatarMxc: string }>(() => {
         const user = ownUserId ? client.getUser(ownUserId) : null;
-        return { displayName: user?.displayName ?? "", avatarMxc: user?.avatarUrl ?? "" };
+        return { displayName: plainUserDisplayName(user) ?? "", avatarMxc: user?.avatarUrl ?? "" };
     });
 
     useEffect(() => {
@@ -1715,7 +1716,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         const applyFromUser = (): void => {
             const current = client.getUser(ownUserId);
             setOwnProfile((previous) => {
-                const displayName = current?.displayName ?? previous.displayName;
+                const displayName = plainUserDisplayName(current) ?? previous.displayName;
                 const avatarMxc = current?.avatarUrl ?? previous.avatarMxc;
                 return displayName === previous.displayName && avatarMxc === previous.avatarMxc
                     ? previous
@@ -2765,7 +2766,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 {calls.outgoingCall && !calls.outgoingCall.answered && activeRoom?.roomId === calls.outgoingCall.roomId ? (
                     <div className="call-status-bar" role="status">
                         <span>
-                            Calling {client.getUser(calls.outgoingCall.calleeId)?.displayName || calls.outgoingCall.calleeId}...
+                            Calling {plainUserDisplayName(client.getUser(calls.outgoingCall.calleeId)) || calls.outgoingCall.calleeId}...
                         </span>
                         <button type="button" className="call-status-cancel" onClick={leaveVoiceSession}>
                             Cancel

@@ -12,6 +12,7 @@ import {
 
 import { memberAvatarSources, roomAvatarSources } from "../adapters/avatar";
 import { sharedStateEventDeduperFor } from "../../core/net/stateEventDeduper";
+import { plainUserDisplayName } from "../../core/users/userDisplayName";
 import { mediaFromMxc, thumbnailFromMxc } from "../adapters/media";
 import type { SpaceChildAffordance } from "../adapters/spaceHierarchyAdapter";
 import { fetchVoiceParticipants, isVoiceFeatureEnabled } from "../adapters/voiceAdapter";
@@ -582,7 +583,7 @@ export function RoomList({
                                 participant.name ||
                                 member?.rawDisplayName ||
                                 member?.name ||
-                                user?.displayName ||
+                                plainUserDisplayName(user) ||
                                 participant.identity;
                             const avatarMxc =
                                 member?.getMxcAvatarUrl() ||
@@ -912,7 +913,7 @@ export function RoomList({
                       return {
                           identity,
                           matrixUserId: identity,
-                          displayName: member?.rawDisplayName || member?.name || user?.displayName || identity,
+                          displayName: member?.rawDisplayName || member?.name || plainUserDisplayName(user) || identity,
                           avatarMxc: member?.getMxcAvatarUrl() || user?.avatarUrl || null,
                           micMuted: isLocalParticipant ? localVoiceSessionForRoom?.micMuted === true : undefined,
                           audioMuted: isLocalParticipant ? localVoiceSessionForRoom?.audioMuted === true : undefined,

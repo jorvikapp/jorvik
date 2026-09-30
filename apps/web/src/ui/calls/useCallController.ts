@@ -12,6 +12,7 @@ import {
     type CallRing,
 } from "../../core/calls/callSignals";
 import { createOrReuseDirectChat } from "../../core/dm/directChats";
+import { plainUserDisplayName } from "../../core/users/userDisplayName";
 import { startRingtone } from "../notifications/sound";
 import type { VoiceSessionStatus } from "../components/voice/VoiceRoom";
 
@@ -44,7 +45,7 @@ export interface CallController {
 }
 
 function displayName(client: MatrixClient, userId: string): string {
-    return client.getUser(userId)?.displayName || userId;
+    return plainUserDisplayName(client.getUser(userId)) || userId;
 }
 
 /**

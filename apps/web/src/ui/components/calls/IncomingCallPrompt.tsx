@@ -2,6 +2,7 @@ import React from "react";
 import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import type { CallRing } from "../../../core/calls/callSignals";
+import { plainUserDisplayName } from "../../../core/users/userDisplayName";
 import { memberAvatarSources } from "../../adapters/avatar";
 import { Avatar } from "../Avatar";
 
@@ -14,7 +15,9 @@ interface IncomingCallPromptProps {
 
 export function IncomingCallPrompt({ client, call, onAccept, onDecline }: IncomingCallPromptProps): React.ReactElement {
     const member = client.getRoom(call.roomId)?.getMember(call.callerId) ?? null;
-    const name = member?.name || client.getUser(call.callerId)?.displayName || call.callerId;
+    // rawDisplayName, not name: name adds "(@id)" when the room has two people
+    // with the same display name.
+    const name = member?.rawDisplayName || plainUserDisplayName(client.getUser(call.callerId)) || call.callerId;
     const sources = memberAvatarSources(client, member, 96, "crop");
 
     return (

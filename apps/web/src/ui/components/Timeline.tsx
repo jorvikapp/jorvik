@@ -13,6 +13,7 @@ import {
     type Room,
 } from "matrix-js-sdk/src/matrix";
 
+import { plainUserDisplayName } from "../../core/users/userDisplayName";
 import { memberAvatarSources } from "../adapters/avatar";
 import { mediaFromMxc } from "../adapters/media";
 import { normalizeEmojiShortcode, resetPersonalEmojiPackCache, resetSpaceEmojiPackCache } from "../emoji/EmojiPackStore";
@@ -728,7 +729,7 @@ function getReadReceiptUserMetadata(
 ): { name: string; avatarUrl: string | null; avatarSources: string[] } {
     const member = room.getMember(userId);
     const user = client.getUser(userId);
-    const name = member?.rawDisplayName || member?.name || user?.displayName || userId;
+    const name = member?.rawDisplayName || member?.name || plainUserDisplayName(user) || userId;
 
     const memberSources = memberAvatarSources(client, member, avatarSize, "crop");
     const userSources =
@@ -1154,7 +1155,8 @@ function resolveMentionDisplayName(
 ): string {
     const member = room.getMember(mentionedUserId);
     const user = client.getUser(mentionedUserId);
-    const displayName = member?.rawDisplayName || member?.name || user?.displayName || mxidLocalpart(mentionedUserId);
+    const displayName =
+        member?.rawDisplayName || member?.name || plainUserDisplayName(user) || mxidLocalpart(mentionedUserId);
     return displayName.startsWith("@") ? displayName.slice(1) : displayName;
 }
 

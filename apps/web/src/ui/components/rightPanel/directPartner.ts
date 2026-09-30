@@ -1,6 +1,7 @@
 import type { Room } from "matrix-js-sdk/src/matrix";
 
 import { formatUserIdForDisplay } from "../../../core/users/formatUserId";
+import { plainUserDisplayName } from "../../../core/users/userDisplayName";
 
 // A DM with two or fewer participants is one-to-one: its member list would
 // only repeat the two of you, so the other person's profile stands in for it.
@@ -38,6 +39,7 @@ export function getOneToOneDirectName(room: Room, ownUserId: string, localDomain
 
     // rawDisplayName falls back to the user ID when no display name is set.
     const memberName = room.getMember(partnerId)?.rawDisplayName;
-    const displayName = memberName && memberName !== partnerId ? memberName : room.client.getUser(partnerId)?.displayName;
+    const displayName =
+        memberName && memberName !== partnerId ? memberName : plainUserDisplayName(room.client.getUser(partnerId));
     return displayName?.trim() || formatUserIdForDisplay(partnerId, localDomain);
 }
