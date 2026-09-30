@@ -70,6 +70,17 @@
   </branding>
 
   <releases>
+    <release version="1.0.15" date="2026-09-30">
+      <description>
+        <p>Clearer names, and any chat can be deleted.</p>
+        <ul>
+          <li>Direct messages are named after the person, with their @name beside their display name</li>
+          <li>Any direct message can be deleted, including one the other person started</li>
+          <li>The security screens say which account you are signed in as</li>
+          <li>The Flatpak moves to the 26.08 runtime and asks for fewer permissions</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.14" date="2026-09-30">
       <description>
         <p>Verification with other Matrix apps works, and a batch of new features.</p>
