@@ -265,11 +265,16 @@ export function RegistrationInteractiveAuth({
                     return;
                 }
 
+                // Until the link in the email is clicked, every check comes back
+                // "Unable to get validated threepid" (M_UNAUTHORIZED): waiting, not
+                // an error. It used to show in red while the email was on its way.
+                const waitingForEmail = nextStage === AuthType.Email && status.errcode === "M_UNAUTHORIZED";
                 setStage(nextStage);
                 setStageParams(authLogic.getStageParams(nextStage));
-                setStageState(status);
+                setStageState(waitingForEmail ? { ...status, errcode: undefined, error: undefined } : status);
                 setBusy(false);
-                setError(status.error ?? null);
+                // The stage's own error is shown from stageState; copying it here showed it twice.
+                setError(null);
             },
             requestEmailToken: (email, secret, attempt) => client.requestRegisterEmailToken(email, secret, attempt),
             supportedStages: [
