@@ -76,6 +76,7 @@ function makeClient(initial: Partial<FakeState> = {}) {
         userHasCrossSigningKeys: vi.fn(async () => state.onServer),
         getKeyBackupInfo: vi.fn(async () => (state.backupVersion ? { version: state.backupVersion } : null)),
         isKeyBackupTrusted: vi.fn(async () => ({ trusted: state.holdsBackupKey, matchesDecryptionKey: state.holdsBackupKey })),
+        checkKeyBackupAndEnable: vi.fn(async () => null),
         bootstrapCrossSigning: vi.fn(
             async (opts: { setupNewCrossSigning?: boolean; authUploadDeviceSigningKeys?: (makeRequest: never) => Promise<void> }) => {
                 calls.push(opts.setupNewCrossSigning ? "bootstrapCrossSigning(new)" : "bootstrapCrossSigning");
@@ -94,6 +95,8 @@ function makeClient(initial: Partial<FakeState> = {}) {
             calls.push(`bootstrapSecretStorage(new storage: ${Boolean(opts.setupNewSecretStorage)}, new backup: ${Boolean(opts.setupNewKeyBackup)})`);
             keysSeen.push(await keySuppliedToSdk());
             state.hasSecretStorage = true;
+            // The SDK saves the keys this device holds under the account's key.
+            state.inSecretStorage ||= state.cached;
             if (opts.setupNewKeyBackup) {
                 state.backupVersion = "2";
                 state.holdsBackupKey = true;
@@ -165,6 +168,20 @@ describe("completeCrossSigningWithRecoveryKey", () => {
         expect(uiaAttempts).toEqual([null]);
         expect(keysSeen).toEqual([Array.from(RIGHT_KEY)]);
         expect(state).toMatchObject({ cached: true, inSecretStorage: true, onServer: true });
+    });
+
+    it("saves keys only this device has under the existing key, without reading a copy an older key left", async () => {
+        const { client, crypto, calls, keysSeen, uiaAttempts, state } = makeClient({ cached: true, onServer: true });
+        await completeCrossSigningWithRecoveryKey(client, RECOVERY_KEY);
+        expect(calls).toEqual(["bootstrapSecretStorage(new storage: false, new backup: false)"]);
+        expect(crypto.bootstrapCrossSigning).not.toHaveBeenCalled();
+        expect(keysSeen).toEqual([Array.from(RIGHT_KEY)]);
+        expect(uiaAttempts).toEqual([]);
+        expect(state).toMatchObject({ cached: true, inSecretStorage: true, onServer: true });
+        // Or the SDK could save an old backup's key as the current one's.
+        expect(crypto.checkKeyBackupAndEnable.mock.invocationCallOrder[0]).toBeLessThan(
+            crypto.bootstrapSecretStorage.mock.invocationCallOrder[0]!,
+        );
     });
 
     it("imports keys from secret storage", async () => {
@@ -272,10 +289,13 @@ describe("bootstrapSecretStorageSetup", () => {
     });
 
     it("keeps a backup this session can open, so the SDK moves its key under the new one", async () => {
-        const { client, calls, state } = makeClient({ backupVersion: "1", holdsBackupKey: true });
+        const { client, crypto, calls, state } = makeClient({ backupVersion: "1", holdsBackupKey: true });
         await bootstrapSecretStorageSetup(client, newKey() as never);
         expect(calls[0]).toBe("bootstrapSecretStorage(new storage: true, new backup: false)");
         expect(state.backupVersion).toBe("1");
+        expect(crypto.checkKeyBackupAndEnable.mock.invocationCallOrder[0]).toBeLessThan(
+            crypto.bootstrapSecretStorage.mock.invocationCallOrder[0]!,
+        );
     });
 
     it("replaces a backup this session cannot open, or the new key would be refused at the next sign-in", async () => {

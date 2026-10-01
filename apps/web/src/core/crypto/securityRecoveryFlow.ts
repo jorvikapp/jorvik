@@ -304,6 +304,9 @@ export async function bootstrapSecretStorageSetup(
         throw new Error("Encryption is not available for this session.");
     }
 
+    // The SDK moves the backup's key under the new key by its own cached idea
+    // of which backup is current; refresh it so that matches what is checked here.
+    await crypto.checkKeyBackupAndEnable();
     const backupInfo = await crypto.getKeyBackupInfo();
     const keepBackup = await canKeepKeyBackup(crypto, backupInfo);
     // Only for an account without any: keys held elsewhere are never replaced.

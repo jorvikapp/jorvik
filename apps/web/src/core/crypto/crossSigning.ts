@@ -123,14 +123,24 @@ export async function completeCrossSigningWithRecoveryKey(client: MatrixClient, 
 
     const key = await unlockSecretStorage(client, recoveryKey);
     try {
-        await withKey(key, () =>
-            crypto.bootstrapCrossSigning({
-                // Fresh keys for an account without any, even if an earlier
-                // attempt left some here that never reached the server.
-                setupNewCrossSigning: situation === "missing",
-                authUploadDeviceSigningKeys: uploadWithoutPassword,
-            }),
-        );
+        if (situation === "unsaved") {
+            // Save this device's keys under the account's key. bootstrapCrossSigning
+            // reads the saved copy first, and a key change made from a session
+            // without the keys leaves one under the old key: "bad MAC".
+            // This also saves the device's backup key, so refresh which backup
+            // is current first, or an old backup's key replaces the right one.
+            await crypto.checkKeyBackupAndEnable();
+            await withKey(key, () => crypto.bootstrapSecretStorage({}));
+        } else {
+            await withKey(key, () =>
+                crypto.bootstrapCrossSigning({
+                    // Fresh keys for an account without any, even if an earlier
+                    // attempt left some here that never reached the server.
+                    setupNewCrossSigning: situation === "missing",
+                    authUploadDeviceSigningKeys: uploadWithoutPassword,
+                }),
+            );
+        }
     } catch (error) {
         if (situation === "in_secret_storage" && String((error as Error | undefined)?.message).includes("importCrossSigningKeys failed")) {
             throw new StaleCrossSigningKeysError();
