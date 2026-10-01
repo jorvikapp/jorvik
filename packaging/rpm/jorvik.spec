@@ -3,8 +3,8 @@
 # network. The tarball is payload only, so the desktop entry and the icon set
 # are produced here.
 Name:           jorvik
-Version:        1.0.15
-Release:        2%{?dist}
+Version:        1.0.16
+Release:        1%{?dist}
 Summary:        Chat and voice for Matrix
 
 License:        AGPL-3.0-only
@@ -111,6 +111,9 @@ appstream-util validate-relax --nonet \
 %{_datadir}/dnf5/repos.override.d/80-jorvik-copr.repo
 
 %changelog
+* Thu Oct 01 2026 Jorvik contributors <admin@jorvik.app> - 1.0.16-1
+- Update to 1.0.16
+
 * Wed Sep 30 2026 Jorvik contributors <admin@jorvik.app> - 1.0.15-2
 - Check the COPR repository for new releases every 6 hours instead of 48
 
