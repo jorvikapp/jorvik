@@ -7,6 +7,7 @@ import {
     createSecretStorageSetupKey,
     newKeyReplacesKeyBackup,
 } from "../../../adapters/securityRecoveryAdapter";
+import { securityKeyFileName } from "../../../components/securityKeyFileName";
 import { useMatrix } from "../../../providers/MatrixProvider";
 
 interface EncryptionTabProps {
@@ -175,7 +176,7 @@ export function EncryptionTab({ client, verificationNonce, onOpenVerification }:
         const objectUrl = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = objectUrl;
-        link.download = "security-key.txt";
+        link.download = securityKeyFileName(client.getUserId());
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -306,10 +307,13 @@ export function EncryptionTab({ client, verificationNonce, onOpenVerification }:
                         ) : null}
                         {setupGeneratedKey ? (
                             <div className="settings-recovery-key-box">
-                                <p className="settings-inline-note settings-recovery-key-label">Security key</p>
-                                <code>{setupGeneratedKey}</code>
+                                <p className="settings-inline-note settings-recovery-key-label">New security key, not saved yet</p>
+                                {/* Copied by hand counts too, or Finish stays greyed out with no reason given. */}
+                                <code onCopy={() => setSetupCopied(true)}>{setupGeneratedKey}</code>
                                 <p className="settings-inline-note">
-                                    Save this key offline. You will need it to unlock encrypted history later.
+                                    {hasRecoveryKey
+                                        ? "Save it somewhere safe, then press Finish. Until then nothing changes, and your current key keeps working."
+                                        : "Save it somewhere safe, then press Finish. Until then it isn't your account's key."}
                                 </p>
                                 <div className="settings-actions-row">
                                     <button
@@ -333,6 +337,9 @@ export function EncryptionTab({ client, verificationNonce, onOpenVerification }:
                         ) : null}
 
                         {setupError ? <p className="settings-inline-error">{setupError}</p> : null}
+                        {setupGeneratedKey && !setupCopied && !setupDownloaded ? (
+                            <p className="settings-inline-note">Copy or download the key first.</p>
+                        ) : null}
 
                         <div className="settings-actions-row">
                             {setupGeneratedKey ? (

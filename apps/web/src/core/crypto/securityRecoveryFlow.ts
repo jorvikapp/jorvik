@@ -192,7 +192,7 @@ export async function restoreKeyBackupWithSecretStorageCredential(
     try {
         const isValidForSecretStorage = await secretStorage.checkKey(privateKey, selectedKeyInfo);
         if (!isValidForSecretStorage) {
-            throw new Error("Provided security key does not unlock secret storage.");
+            throw new Error("That security key doesn't unlock this account.");
         }
 
         await withSecretStorageKeyProvider(

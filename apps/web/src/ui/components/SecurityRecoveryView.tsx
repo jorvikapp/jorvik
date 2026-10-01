@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 import { isRecoveryKeyValid, type SecurityRecoveryFlow } from "../adapters/securityRecoveryAdapter";
+import { securityKeyFileName } from "./securityKeyFileName";
 
 interface SecurityRecoveryViewProps {
     flow: SecurityRecoveryFlow;
@@ -133,7 +134,7 @@ export function SecurityRecoveryView({
         const objectUrl = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = objectUrl;
-        link.download = "security-key.txt";
+        link.download = securityKeyFileName(accountLabel);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -175,10 +176,11 @@ export function SecurityRecoveryView({
 
                     {generatedSetupKey ? (
                         <div className="security-generated-key">
-                            <p className="security-generated-key-label">Security key</p>
-                            <code>{generatedSetupKey}</code>
+                            <p className="security-generated-key-label">New security key, not saved yet</p>
+                            {/* Copied by hand counts too, or Finish stays greyed out with no reason given. */}
+                            <code onCopy={() => setSetupCopied(true)}>{generatedSetupKey}</code>
                             <p className="security-generated-key-hint">
-                                Save this key offline. You will need it to restore encrypted history if this session is lost.
+                                Save it somewhere safe, then press Finish setup. Until then it isn't your account's key.
                             </p>
                             <div className="security-generated-key-actions">
                                 <button type="button" className="security-skip" onClick={() => void handleCopySetupKey()} disabled={setupBusy}>
@@ -192,6 +194,10 @@ export function SecurityRecoveryView({
                     ) : null}
 
                     {effectiveSetupError ? <p className="login-error">{effectiveSetupError}</p> : null}
+
+                    {generatedSetupKey && !setupCopied && !setupDownloaded ? (
+                        <p className="security-generated-key-hint">Copy or download the key first.</p>
+                    ) : null}
 
                     <div className="security-actions">
                         {generatedSetupKey ? (
