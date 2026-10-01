@@ -293,11 +293,10 @@ export function SecurityRecoveryView({
                     </button>
                 </div>
 
-                {flow === "cross_signing" ? (
-                    <p className="security-generated-key-hint">
-                        Lost your security key? Skip for now, then make a new one in Settings under Encryption.
-                    </p>
-                ) : null}
+                {/* Both screens ask for the key at every start until it is entered. */}
+                <p className="security-generated-key-hint">
+                    Lost your security key? Skip for now, then make a new one in Settings under Encryption.
+                </p>
             </form>
         </div>
     );

@@ -40,6 +40,25 @@ function renderSetup(onCompleteSetup = vi.fn(async () => undefined)) {
 const button = (label: string): HTMLButtonElement =>
     [...container.querySelectorAll("button")].find((candidate) => candidate.textContent === label)!;
 
+describe("SecurityRecoveryView key prompts", () => {
+    it.each(["restore", "cross_signing"] as const)("%s says what to do about a lost key", (flow) => {
+        act(() => {
+            root.render(
+                <SecurityRecoveryView
+                    flow={flow}
+                    error={null}
+                    onPrepareSetup={vi.fn()}
+                    onCompleteSetup={vi.fn()}
+                    onRestore={vi.fn()}
+                    onCompleteCrossSigning={vi.fn()}
+                    onSkip={vi.fn()}
+                />,
+            );
+        });
+        expect(container.textContent).toContain("Lost your security key? Skip for now, then make a new one in Settings under Encryption.");
+    });
+});
+
 describe("SecurityRecoveryView setup", () => {
     it("says a new key is not saved yet, and why Finish is greyed out", async () => {
         renderSetup();
