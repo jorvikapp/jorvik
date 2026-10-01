@@ -70,6 +70,19 @@
   </branding>
 
   <releases>
+    <release version="1.0.16" date="2026-10-01">
+      <description>
+        <p>Security keys that work when you need them, and calls that show everyone.</p>
+        <ul>
+          <li>Calls show the picture of everyone in them, your own included</li>
+          <li>Names show plainly, without an @name added when two people share one</li>
+          <li>A new security key made in Settings works at the next sign-in, and a key that is not saved yet says so</li>
+          <li>Finishing setup after a key change no longer fails with a decryption error</li>
+          <li>The security key screens say what to do if you have lost your key</li>
+          <li>Signing up no longer shows an error while you wait for the verification email</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.15" date="2026-09-30">
       <description>
         <p>Clearer names, and any chat can be deleted.</p>
