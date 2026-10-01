@@ -10,7 +10,7 @@ import {
     resetCrossSigningIdentity,
     StaleCrossSigningKeysError,
 } from "../../../../src/core/crypto/crossSigning";
-import { bootstrapSecretStorageSetup } from "../../../../src/core/crypto/securityRecoveryFlow";
+import { bootstrapSecretStorageSetup, newKeyReplacesKeyBackup } from "../../../../src/core/crypto/securityRecoveryFlow";
 
 const ME = "@me:x";
 const KEY_ID = "ssss-key";
@@ -25,6 +25,8 @@ interface FakeState {
     onServer: boolean;
     hasSecretStorage: boolean;
     backupVersion: string | null;
+    /** This session holds the backup's key, so a new security key can take the backup along. */
+    holdsBackupKey: boolean;
     password: string;
 }
 
@@ -41,6 +43,7 @@ function makeClient(initial: Partial<FakeState> = {}) {
         onServer: false,
         hasSecretStorage: true,
         backupVersion: "1",
+        holdsBackupKey: true,
         password: "right password",
         ...initial,
     };
@@ -67,6 +70,7 @@ function makeClient(initial: Partial<FakeState> = {}) {
         })),
         userHasCrossSigningKeys: vi.fn(async () => state.onServer),
         getKeyBackupInfo: vi.fn(async () => (state.backupVersion ? { version: state.backupVersion } : null)),
+        isKeyBackupTrusted: vi.fn(async () => ({ trusted: state.holdsBackupKey, matchesDecryptionKey: state.holdsBackupKey })),
         bootstrapCrossSigning: vi.fn(
             async (opts: { setupNewCrossSigning?: boolean; authUploadDeviceSigningKeys?: (makeRequest: never) => Promise<void> }) => {
                 calls.push(opts.setupNewCrossSigning ? "bootstrapCrossSigning(new)" : "bootstrapCrossSigning");
@@ -87,6 +91,7 @@ function makeClient(initial: Partial<FakeState> = {}) {
             state.hasSecretStorage = true;
             if (opts.setupNewKeyBackup) {
                 state.backupVersion = "2";
+                state.holdsBackupKey = true;
             }
         }),
     };
@@ -258,6 +263,34 @@ describe("bootstrapSecretStorageSetup", () => {
         const { client, calls } = makeClient({ hasSecretStorage: false, onServer: true });
         await bootstrapSecretStorageSetup(client, newKey() as never);
         expect(calls).toEqual(["bootstrapSecretStorage(new storage: true, new backup: false)"]);
+    });
+
+    it("keeps a backup this session can open, so the SDK moves its key under the new one", async () => {
+        const { client, calls, state } = makeClient({ backupVersion: "1", holdsBackupKey: true });
+        await bootstrapSecretStorageSetup(client, newKey() as never);
+        expect(calls[0]).toBe("bootstrapSecretStorage(new storage: true, new backup: false)");
+        expect(state.backupVersion).toBe("1");
+    });
+
+    it("replaces a backup this session cannot open, or the new key would be refused at the next sign-in", async () => {
+        const { client, calls, state } = makeClient({ backupVersion: "1", holdsBackupKey: false });
+        await bootstrapSecretStorageSetup(client, newKey() as never);
+        expect(calls).toEqual(["bootstrapSecretStorage(new storage: true, new backup: true)", "bootstrapCrossSigning(new)"]);
+        expect(state).toMatchObject({ backupVersion: "2", holdsBackupKey: true, onServer: true });
+    });
+});
+
+describe("newKeyReplacesKeyBackup", () => {
+    it("is false without a backup", async () => {
+        expect(await newKeyReplacesKeyBackup(makeClient({ backupVersion: null }).client)).toBe(false);
+    });
+
+    it("is false when this session holds the backup's key", async () => {
+        expect(await newKeyReplacesKeyBackup(makeClient({ holdsBackupKey: true }).client)).toBe(false);
+    });
+
+    it("is true when this session cannot open the backup", async () => {
+        expect(await newKeyReplacesKeyBackup(makeClient({ holdsBackupKey: false }).client)).toBe(true);
     });
 });
 

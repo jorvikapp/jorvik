@@ -1,4 +1,4 @@
-import type { GeneratedSecretStorageKey } from "matrix-js-sdk/src/crypto-api";
+import type { CryptoApi, GeneratedSecretStorageKey, KeyBackupInfo } from "matrix-js-sdk/src/crypto-api";
 import { decodeRecoveryKey } from "matrix-js-sdk/src/crypto-api/recovery-key";
 import type { MatrixClient, Room } from "matrix-js-sdk/src/matrix";
 
@@ -236,6 +236,26 @@ export async function createSecretStorageSetupKey(client: MatrixClient): Promise
     return generatedKey;
 }
 
+/**
+ * A new security key can take the key backup along only if this session holds
+ * the backup's key. Otherwise the backup's key stays locked under the old
+ * security key, and the new one is refused at the next sign-in.
+ */
+async function canKeepKeyBackup(crypto: CryptoApi, backupInfo: KeyBackupInfo | null): Promise<boolean> {
+    return Boolean(backupInfo?.version) && (await crypto.isKeyBackupTrusted(backupInfo!)).matchesDecryptionKey;
+}
+
+/** True when a new security key would replace a key backup this session cannot open. */
+export async function newKeyReplacesKeyBackup(client: MatrixClient): Promise<boolean> {
+    const crypto = client.getCrypto();
+    if (!crypto) {
+        return false;
+    }
+
+    const backupInfo = await crypto.getKeyBackupInfo();
+    return Boolean(backupInfo?.version) && !(await canKeepKeyBackup(crypto, backupInfo));
+}
+
 export async function bootstrapSecretStorageSetup(
     client: MatrixClient,
     secretStorageKey: GeneratedSecretStorageKey,
@@ -246,6 +266,7 @@ export async function bootstrapSecretStorageSetup(
     }
 
     const backupInfo = await crypto.getKeyBackupInfo();
+    const keepBackup = await canKeepKeyBackup(crypto, backupInfo);
     // Only for an account without any: keys held elsewhere are never replaced.
     const crossSigningMissing = (await getCrossSigningSituation(client)) === "missing";
     await withSecretStorageKeyProvider(
@@ -261,7 +282,9 @@ export async function bootstrapSecretStorageSetup(
             await crypto.bootstrapSecretStorage({
                 createSecretStorageKey: async () => secretStorageKey,
                 setupNewSecretStorage: true,
-                setupNewKeyBackup: !backupInfo?.version,
+                // Replaces a backup this session cannot open, so that the new
+                // key opens the backup at the next sign-in.
+                setupNewKeyBackup: !keepBackup,
             });
             // Jorvik used to stop here, leaving accounts without cross-signing.
             // Created after the new secret storage so the keys are saved in it;

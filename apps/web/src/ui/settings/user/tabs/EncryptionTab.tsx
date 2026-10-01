@@ -5,6 +5,7 @@ import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 import {
     bootstrapSecretStorageSetup,
     createSecretStorageSetupKey,
+    newKeyReplacesKeyBackup,
 } from "../../../adapters/securityRecoveryAdapter";
 import { useMatrix } from "../../../providers/MatrixProvider";
 
@@ -19,6 +20,7 @@ export function EncryptionTab({ client, verificationNonce, onOpenVerification }:
     const [crossSigningReady, setCrossSigningReady] = useState(false);
     const [backupVersion, setBackupVersion] = useState<string | null>(null);
     const [hasRecoveryKey, setHasRecoveryKey] = useState(false);
+    const [replacesBackup, setReplacesBackup] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [setupNonce, setSetupNonce] = useState(0);
@@ -57,16 +59,18 @@ export function EncryptionTab({ client, verificationNonce, onOpenVerification }:
             setLoading(true);
             setError(null);
             try {
-                const [isCrossSigningReady, activeBackupVersion, defaultRecoveryKeyId] = await Promise.all([
+                const [isCrossSigningReady, activeBackupVersion, defaultRecoveryKeyId, newKeyReplacesBackup] = await Promise.all([
                     crypto.isCrossSigningReady(),
                     crypto.getActiveSessionBackupVersion(),
                     client.secretStorage.getDefaultKeyId(),
+                    newKeyReplacesKeyBackup(client),
                 ]);
 
                 if (!canceled) {
                     setCrossSigningReady(Boolean(isCrossSigningReady));
                     setBackupVersion(activeBackupVersion);
                     setHasRecoveryKey(Boolean(defaultRecoveryKeyId));
+                    setReplacesBackup(newKeyReplacesBackup);
                 }
             } catch (loadError) {
                 if (!canceled) {
@@ -293,6 +297,13 @@ export function EncryptionTab({ client, verificationNonce, onOpenVerification }:
 
                 {setupOpen ? (
                     <div className="settings-recovery-setup">
+                        {replacesBackup ? (
+                            <p className="settings-inline-error">
+                                This session can't open your key backup, so a new key starts a new backup. Messages saved
+                                only in the old one can't be recovered after that. If you still have your current security
+                                key, reopen Jorvik and enter it when asked instead.
+                            </p>
+                        ) : null}
                         {setupGeneratedKey ? (
                             <div className="settings-recovery-key-box">
                                 <p className="settings-inline-note settings-recovery-key-label">Security key</p>
@@ -331,7 +342,7 @@ export function EncryptionTab({ client, verificationNonce, onOpenVerification }:
                                     onClick={() => void handleFinishSetup()}
                                     disabled={!canFinishSetup}
                                 >
-                                    {setupBusy ? "Finishing..." : "Finish secure backup"}
+                                    {setupBusy ? "Finishing..." : replacesBackup ? "Replace backup and finish" : "Finish secure backup"}
                                 </button>
                             ) : (
                                 <button

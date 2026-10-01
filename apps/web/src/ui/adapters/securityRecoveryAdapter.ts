@@ -3,6 +3,7 @@ export {
     bootstrapSecretStorageSetup,
     createSecretStorageSetupKey,
     isRecoveryKeyValid,
+    newKeyReplacesKeyBackup,
     restoreKeyBackupWithRecoveryKey,
     restoreKeyBackupWithSecretStorageCredential,
     triggerRoomHistoryDecryption,
