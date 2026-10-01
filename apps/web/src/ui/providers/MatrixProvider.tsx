@@ -16,7 +16,7 @@ import { waitForClientReady, waitForLiveSync } from "../../core/client/clientRea
 import { getDefaultIdentityServer, getFallbackHomeserver } from "../../core/config/serverDefaults";
 import {
     attemptAutomaticKeyBackupRestore,
-    bootstrapSecretStorageSetup,
+    completeFirstTimeSetup,
     createSecretStorageSetupKey,
     type CrossSigningSituation,
     finishSetupWithRecoveryKey,
@@ -25,6 +25,7 @@ import {
     requestCrossSigningKeysFromOtherSessions,
     resetCrossSigningIdentity,
     type SecurityRecoveryFlow,
+    SetupUnfinishedError,
     StaleCrossSigningKeysError,
     restoreKeyBackupWithRecoveryKey,
     restoreKeyBackupWithSecretStorageCredential,
@@ -899,13 +900,30 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
 
         dispatch({ type: "set_status", status: "starting", error: null });
 
+        // The account's key, whichever it is, is the one to finish with: never
+        // a second one, and never one that only this screen has seen.
+        const askForSavedKey = async (error: string): Promise<void> => {
+            applyPostLoginState({
+                ...READY_STATE,
+                status: "security_recovery",
+                recoveryFlow: "cross_signing",
+                error,
+                localDeviceVerified: await isLocalDeviceVerified(state.client!),
+            });
+        };
         try {
-            // Set up from another session meanwhile: use that key, never make a second.
-            if (!(await state.client.secretStorage.hasKey())) {
-                await bootstrapSecretStorageSetup(state.client, pendingSetupKey);
-            }
+            const outcome = await completeFirstTimeSetup(state.client, pendingSetupKey);
             clearPendingSetupKey();
+            if (outcome === "key_exists") {
+                await askForSavedKey("This account already has a security key, so the one shown was not saved. Enter the key you saved before.");
+                return;
+            }
         } catch (error) {
+            if (error instanceof SetupUnfinishedError) {
+                clearPendingSetupKey();
+                await askForSavedKey(error.message);
+                return;
+            }
             dispatch({
                 type: "set_status",
                 status: "security_recovery",
@@ -915,7 +933,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
         }
         // Signing keys held only by another session still need verification.
         await applySessionSecurity(state.client);
-    }, [applySessionSecurity, clearPendingSetupKey, state.client]);
+    }, [applyPostLoginState, applySessionSecurity, clearPendingSetupKey, state.client]);
 
     const completeSecurityRecovery = useCallback(
         async (credential: string): Promise<void> => {

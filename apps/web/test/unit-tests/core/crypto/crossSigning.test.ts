@@ -10,7 +10,12 @@ import {
     resetCrossSigningIdentity,
     StaleCrossSigningKeysError,
 } from "../../../../src/core/crypto/crossSigning";
-import { bootstrapSecretStorageSetup, newKeyReplacesKeyBackup } from "../../../../src/core/crypto/securityRecoveryFlow";
+import {
+    bootstrapSecretStorageSetup,
+    completeFirstTimeSetup,
+    newKeyReplacesKeyBackup,
+    SetupUnfinishedError,
+} from "../../../../src/core/crypto/securityRecoveryFlow";
 
 const ME = "@me:x";
 const KEY_ID = "ssss-key";
@@ -113,6 +118,7 @@ function makeClient(initial: Partial<FakeState> = {}) {
         getCrypto: () => crypto,
         http: { authedRequest },
         secretStorage: {
+            hasKey: vi.fn(async () => state.hasSecretStorage),
             getDefaultKeyId: vi.fn(async () => (state.hasSecretStorage ? KEY_ID : null)),
             getKey: vi.fn(async (keyId: string) => [keyId, KEY_INFO]),
             checkKey: vi.fn(async (key: Uint8Array) => key.every((byte, index) => byte === RIGHT_KEY[index])),
@@ -277,6 +283,47 @@ describe("bootstrapSecretStorageSetup", () => {
         await bootstrapSecretStorageSetup(client, newKey() as never);
         expect(calls).toEqual(["bootstrapSecretStorage(new storage: true, new backup: true)", "bootstrapCrossSigning(new)"]);
         expect(state).toMatchObject({ backupVersion: "2", holdsBackupKey: true, onServer: true });
+    });
+});
+
+describe("completeFirstTimeSetup", () => {
+    const shownKey = (fill = 7) => ({ privateKey: new Uint8Array(32).fill(fill), encodedPrivateKey: "shown", keyInfo: {} });
+
+    it("saves the key shown when the account has none", async () => {
+        const { client, calls, state } = makeClient({ hasSecretStorage: false, backupVersion: null });
+        expect(await completeFirstTimeSetup(client, shownKey() as never)).toBe("done");
+        expect(calls[0]).toBe("bootstrapSecretStorage(new storage: true, new backup: true)");
+        expect(state.hasSecretStorage).toBe(true);
+    });
+
+    it("never makes a second key, and says so when the one shown was not saved", async () => {
+        const { client, calls } = makeClient({ hasSecretStorage: true });
+        expect(await completeFirstTimeSetup(client, shownKey(9) as never)).toBe("key_exists");
+        expect(calls).toEqual([]);
+    });
+
+    it("carries on when the account's key is the one shown", async () => {
+        const { client, calls } = makeClient({ hasSecretStorage: true });
+        expect(await completeFirstTimeSetup(client, shownKey(7) as never)).toBe("done");
+        expect(calls).toEqual([]);
+    });
+
+    it("asks to finish with the saved key when a later step fails", async () => {
+        const { client, crypto, state } = makeClient({ hasSecretStorage: false, backupVersion: null });
+        crypto.bootstrapSecretStorage.mockImplementationOnce(async () => {
+            state.hasSecretStorage = true;
+            throw new Error("backup upload failed");
+        });
+        const failure = completeFirstTimeSetup(client, shownKey() as never);
+        await expect(failure).rejects.toBeInstanceOf(SetupUnfinishedError);
+        await expect(failure).rejects.toThrow("backup upload failed");
+    });
+
+    it("passes the error on when nothing was saved, so a new key can be made", async () => {
+        const { client, crypto } = makeClient({ hasSecretStorage: false, backupVersion: null });
+        crypto.bootstrapSecretStorage.mockRejectedValueOnce(new Error("network down"));
+        await expect(completeFirstTimeSetup(client, shownKey() as never)).rejects.toThrow("network down");
+        await expect(completeFirstTimeSetup(client, shownKey() as never)).resolves.toBe("done");
     });
 });
 

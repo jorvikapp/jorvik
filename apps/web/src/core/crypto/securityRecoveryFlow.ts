@@ -214,6 +214,45 @@ export async function restoreKeyBackupWithSecretStorageCredential(
     }
 }
 
+/** Setup saved the security key, then a later step failed: finish with that key, never a new one. */
+export class SetupUnfinishedError extends Error {
+    public constructor(cause: unknown) {
+        super(`Your security key was saved, but setup didn't finish (${toErrorMessage(cause)}). Enter it to finish.`);
+        this.name = "SetupUnfinishedError";
+    }
+}
+
+async function isAccountKey(client: MatrixClient, privateKey: Uint8Array): Promise<boolean> {
+    const keyId = await client.secretStorage.getDefaultKeyId();
+    const key = keyId ? await client.secretStorage.getKey(keyId) : null;
+    return Boolean(key) && (await client.secretStorage.checkKey(privateKey, key![1]));
+}
+
+/**
+ * First-time setup with the key shown on screen. Never makes a second key: if
+ * the account has a different one by now (from another session, or saved by an
+ * earlier try here that failed later), the key shown is not saved, and
+ * "key_exists" means ask for the saved one instead.
+ */
+export async function completeFirstTimeSetup(
+    client: MatrixClient,
+    secretStorageKey: GeneratedSecretStorageKey,
+): Promise<"done" | "key_exists"> {
+    if (await client.secretStorage.hasKey()) {
+        return (await isAccountKey(client, secretStorageKey.privateKey)) ? "done" : "key_exists";
+    }
+
+    try {
+        await bootstrapSecretStorageSetup(client, secretStorageKey);
+    } catch (error) {
+        if (await client.secretStorage.hasKey().catch(() => false)) {
+            throw new SetupUnfinishedError(error);
+        }
+        throw error;
+    }
+    return "done";
+}
+
 export function triggerRoomHistoryDecryption(client: MatrixClient): void {
     for (const room of client.getRooms()) {
         const decryptAllEvents = (room as Room & { decryptAllEvents?: () => void }).decryptAllEvents;

@@ -1,11 +1,13 @@
 export {
     attemptAutomaticKeyBackupRestore,
     bootstrapSecretStorageSetup,
+    completeFirstTimeSetup,
     createSecretStorageSetupKey,
     isRecoveryKeyValid,
     newKeyReplacesKeyBackup,
     restoreKeyBackupWithRecoveryKey,
     restoreKeyBackupWithSecretStorageCredential,
+    SetupUnfinishedError,
     triggerRoomHistoryDecryption,
 } from "../../core/crypto/securityRecoveryFlow";
 export type {
