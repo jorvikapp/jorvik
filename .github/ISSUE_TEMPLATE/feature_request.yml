@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest something new for Jorvik
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for the idea! Please check the [open issues](https://github.com/jorvikapp/jorvik/issues) first, in case someone has suggested it already.
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would it help you?
+      description: The problem it would solve, or what you would use it for.
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Sketches, examples from other apps, or links.

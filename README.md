@@ -326,12 +326,9 @@ Planned:
 
 ## Contributing
 
-1. Fork and clone the repo
-2. Install dependencies: `pnpm install`
-3. Start dev server: `pnpm dev:web`
-4. Make your changes and open a pull request
-
-Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/jorvikapp/jorvik/issues).
+Contributions are welcome: bug reports, testing, ideas, code and packaging. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for how to set up, run the checks and open a pull
+request, and [Issues](https://github.com/jorvikapp/jorvik/issues) for bugs and ideas.
 
 ---
 

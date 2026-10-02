@@ -1,0 +1,55 @@
+name: Bug report
+description: Something in Jorvik does not work as it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please check the [open issues](https://github.com/jorvikapp/jorvik/issues) first, in case it is already there.
+
+        For help with your account, or anything private, email **support@jorvik.app** instead. **Security problems** go there too, not here.
+  - type: input
+    id: version
+    attributes:
+      label: Jorvik version
+      description: "In Jorvik: Settings → My Account → Version. The Copy version button also copies your account and device ID, so please leave those out here."
+      placeholder: "1.0.16 (desktop)"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Where do you use Jorvik?
+      options:
+        - Web app, in a browser
+        - Windows
+        - macOS
+        - "Linux: Snap"
+        - "Linux: Fedora (COPR)"
+        - "Linux: Arch (AUR)"
+        - "Linux: Flatpak"
+        - "Linux: AppImage"
+        - "Linux: .deb"
+        - "Linux: .rpm, tarball or something else"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to make it happen again
+      placeholder: |
+        1.
+        2.
+        3.
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots, or anything else
+      description: Drag images in here. If it is the web app, which browser?
