@@ -1,4 +1,4 @@
-import type { CryptoApi, GeneratedSecretStorageKey, KeyBackupInfo } from "matrix-js-sdk/src/crypto-api";
+import type { GeneratedSecretStorageKey } from "matrix-js-sdk/src/crypto-api";
 import { decodeRecoveryKey } from "matrix-js-sdk/src/crypto-api/recovery-key";
 import type { MatrixClient, Room } from "matrix-js-sdk/src/matrix";
 
@@ -280,7 +280,11 @@ export async function createSecretStorageSetupKey(client: MatrixClient): Promise
  * the backup's key. Otherwise the backup's key stays locked under the old
  * security key, and the new one is refused at the next sign-in.
  */
-async function canKeepKeyBackup(crypto: CryptoApi, backupInfo: KeyBackupInfo | null): Promise<boolean> {
+// Taken from the client so the types match what getCrypto() returns.
+type ClientCrypto = NonNullable<ReturnType<MatrixClient["getCrypto"]>>;
+type BackupInfo = Awaited<ReturnType<ClientCrypto["getKeyBackupInfo"]>>;
+
+async function canKeepKeyBackup(crypto: ClientCrypto, backupInfo: BackupInfo): Promise<boolean> {
     return Boolean(backupInfo?.version) && (await crypto.isKeyBackupTrusted(backupInfo!)).matchesDecryptionKey;
 }
 
