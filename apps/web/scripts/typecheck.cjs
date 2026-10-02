@@ -27,7 +27,15 @@ const program = ts.createProgram({
 });
 
 const allDiagnostics = ts.getPreEmitDiagnostics(program);
+// The app imports matrix-js-sdk's TypeScript sources, so tsc also checks those, and
+// they have errors of their own under our stricter settings. Those are not ours to fix.
+const inDependency = (diagnostic) => (diagnostic.file?.fileName.replace(/\\/g, "/") ?? "").includes("/node_modules/");
+const dependencyErrors = allDiagnostics.filter(inDependency).length;
+
 const filteredDiagnostics = allDiagnostics.filter((diagnostic) => {
+    if (inDependency(diagnostic)) {
+        return false;
+    }
     if (diagnostic.code !== 2578) {
         return true;
     }
@@ -41,7 +49,9 @@ if (filteredDiagnostics.length > 0) {
     process.exit(1);
 }
 
-console.log("Typecheck passed (known core TS2578 in src/core/storage/tokens.ts ignored).");
+console.log(
+    `Typecheck passed (known core TS2578 in src/core/storage/tokens.ts ignored; ${dependencyErrors} errors inside dependencies' own sources ignored).`,
+);
 
 function reportDiagnostics(diagnostics) {
     const host = {
