@@ -54,6 +54,7 @@ export function RightPanel({
         return (
             <aside className="right-panel">
                 <div className="right-panel-empty">Select a room to view room info.</div>
+                <div className="right-panel-drag-strip" aria-hidden="true" />
             </aside>
         );
     }
@@ -114,6 +115,7 @@ export function RightPanel({
                     ) : null}
                 </>
             )}
+            <div className="right-panel-drag-strip" aria-hidden="true" />
         </aside>
     );
 }

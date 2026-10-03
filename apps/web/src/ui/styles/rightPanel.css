@@ -1,10 +1,30 @@
 .right-panel {
+    position: relative;
     border-left: 2px solid var(--border);
     background: var(--bg-main);
     min-width: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+}
+
+/* The panel opts out of window dragging so it scrolls and clicks normally,
+   but its top edge beside the window controls should still move the window,
+   as the chat header does. The strip is as tall as the controls; the panel's
+   content starts below it. */
+.right-panel-drag-strip {
+    display: none;
+}
+
+.app-shell.is-desktop-runtime .right-panel-drag-strip {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--desktop-titlebar-overlay-height, 0px);
+    z-index: 2;
+    -webkit-app-region: drag;
 }
 
 .right-panel-empty {
