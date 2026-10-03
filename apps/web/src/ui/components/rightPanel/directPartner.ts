@@ -43,3 +43,19 @@ export function getOneToOneDirectName(room: Room, ownUserId: string, localDomain
         memberName && memberName !== partnerId ? memberName : plainUserDisplayName(room.client.getUser(partnerId));
     return displayName?.trim() || formatUserIdForDisplay(partnerId, localDomain);
 }
+
+/**
+ * A one-to-one DM's name with the person's account name beside it, the way
+ * Jorvik shows people elsewhere: "Xuruh (@xuruh)", or just "@xuruh" when they
+ * have no display name. Null for named DMs and group DMs, as above.
+ */
+export function getOneToOneDirectLabel(room: Room, ownUserId: string, localDomain: string | null): string | null {
+    const name = getOneToOneDirectName(room, ownUserId, localDomain);
+    const partnerId = getOneToOnePartnerId(room, ownUserId);
+    if (!name || !partnerId) {
+        return null;
+    }
+
+    const accountName = formatUserIdForDisplay(partnerId, localDomain);
+    return name === accountName ? name : `${name} (${accountName})`;
+}

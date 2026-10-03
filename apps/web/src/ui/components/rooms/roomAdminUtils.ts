@@ -36,6 +36,16 @@ export function getRoomDisplayName(room: Room): string {
     return room.name || room.getCanonicalAlias() || room.roomId;
 }
 
+/**
+ * The name someone gave the room, or "" if nobody did. Not room.name, which
+ * the SDK makes up for unnamed rooms (for a DM, the other person's name, with
+ * their full ID added when two members share a display name).
+ */
+export function getExplicitRoomName(room: Room): string {
+    const name = room.currentState.getStateEvents(EventType.RoomName, "")?.getContent()?.name;
+    return typeof name === "string" ? name : "";
+}
+
 export function getPowerLevelsContent(room: Room): PowerLevelsContent {
     const event = room.currentState.getStateEvents(EventType.RoomPowerLevels, "");
     const content = (event?.getContent() ?? {}) as Record<string, unknown>;

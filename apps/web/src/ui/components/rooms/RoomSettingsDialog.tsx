@@ -8,9 +8,9 @@ import {
 } from "matrix-js-sdk/src/matrix";
 
 import { getDirectRoomIds } from "../../adapters/dmAdapter";
-import { getOneToOneDirectName } from "../rightPanel/directPartner";
+import { getOneToOneDirectLabel, getOneToOneDirectName } from "../rightPanel/directPartner";
 import { RoomDialog } from "./RoomDialog";
-import { getRoomDisplayName } from "./roomAdminUtils";
+import { getExplicitRoomName, getRoomDisplayName } from "./roomAdminUtils";
 
 interface RoomSettingsDialogProps {
     client: MatrixClient;
@@ -69,6 +69,11 @@ export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: R
     const roomLabel = room
         ? (isDirect ? getOneToOneDirectName(room, myUserId, client.getDomain()) : null) ?? getRoomDisplayName(room)
         : "room";
+    // The box holds only a name someone set; an unnamed room shows what it is
+    // called as a hint, so saving can't turn a made-up name into a real one.
+    const namePlaceholder = room
+        ? (isDirect ? getOneToOneDirectLabel(room, myUserId, client.getDomain()) : null) ?? roomLabel
+        : "";
     const currentlyEncrypted = useMemo(() => (room ? isRoomEncrypted(room) : false), [room]);
 
     const canEditName = Boolean(room && myUserId && room.currentState.maySendStateEvent(EventType.RoomName, myUserId));
@@ -102,7 +107,7 @@ export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: R
             return;
         }
 
-        setName(room.name || "");
+        setName(getExplicitRoomName(room));
         setTopic(room.currentState.getStateEvents(EventType.RoomTopic, "")?.getContent()?.topic ?? "");
         setJoinRule(getJoinRule(room));
         setHistoryVisibility(getHistoryVisibility(room));
@@ -122,7 +127,7 @@ export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: R
         setError(null);
 
         try {
-            const currentName = room.name || "";
+            const currentName = getExplicitRoomName(room);
             const currentTopic = room.currentState.getStateEvents(EventType.RoomTopic, "")?.getContent()?.topic ?? "";
             const currentJoinRule = getJoinRule(room);
             const currentHistoryVisibility = getHistoryVisibility(room);
@@ -217,6 +222,7 @@ export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: R
                     className="room-dialog-input"
                     type="text"
                     value={name}
+                    placeholder={namePlaceholder}
                     onChange={(event) => setName(event.target.value)}
                     disabled={saving || !canEditName}
                 />

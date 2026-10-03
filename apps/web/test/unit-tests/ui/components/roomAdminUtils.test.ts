@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
     getActionPowerLevel,
     getBannedMembers,
+    getExplicitRoomName,
     getJoinedOrInvitedMembers,
     getPowerLevelsContent,
     getRoomDisplayName,
@@ -127,5 +128,22 @@ describe("roomAdminUtils", () => {
 
         const members = getBannedMembers(room as any).map((member) => member.userId);
         expect(members).toEqual(["@a:hs", "@z:hs"]);
+    });
+});
+
+describe("getExplicitRoomName", () => {
+    const withState = (content: unknown) =>
+        ({ name: "Xuruh (@xuruh:matrix.jorvik.app)", currentState: { getStateEvents: (type: string) => (type === EventType.RoomName && content ? { getContent: () => content } : null) } }) as never;
+
+    it("is the name someone set", () => {
+        expect(getExplicitRoomName(withState({ name: "Plans" }))).toBe("Plans");
+    });
+
+    it("is empty for an unnamed room, not the name the SDK makes up", () => {
+        expect(getExplicitRoomName(withState(null))).toBe("");
+    });
+
+    it("is empty for a name event without a name", () => {
+        expect(getExplicitRoomName(withState({}))).toBe("");
     });
 });

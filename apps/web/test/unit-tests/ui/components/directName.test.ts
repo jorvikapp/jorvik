@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getOneToOneDirectName } from "../../../../src/ui/components/rightPanel/directPartner";
+import { getOneToOneDirectLabel, getOneToOneDirectName } from "../../../../src/ui/components/rightPanel/directPartner";
 
 const ME = "@xuruh:matrix.jorvik.app";
 
@@ -46,5 +46,27 @@ describe("getOneToOneDirectName", () => {
             { userId: "@b:matrix.jorvik.app", membership: "join", rawDisplayName: "B" },
         ]);
         expect(getOneToOneDirectName(group, ME, "matrix.jorvik.app")).toBeNull();
+    });
+});
+
+describe("getOneToOneDirectLabel", () => {
+    it("puts the short account name beside a display name, even one you share", () => {
+        const room = fakeRoom([me, { userId: "@admin:matrix.jorvik.app", membership: "join", rawDisplayName: "Xuruh" }]);
+        expect(getOneToOneDirectLabel(room, ME, "matrix.jorvik.app")).toBe("Xuruh (@admin)");
+    });
+
+    it("is just the account name when there is no display name", () => {
+        const room = fakeRoom([me, { userId: "@admin:matrix.jorvik.app", membership: "join", rawDisplayName: "@admin:matrix.jorvik.app" }]);
+        expect(getOneToOneDirectLabel(room, ME, "matrix.jorvik.app")).toBe("@admin");
+    });
+
+    it("keeps the server for someone on another server", () => {
+        const room = fakeRoom([me, { userId: "@bob:matrix.org", membership: "join", rawDisplayName: "Bob" }]);
+        expect(getOneToOneDirectLabel(room, ME, "matrix.jorvik.app")).toBe("Bob (@bob:matrix.org)");
+    });
+
+    it("leaves named DMs to their own name", () => {
+        const named = fakeRoom([me, { userId: "@admin:matrix.jorvik.app", membership: "join", rawDisplayName: "Xuruh" }], { roomName: "Plans" });
+        expect(getOneToOneDirectLabel(named, ME, "matrix.jorvik.app")).toBeNull();
     });
 });
