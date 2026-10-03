@@ -30,6 +30,11 @@
     --motion-slow: 240ms;
     --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
     --motion-ease-enter: cubic-bezier(0.22, 0.9, 0.28, 1);
+    --badge-staff: #e3b341;
+    --badge-bug-finder: #a99cff;
+    --badge-tester: #5cb8ff;
+    --badge-contributor: #f08c4a;
+    --badge-early-supporter: #f07c9a;
 }
 
 *,
@@ -5349,4 +5354,151 @@ select,
     background: var(--bg-hover);
     opacity: 1;
     box-shadow: inset 0 -2px 0 var(--accent, var(--status-online));
+}
+
+/* ---------- user badges ---------- */
+
+.user-badges {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
+.user-badge {
+    display: inline-flex;
+    align-items: center;
+    color: var(--user-badge-color);
+}
+
+.user-badge svg {
+    display: block;
+    width: 14px;
+    height: 14px;
+}
+
+.user-badge-staff {
+    --user-badge-color: var(--badge-staff);
+}
+
+.user-badge-bug_finder {
+    --user-badge-color: var(--badge-bug-finder);
+}
+
+.user-badge-tester {
+    --user-badge-color: var(--badge-tester);
+}
+
+.user-badge-contributor {
+    --user-badge-color: var(--badge-contributor);
+}
+
+.user-badge-early_supporter {
+    --user-badge-color: var(--badge-early-supporter);
+}
+
+/* A name and its badges on one line: the name gives way first. */
+.user-name-line {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.user-name-line > :first-child {
+    flex-shrink: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* With badges, a long name still leaves room for the first one. */
+.user-name-line > :first-child:not(:last-child) {
+    max-width: calc(100% - 18px);
+}
+
+/* Badges take the space the name leaves. Those that don't fit wrap onto a
+   hidden second line, so only whole icons show. */
+.user-name-line > .user-badges {
+    flex-shrink: 1;
+    min-width: 14px;
+    height: 14px;
+    flex-wrap: wrap;
+    overflow: hidden;
+}
+
+/* The message header spaces its parts 8px apart; badges sit closer. */
+.timeline-user-trigger > .user-badges {
+    margin-left: -4px;
+}
+
+/* On a profile, each badge is spelled out. */
+.user-badges-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.user-badges-chips .user-badge {
+    gap: 5px;
+    padding: 2px 9px 2px 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--user-badge-color) 16%, transparent);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 18px;
+}
+
+.rp-profile-badges {
+    margin-top: 8px;
+}
+
+.badges-dialog-list {
+    display: grid;
+    gap: 4px;
+}
+
+.badges-dialog-option {
+    display: grid;
+    grid-template-columns: auto 22px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.badges-dialog-option:hover {
+    background: var(--bg-hover);
+}
+
+.badges-dialog-icon {
+    display: flex;
+    color: var(--user-badge-color);
+}
+
+.badges-dialog-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.badges-dialog-text {
+    display: grid;
+    gap: 1px;
+}
+
+.badges-dialog-name {
+    font-weight: 600;
+}
+
+.badges-dialog-snippet {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--bg-input, var(--bg-hover));
+    font-size: 12px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: all;
 }

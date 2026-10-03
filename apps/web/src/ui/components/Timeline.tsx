@@ -22,6 +22,7 @@ import { loadAvailableEmojis } from "../emoji/EmojiResolver";
 import { mxidLocalpart, tokenizeMatrixMentions } from "../mentions/mentionTokens";
 import { mxcThumbnailToHttp } from "../utils/mxc";
 import { Avatar } from "./Avatar";
+import { UserBadges } from "./badges/UserBadges";
 import { MessageRenderer } from "./MessageRenderer";
 import { MessageActionsBar } from "./messages/MessageActionsBar";
 import { Toast, type ToastState } from "./Toast";
@@ -2308,6 +2309,7 @@ export function Timeline({
                                             userId={senderId || undefined}
                                         />
                                         <span className="timeline-sender">{senderName}</span>
+                                        <UserBadges userId={senderId} />
                                     </button>
                                     <span className="timeline-time">{timeLabel}</span>
                                     {edited ? <span className="timeline-edited">(edited)</span> : null}

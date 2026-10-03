@@ -16,6 +16,11 @@
     --channel-encrypted-bg: rgba(16, 99, 40, 0.14);
     --channel-danger: #b3262f;
     --channel-danger-hover-bg: rgba(179, 38, 47, 0.16);
+    --badge-staff: #9a6b00;
+    --badge-bug-finder: #5b4fd1;
+    --badge-tester: #0f6cbd;
+    --badge-contributor: #b4541a;
+    --badge-early-supporter: #b4325a;
 }
 
 .app-shell.hide-timestamps .timeline-time {

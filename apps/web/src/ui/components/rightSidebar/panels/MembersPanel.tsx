@@ -8,6 +8,7 @@ import { getPresenceSortRank, toAvatarPresenceState } from "../../../presence/bu
 import { isPresenceEnabledForClient } from "../../../presence/presenceConfig";
 import { usePresenceMap } from "../../../presence/usePresence";
 import { Avatar } from "../../Avatar";
+import { UserBadges } from "../../badges/UserBadges";
 
 interface MembersPanelProps {
     client: MatrixClient;
@@ -148,7 +149,10 @@ export function MembersPanel({
                                 presenceState={presenceEnabled ? toAvatarPresenceState(presence) : null}
                             />
                             <span className="rs-member-meta">
-                                <span className="rs-member-name">{displayName}</span>
+                                <span className="user-name-line">
+                                    <span className="rs-member-name">{displayName}</span>
+                                    <UserBadges userId={member.userId} />
+                                </span>
                                 <span className="rs-member-id">
                                     {formatUserIdForDisplay(member.userId, localDomain)}
                                 </span>

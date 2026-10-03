@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { Avatar } from "../Avatar";
+import { UserBadges } from "../badges/UserBadges";
 import type { PresenceVm } from "../../presence/buildPresenceVm";
 import { toAvatarPresenceState } from "../../presence/buildPresenceVm";
 import { PresenceText } from "../presence/PresenceText";
@@ -19,6 +20,8 @@ interface ProfileHeaderProps {
     onMessage?: () => Promise<void>;
     onCall?: () => void;
     onAdd?: () => void;
+    // Only for the server's badge managers.
+    onEditBadges?: () => void;
 }
 
 function hashToHue(value: string): number {
@@ -41,6 +44,7 @@ export function ProfileHeader({
     onMessage,
     onCall,
     onAdd,
+    onEditBadges,
 }: ProfileHeaderProps): React.ReactElement {
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement | null>(null);
@@ -97,6 +101,7 @@ export function ProfileHeader({
             <div className="rp-profile-main">
                 <h2 className="rp-profile-name">{displayName}</h2>
                 <div className="rp-profile-mxid">{formatUserIdForDisplay(userId, localDomain)}</div>
+                <UserBadges userId={userId} variant="chips" className="rp-profile-badges" />
                 {presence ? <PresenceText presence={presence} className="rp-profile-presence" /> : null}
             </div>
             <div className="rp-profile-actions">
@@ -149,6 +154,19 @@ export function ProfileHeader({
                             >
                                 Copy user ID
                             </button>
+                            {onEditBadges ? (
+                                <button
+                                    type="button"
+                                    className="rp-profile-menu-item"
+                                    role="menuitem"
+                                    onClick={() => {
+                                        onEditBadges();
+                                        setMenuOpen(false);
+                                    }}
+                                >
+                                    Badges
+                                </button>
+                            ) : null}
                         </div>
                     ) : null}
                 </div>

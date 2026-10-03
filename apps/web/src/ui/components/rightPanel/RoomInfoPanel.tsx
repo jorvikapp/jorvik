@@ -9,6 +9,7 @@ import { isPresenceEnabledForClient } from "../../presence/presenceConfig";
 import { toAvatarPresenceState } from "../../presence/buildPresenceVm";
 import { usePresenceMap } from "../../presence/usePresence";
 import { Avatar } from "../Avatar";
+import { UserBadges } from "../badges/UserBadges";
 import { buildMatrixToRoomPermalink } from "../../utils/permalink";
 import { AboutCard } from "./cards/AboutCard";
 import { MediaCard } from "./cards/MediaCard";
@@ -314,7 +315,10 @@ export function RoomInfoPanel({
                                         presenceState={presenceEnabled ? toAvatarPresenceState(presence) : null}
                                     />
                                     <span className="rp-member-row-meta">
-                                        <span className="rp-member-row-name">{displayName}</span>
+                                        <span className="user-name-line">
+                                            <span className="rp-member-row-name">{displayName}</span>
+                                            <UserBadges userId={member.userId} />
+                                        </span>
                                         <span className="rp-member-row-id">{formatUserIdForDisplay(member.userId, client.getDomain())}</span>
                                     </span>
                                 </button>

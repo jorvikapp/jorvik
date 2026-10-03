@@ -10,6 +10,8 @@ import { memberAvatarSources } from "../../adapters/avatar";
 import { isUserOnOwnServer, reportUser, serverNameOf } from "../../../core/moderation/reports";
 import { useIgnoredUsers } from "../../moderation/useIgnoredUsers";
 import { ReportDialog } from "../moderation/ReportDialog";
+import { BadgesDialog } from "../badges/BadgesDialog";
+import { useBadgeSettings } from "../../hooks/useUserBadges";
 import { RoomDialog } from "../rooms/RoomDialog";
 import { ProfileHeader } from "./ProfileHeader";
 import { AboutCard } from "./cards/AboutCard";
@@ -122,6 +124,8 @@ export function UserProfilePanel({
     const blocked = ignoredUsers.isIgnored(userId);
     const [confirmBlockOpen, setConfirmBlockOpen] = useState(false);
     const [reportOpen, setReportOpen] = useState(false);
+    const [badgesOpen, setBadgesOpen] = useState(false);
+    const canManageBadges = useBadgeSettings().managers.includes(ownUserId);
     const reportable = isUserOnOwnServer(client, userId);
 
     useEffect(() => {
@@ -222,6 +226,7 @@ export function UserProfilePanel({
                 onMessage={canMessage ? openDm : undefined}
                 onCall={ownUserId !== userId && onStartCall ? () => onStartCall(userId) : undefined}
                 onAdd={ownUserId !== userId && onAddToRoom ? () => onAddToRoom(userId) : undefined}
+                onEditBadges={canManageBadges ? () => setBadgesOpen(true) : undefined}
                 onCopyMxid={async () => {
                     await copyText(userId);
                     onToast?.({ type: "success", message: "MXID copied." });
@@ -294,6 +299,14 @@ export function UserProfilePanel({
                     them from their profile or from Settings, Privacy &amp; Safety.
                 </p>
             </RoomDialog>
+
+            <BadgesDialog
+                client={client}
+                userId={userId}
+                displayName={displayName}
+                open={badgesOpen}
+                onClose={() => setBadgesOpen(false)}
+            />
 
             <ReportDialog
                 open={reportOpen}

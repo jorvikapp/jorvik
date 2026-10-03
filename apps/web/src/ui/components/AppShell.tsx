@@ -93,6 +93,7 @@ import {
     isVoiceChannelRoom,
 } from "../voice/voiceChannel";
 import { clearVoiceDiscovery, initVoiceDiscovery } from "../voice/voiceDiscovery";
+import { isBadgesRoom, startUserBadges } from "../../core/badges/userBadges";
 import { CHANNEL_ORDER_STATE_EVENT, readChannelOrder, writeChannelOrder } from "../stores/CategoryStore";
 
 interface AppShellProps {
@@ -1015,6 +1016,14 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     }, [client]);
 
     useEffect(() => {
+        const homeserverUrl =
+            (client as MatrixClient & {
+                getHomeserverUrl?: () => string;
+            }).getHomeserverUrl?.() ?? client.baseUrl;
+        return startUserBadges(client, homeserverUrl);
+    }, [client]);
+
+    useEffect(() => {
         const watchedRooms = new Set<Room>();
 
         const onRoomsChanged = (): void => {
@@ -1093,7 +1102,8 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     }, [client]);
 
     const visibleRooms = useMemo(
-        () => rooms.filter(isVisibleMembership),
+        // The badges room only holds the list; there is nothing in it to open.
+        () => rooms.filter((room) => isVisibleMembership(room) && !isBadgesRoom(room)),
         [rooms],
     );
     const visibleRoomIdsKey = useMemo(
