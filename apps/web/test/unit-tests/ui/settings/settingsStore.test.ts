@@ -16,6 +16,7 @@ function createSettings(partial?: Partial<UserLocalSettings>): UserLocalSettings
             compactMode: false,
             showTimestamps: true,
             closeOnWindowCloseMinimize: true,
+            developerToolsEnabled: false,
             chatLineLengthCh: 0,
             showSpaceChannelAvatars: false,
         },
@@ -130,6 +131,17 @@ describe("settingsStore", () => {
         expect(load(null)).toBe(10);
     });
 
+    it("keeps the developer tools off unless they were turned on", () => {
+        window.localStorage.removeItem(STORAGE_KEY);
+        expect(loadUserLocalSettings().appearance.developerToolsEnabled).toBe(false);
+
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ appearance: { developerToolsEnabled: "yes" } }));
+        expect(loadUserLocalSettings().appearance.developerToolsEnabled).toBe(false);
+
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ appearance: { developerToolsEnabled: true } }));
+        expect(loadUserLocalSettings().appearance.developerToolsEnabled).toBe(true);
+    });
+
     it("saveUserLocalSettings writes JSON into local storage", () => {
         const settings = createSettings({
             appearance: {
@@ -137,6 +149,7 @@ describe("settingsStore", () => {
                 compactMode: false,
                 showTimestamps: true,
                 closeOnWindowCloseMinimize: true,
+                developerToolsEnabled: false,
                 chatLineLengthCh: 0,
                 showSpaceChannelAvatars: false,
             },
@@ -154,6 +167,7 @@ describe("settingsStore", () => {
             compactMode: false,
             showTimestamps: true,
             closeOnWindowCloseMinimize: true,
+            developerToolsEnabled: false,
             chatLineLengthCh: 0,
             showSpaceChannelAvatars: true,
         });

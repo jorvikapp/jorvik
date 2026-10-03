@@ -26,6 +26,7 @@ export interface HeorotDesktopBridge {
     setMediaAuthState?: (state: HeorotDesktopMediaAuthState) => Promise<void>;
     clearMediaAuthState?: () => Promise<void>;
     setCloseOnWindowCloseMinimize?: (enabled: boolean) => Promise<void>;
+    setDevToolsEnabled?: (enabled: boolean) => Promise<void>;
     quitApp?: () => Promise<void>;
     getAppVersion?: () => Promise<string>;
     getSystemIdleSeconds?: () => Promise<number>;

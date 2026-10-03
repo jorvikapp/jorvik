@@ -1833,6 +1833,19 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     }, [userSettings.appearance.closeOnWindowCloseMinimize]);
 
     useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+
+        const bridge = window.heorotDesktop;
+        if (!bridge?.setDevToolsEnabled) {
+            return;
+        }
+
+        void bridge.setDevToolsEnabled(userSettings.appearance.developerToolsEnabled);
+    }, [userSettings.appearance.developerToolsEnabled]);
+
+    useEffect(() => {
         if (isRoomVoiceChannel(activeRoom) && !voiceSessionRoomId && activeRoom) {
             setVoiceSessionRoomId(activeRoom.roomId);
         }

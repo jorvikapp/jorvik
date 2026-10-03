@@ -5,6 +5,7 @@ export interface AppearanceSettings {
     compactMode: boolean;
     showTimestamps: boolean;
     closeOnWindowCloseMinimize: boolean;
+    developerToolsEnabled: boolean;
     chatLineLengthCh: number;
     showSpaceChannelAvatars: boolean;
 }
@@ -55,6 +56,7 @@ const DEFAULT_SETTINGS: UserLocalSettings = {
         compactMode: false,
         showTimestamps: true,
         closeOnWindowCloseMinimize: true,
+        developerToolsEnabled: false,
         chatLineLengthCh: 0,
         showSpaceChannelAvatars: false,
     },
@@ -101,6 +103,7 @@ function normalizeSettings(raw: unknown): UserLocalSettings {
     const compactMode = appearance.compactMode === true;
     const showTimestamps = appearance.showTimestamps !== false;
     const closeOnWindowCloseMinimize = appearance.closeOnWindowCloseMinimize !== false;
+    const developerToolsEnabled = appearance.developerToolsEnabled === true;
     const showSpaceChannelAvatars = appearance.showSpaceChannelAvatars === true;
     const chatLineLengthChRaw = typeof appearance.chatLineLengthCh === "number" ? appearance.chatLineLengthCh : 0;
     const chatLineLengthCh =
@@ -123,6 +126,7 @@ function normalizeSettings(raw: unknown): UserLocalSettings {
             compactMode,
             showTimestamps,
             closeOnWindowCloseMinimize,
+            developerToolsEnabled,
             chatLineLengthCh,
             showSpaceChannelAvatars,
         },

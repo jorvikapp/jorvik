@@ -21,6 +21,7 @@ export function AppearanceTab({
     onChange,
 }: AppearanceTabProps): React.ReactElement {
     const isDesktopRuntime = typeof window !== "undefined" && Boolean(window.heorotDesktop);
+    const devToolsShortcut = isDesktopRuntime && window.heorotDesktop?.platform === "darwin" ? "Cmd+Shift+I" : "Ctrl+Shift+I";
     const useMaximumLineWidth = settings.chatLineLengthCh === 0;
     const effectiveLineLengthCh = useMaximumLineWidth
         ? CHAT_LINE_LENGTH_MAX_CH
@@ -160,19 +161,38 @@ export function AppearanceTab({
                 Render reaction images
             </label>
             {isDesktopRuntime ? (
-                <label className="settings-toggle">
-                    <input
-                        type="checkbox"
-                        checked={settings.closeOnWindowCloseMinimize}
-                        onChange={(event) =>
-                            onChange({
-                                ...settings,
-                                closeOnWindowCloseMinimize: event.target.checked,
-                            })
-                        }
-                    />
-                    Close button minimizes app (desktop)
-                </label>
+                <>
+                    <label className="settings-toggle">
+                        <input
+                            type="checkbox"
+                            checked={settings.closeOnWindowCloseMinimize}
+                            onChange={(event) =>
+                                onChange({
+                                    ...settings,
+                                    closeOnWindowCloseMinimize: event.target.checked,
+                                })
+                            }
+                        />
+                        Close button minimizes app (desktop)
+                    </label>
+                    <label className="settings-toggle">
+                        <input
+                            type="checkbox"
+                            checked={settings.developerToolsEnabled}
+                            onChange={(event) =>
+                                onChange({
+                                    ...settings,
+                                    developerToolsEnabled: event.target.checked,
+                                })
+                            }
+                        />
+                        Developer tools (desktop)
+                    </label>
+                    <p className="settings-inline-note">
+                        Lets {devToolsShortcut} open the developer tools. Only turn this on if you know what they're
+                        for: anyone who talks you into pasting something there can take over your account.
+                    </p>
+                </>
             ) : null}
         </div>
     );

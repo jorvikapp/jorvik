@@ -25,6 +25,7 @@ export interface HeorotDesktopBridge {
     setMediaAuthState: (state: HeorotDesktopMediaAuthState) => Promise<void>;
     clearMediaAuthState: () => Promise<void>;
     setCloseOnWindowCloseMinimize: (enabled: boolean) => Promise<void>;
+    setDevToolsEnabled: (enabled: boolean) => Promise<void>;
     quitApp: () => Promise<void>;
     getAppVersion: () => Promise<string>;
     getSystemIdleSeconds: () => Promise<number>;
@@ -53,6 +54,9 @@ const bridge: HeorotDesktopBridge = {
     },
     setCloseOnWindowCloseMinimize: async (enabled: boolean): Promise<void> => {
         await ipcRenderer.invoke("heorot:setCloseOnWindowCloseMinimize", enabled);
+    },
+    setDevToolsEnabled: async (enabled: boolean): Promise<void> => {
+        await ipcRenderer.invoke("heorot:setDevToolsEnabled", enabled);
     },
     quitApp: async (): Promise<void> => {
         await ipcRenderer.invoke("heorot:quitApp");

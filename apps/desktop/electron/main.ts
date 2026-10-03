@@ -55,6 +55,7 @@ let mainWindow: BrowserWindow | null = null;
 let mediaAuthInterceptorConfigured = false;
 let appProtocolConfigured = false;
 let closeOnWindowCloseMinimize = true;
+let devToolsEnabled = false;
 let isAppQuitting = false;
 let preferredDisplayMediaSourceId: string | null = null;
 let tray: Tray | null = null;
@@ -488,6 +489,14 @@ function configureNavigationSafety(window: BrowserWindow): void {
     });
 }
 
+// The developer tools open only when turned on in Settings, so nobody can be
+// talked into pasting something there. Builds run from source always allow
+// them, and so does starting with --devtools, for when the app can't get as
+// far as Settings.
+function devToolsAllowed(): boolean {
+    return devToolsEnabled || !app.isPackaged || process.argv.includes("--devtools");
+}
+
 function createMainWindow(): BrowserWindow {
     const windowState = readWindowState();
     const preloadPath = resolvePreloadPath();
@@ -527,9 +536,17 @@ function createMainWindow(): BrowserWindow {
     configureNavigationSafety(window);
     window.webContents.on("before-input-event", (event, input) => {
         const modifier = process.platform === "darwin" ? input.meta : input.control;
-        if (modifier && input.shift && input.key.toLowerCase() === "i") {
+        if (input.type === "keyDown" && modifier && input.shift && input.key.toLowerCase() === "i") {
             event.preventDefault();
-            window.webContents.toggleDevTools();
+            if (devToolsAllowed()) {
+                window.webContents.toggleDevTools();
+            }
+        }
+    });
+    // The menu can open them too (View on macOS), so close them from there as well.
+    window.webContents.on("devtools-opened", () => {
+        if (!devToolsAllowed()) {
+            window.webContents.closeDevTools();
         }
     });
     window.webContents.on("preload-error", (_event, preloadPath, error) => {
@@ -602,6 +619,13 @@ function registerIpc(): void {
 
     ipcMain.handle("heorot:setCloseOnWindowCloseMinimize", (_event, enabled: unknown) => {
         closeOnWindowCloseMinimize = enabled !== false;
+    });
+
+    ipcMain.handle("heorot:setDevToolsEnabled", (_event, enabled: unknown) => {
+        devToolsEnabled = enabled === true;
+        if (!devToolsAllowed()) {
+            mainWindow?.webContents.closeDevTools();
+        }
     });
 
     ipcMain.handle("heorot:getDesktopCapturerSources", async () => {
