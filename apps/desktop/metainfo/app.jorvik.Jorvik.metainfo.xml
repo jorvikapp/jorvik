@@ -70,6 +70,18 @@
   </branding>
 
   <releases>
+    <release version="1.0.17" date="2026-10-04">
+      <description>
+        <p>Name badges, developer tools that stay closed, and fixes.</p>
+        <ul>
+          <li>Badges next to names: Staff, Bug Finder, Tester, Contributor and Early Supporter, given out by the server's badge managers from a profile</li>
+          <li>The developer tools stay closed unless turned on in Settings, Appearance</li>
+          <li>The top edge of the right-hand panel moves the window, as the chat header does</li>
+          <li>The menu on a channel inside a category is no longer hidden</li>
+          <li>Room settings show a room's own name, not one made up from its members</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.16" date="2026-10-01">
       <description>
         <p>Security keys that work when you need them, and calls that show everyone.</p>
