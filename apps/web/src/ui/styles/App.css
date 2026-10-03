@@ -1204,6 +1204,12 @@ textarea {
     grid-template-rows: 0fr;
 }
 
+/* The clip is only for folding the category away. A channel's open menu
+   has to reach past the category's last channel. */
+.room-category-channels.has-open-menu {
+    overflow: visible;
+}
+
 .room-category-channels-inner {
     min-height: 0;
 }

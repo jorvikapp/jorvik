@@ -1461,7 +1461,11 @@ export function RoomList({
                                 </div>
                             ) : null}
                         </div>
-                        <div className={`room-category-channels${collapsed ? " is-collapsed" : ""}`}>
+                        <div
+                            className={`room-category-channels${collapsed ? " is-collapsed" : ""}${
+                                !collapsed && catRooms.some((room) => room.roomId === menuRoomId) ? " has-open-menu" : ""
+                            }`}
+                        >
                             <div className="room-category-channels-inner">
                                 {catRooms.map((room, index) =>
                                     renderRoomItem(room, { indexInGroup: index, groupSize: catRooms.length, catId: cat.id }),
