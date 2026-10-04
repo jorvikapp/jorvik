@@ -14,8 +14,9 @@ import { loadAvailableEmojis, resolveEmojiShortcode } from "../emoji/EmojiResolv
 import { subscribeEmojiPackUpdated } from "../emoji/emojiEvents";
 import { normalizeEmojiShortcode } from "../emoji/EmojiPackStore";
 import { replaceEmoticons } from "../emoji/emoticons";
-import { formatMessageWithEmojis } from "../emoji/formatMessageWithEmojis";
-import { findMentions, mentionText, type MentionSpan } from "../mentions/composerMentions";
+import { formatMessage, type FormattedTextMessageContent } from "../formatting/formatMessage";
+import { messagePreviewText } from "../formatting/messagePreviewText";
+import { mentionText } from "../mentions/composerMentions";
 import { useRoomTyping } from "../hooks/useRoomTyping";
 import { mediaFromMxc } from "../adapters/media";
 import { mxcThumbnailToHttp } from "../utils/mxc";
@@ -120,7 +121,6 @@ interface EmojiSuggestionCandidate {
     src: string | null;
 }
 
-type FormattedMessageResult = Awaited<ReturnType<typeof formatMessageWithEmojis>>;
 
 type UploadStatus = "queued" | "encrypting" | "uploading" | "sending" | "failed" | "cancelled";
 
@@ -157,6 +157,8 @@ const TYPING_REFRESH_MARGIN_MS = 1000;
 const CUSTOM_EMOJI_TOKEN_PATTERN = /:[a-zA-Z0-9_+-]{2,}:/g;
 const EMOJI_SUGGESTION_LIMIT = 8;
 
+const REPLY_FALLBACK_START = /^> (?:\* )?<@/;
+
 function stripPlainReplyFallback(body: string): string {
     const lines = body.split("\n");
     while (lines.length && lines[0].startsWith("> ")) {
@@ -176,7 +178,7 @@ function getReplySenderName(room: Room | null, event: MatrixEvent): string {
 
 function getReplySnippet(event: MatrixEvent): string {
     const content = event.getContent() as MessageContent;
-    const body = typeof content.body === "string" ? stripPlainReplyFallback(content.body).trim() : "";
+    const body = messagePreviewText(content);
 
     if (content.msgtype === MsgType.Image) {
         return body ? `[Image] ${body}` : "[Image]";
@@ -532,10 +534,12 @@ function getEditingInitialText(event: MatrixEvent | null): string {
 
     const content = event.getContent() as MessageContent;
     const body = typeof content.body === "string" ? content.body : "";
-    return stripPlainReplyFallback(body);
+    // Only a reply can start with the quote older clients put in front of it,
+    // "> <@sender:server> ..."; any other quote at the start was typed, and stays.
+    return event.getRelation()?.["m.in_reply_to"] && REPLY_FALLBACK_START.test(body) ? stripPlainReplyFallback(body) : body;
 }
 
-function buildTextMessageContent(formattedMessage: FormattedMessageResult): OutgoingTextMessageContent {
+function buildTextMessageContent(formattedMessage: FormattedTextMessageContent): OutgoingTextMessageContent {
     return {
         msgtype: MsgType.Text,
         ...formattedMessage,
@@ -763,12 +767,8 @@ function tokenizeComposerPreview(
     };
 }
 
-function buildMentionsPayload(mentions: readonly MentionSpan[]): MentionsContent | undefined {
-    if (mentions.length === 0) {
-        return undefined;
-    }
-
-    return { user_ids: [...new Set(mentions.map((mention) => mention.userId))] };
+function buildMentionsPayload(userIds: readonly string[]): MentionsContent | undefined {
+    return userIds.length > 0 ? { user_ids: [...userIds] } : undefined;
 }
 
 export function Composer({
@@ -1468,20 +1468,19 @@ export function Composer({
         setEmojiSelectionIndex(0);
         try {
             if (hasTextToSend) {
-                const mentionSpans = findMentions(rawText, room, client.getDomain());
-                const mentions = buildMentionsPayload(mentionSpans);
-                const formattedMessage = await formatMessageWithEmojis(
+                const formatted = await formatMessage(
                     rawText,
                     {
                         roomId: room.roomId,
                         activeSpaceId,
-                        mentions: mentionSpans,
+                        localDomain: client.getDomain(),
                     },
                     resolveEmojiShortcode,
                     client,
                 );
+                const mentions = buildMentionsPayload(formatted.mentionedUserIds);
 
-                const newContent = buildTextMessageContent(formattedMessage);
+                const newContent = buildTextMessageContent(formatted.content);
                 if (editingEventId) {
                     const editContent = buildEditMessageContent(editingEventId, newContent, mentions);
                     await client.sendEvent(

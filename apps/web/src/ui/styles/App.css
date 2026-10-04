@@ -2962,6 +2962,128 @@ textarea {
     color: var(--status-online);
 }
 
+/* HTML message bodies follow HTML's own spacing: line breaks come from <br>,
+   and the newlines between tags mean nothing. */
+.message-renderer-html {
+    white-space: normal;
+}
+
+.message-renderer-html > :first-child {
+    margin-top: 0;
+}
+
+.message-renderer-html > :last-child {
+    margin-bottom: 0;
+}
+
+.message-renderer-p {
+    margin: 0 0 4px;
+}
+
+.message-renderer-blockquote {
+    margin: 4px 0;
+    padding: 0 0 0 10px;
+    border-left: 4px solid color-mix(in srgb, var(--text-muted) 55%, transparent);
+}
+
+.message-renderer-ul,
+.message-renderer-ol {
+    margin: 4px 0;
+    padding-left: 22px;
+}
+
+.message-renderer-h1,
+.message-renderer-h2,
+.message-renderer-h3,
+.message-renderer-h4,
+.message-renderer-h5,
+.message-renderer-h6 {
+    margin: 8px 0 4px;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.message-renderer-h1 {
+    font-size: 1.5em;
+}
+
+.message-renderer-h2 {
+    font-size: 1.3em;
+}
+
+.message-renderer-h3 {
+    font-size: 1.15em;
+}
+
+.message-renderer-h4,
+.message-renderer-h5,
+.message-renderer-h6 {
+    font-size: 1em;
+}
+
+.message-renderer-code,
+.message-renderer-codeblock {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 0.875em;
+    background: var(--bg-input);
+}
+
+.message-renderer-code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+}
+
+.message-renderer-codeblock {
+    margin: 4px 0;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    /* Long lines wrap rather than scroll, so the whole block reads at a glance. */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+}
+
+.message-renderer-codeblock code {
+    font: inherit;
+}
+
+/* Hidden until clicked: a solid bar the size of the text, which hides
+   everything inside it too, emoji and mentions included. */
+.message-renderer-spoiler {
+    border-radius: 4px;
+    background: var(--bg-active);
+    cursor: pointer;
+}
+
+.message-renderer-spoiler:not(.is-revealed) {
+    color: transparent;
+}
+
+.message-renderer-spoiler:not(.is-revealed) * {
+    visibility: hidden;
+}
+
+.message-renderer-spoiler:not(.is-revealed):hover {
+    background: color-mix(in srgb, var(--bg-active) 75%, var(--text-muted));
+}
+
+.message-renderer-spoiler:focus-visible {
+    outline: 2px solid var(--accent-soft);
+    outline-offset: 1px;
+}
+
+.message-renderer-spoiler.is-revealed {
+    cursor: auto;
+}
+
+.message-renderer-rule {
+    margin: 6px 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+}
+
 .reactions-row-wrap {
     margin-left: 50px;
     margin-top: 6px;

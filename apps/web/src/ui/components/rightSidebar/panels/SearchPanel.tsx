@@ -1,6 +1,8 @@
 import React, { useMemo } from "react";
 import { EventType, type MatrixEvent, type Room } from "matrix-js-sdk/src/matrix";
 
+import { messagePreviewText } from "../../../formatting/messagePreviewText";
+
 interface SearchPanelProps {
     room: Room;
     query: string;
@@ -15,8 +17,7 @@ interface SearchResult {
 }
 
 function getMessageBody(event: MatrixEvent): string {
-    const content = event.getContent() as { body?: unknown };
-    return typeof content.body === "string" ? content.body : "";
+    return messagePreviewText(event.getContent());
 }
 
 function getSearchResults(room: Room, query: string): SearchResult[] {

@@ -56,3 +56,55 @@ describe("MessageRenderer mention links", () => {
         expect(container.textContent).toBe("#jorvik and a site");
     });
 });
+
+describe("MessageRenderer formatting", () => {
+    it("shows inline formatting as the same elements", () => {
+        render("<strong>b</strong> <em>i</em> <u>u</u> <del>s</del> <sup>2</sup>");
+        expect([...container.querySelectorAll(".message-renderer-html *")].map((el) => el.tagName.toLowerCase())).toEqual(["strong", "em", "u", "s", "sup"]);
+    });
+
+    it("shows code exactly as sent, without mentions inside", () => {
+        render('<code>@riff:matrix.jorvik.app</code><pre><code class="language-js">a &lt; b\n  c</code></pre>');
+        expect(container.querySelector(".message-renderer-code")?.textContent).toBe("@riff:matrix.jorvik.app");
+        expect(container.querySelector(".message-renderer-codeblock")?.textContent).toBe("a < b\n  c");
+        expect(container.querySelector(".message-renderer-mention")).toBeNull();
+    });
+
+    it("hides a spoiler until it is clicked", () => {
+        render('see <span data-mx-spoiler="">the ending</span>');
+        const spoiler = container.querySelector(".message-renderer-spoiler") as HTMLElement;
+        expect(spoiler.getAttribute("role")).toBe("button");
+        expect(spoiler.classList.contains("is-revealed")).toBe(false);
+        act(() => {
+            spoiler.click();
+        });
+        const revealed = container.querySelector(".message-renderer-spoiler") as HTMLElement;
+        expect(revealed.classList.contains("is-revealed")).toBe(true);
+        expect(revealed.getAttribute("role")).toBeNull();
+    });
+
+    it("opens web links outside, and drops links to anything else", () => {
+        render('<a href="https://example.org/a">site</a> <a href="javascript:alert(1)">bad</a>');
+        const links = [...container.querySelectorAll("a")];
+        expect(links).toHaveLength(1);
+        expect(links[0].getAttribute("href")).toBe("https://example.org/a");
+        expect(links[0].getAttribute("target")).toBe("_blank");
+        expect(links[0].getAttribute("rel")).toBe("noopener noreferrer");
+        expect(container.textContent).toBe("site bad");
+    });
+
+    it("keeps lists free of stray text, and drops scripts and styles entirely", () => {
+        render("<ul>\n<li>one</li>\n<li>two</li>\n</ul><script>alert(1)</script><style>p{}</style><blockquote><p>q</p></blockquote>");
+        const list = container.querySelector(".message-renderer-ul") as HTMLElement;
+        expect([...list.childNodes].every((child) => child.nodeType === Node.ELEMENT_NODE)).toBe(true);
+        expect(container.textContent).toBe("onetwoq");
+        expect(container.querySelector(".message-renderer-blockquote .message-renderer-p")?.textContent).toBe("q");
+    });
+});
+
+describe("MessageRenderer old reply quotes", () => {
+    it("leaves out the quote some clients put in front of replies", () => {
+        render("<mx-reply><blockquote>In reply to <a href=\"https://matrix.to/#/@a:b\">@a:b</a> old</blockquote></mx-reply>the answer");
+        expect(container.textContent).toBe("the answer");
+    });
+});

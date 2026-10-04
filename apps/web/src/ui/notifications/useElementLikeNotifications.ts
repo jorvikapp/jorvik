@@ -16,6 +16,7 @@ import {
 
 import { mediaFromMxc, thumbnailFromMxc } from "../adapters/media";
 import type { NotificationsSettings } from "../settings/user/settingsStore";
+import { messagePreviewText } from "../formatting/messagePreviewText";
 import { playNotificationSound } from "./sound";
 
 interface UseElementLikeNotificationsOptions {
@@ -29,17 +30,6 @@ interface UseElementLikeNotificationsOptions {
 
 const MAX_PENDING_ENCRYPTED = 20;
 const RECENTLY_ACTIVE_THRESHOLD_MS = 2 * 60 * 1000;
-
-function stripPlainReplyFallback(body: string): string {
-    const lines = body.split("\n");
-    while (lines.length > 0 && lines[0].startsWith("> ")) {
-        lines.shift();
-    }
-    if (lines[0] === "") {
-        lines.shift();
-    }
-    return lines.join("\n");
-}
 
 function roomDisplayName(room: Room): string {
     return room.name || room.getCanonicalAlias() || room.roomId;
@@ -88,11 +78,13 @@ async function createLocalNotificationSettingsIfNeeded(
 function notificationMessageForEvent(event: MatrixEvent): string | null {
     const content = event.getContent() as {
         body?: unknown;
+        format?: unknown;
+        formatted_body?: unknown;
         msgtype?: unknown;
         membership?: unknown;
         displayname?: unknown;
     };
-    const body = typeof content.body === "string" ? stripPlainReplyFallback(content.body).trim() : "";
+    const body = messagePreviewText(content);
     const msgType = typeof content.msgtype === "string" ? content.msgtype : null;
 
     if (msgType === MsgType.Image) {

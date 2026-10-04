@@ -1,6 +1,8 @@
 import React, { useMemo } from "react";
 import { EventType, type MatrixEvent, type Room } from "matrix-js-sdk/src/matrix";
 
+import { messagePreviewText } from "../../../formatting/messagePreviewText";
+
 interface PinsPanelProps {
     room: Room;
 }
@@ -24,9 +26,9 @@ function getPinnedEventIds(room: Room): string[] {
 
 function getBody(event: MatrixEvent): string {
     if (event.getType() === EventType.RoomMessage) {
-        const content = event.getContent() as { body?: unknown };
-        if (typeof content.body === "string" && content.body.length > 0) {
-            return content.body;
+        const text = messagePreviewText(event.getContent());
+        if (text.length > 0) {
+            return text;
         }
     }
 

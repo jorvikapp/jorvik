@@ -23,6 +23,7 @@ import { mxidLocalpart, tokenizeMatrixMentions } from "../mentions/mentionTokens
 import { mxcThumbnailToHttp } from "../utils/mxc";
 import { Avatar } from "./Avatar";
 import { UserBadges } from "./badges/UserBadges";
+import { messagePreviewText } from "../formatting/messagePreviewText";
 import { MessageRenderer } from "./MessageRenderer";
 import { MessageActionsBar } from "./messages/MessageActionsBar";
 import { Toast, type ToastState } from "./Toast";
@@ -419,7 +420,7 @@ function normalizeSnippet(text: string): string {
 }
 
 function toReplyPreviewBody(content: MessageContent): string {
-    const body = typeof content.body === "string" ? stripPlainReplyFallback(content.body) : "";
+    const body = messagePreviewText(content);
     if (isMediaMessageType(content.msgtype)) {
         const label = mediaTypeLabel(content.msgtype);
         return body.trim() ? normalizeSnippet(`[${label}] ${body}`) : `[${label}]`;

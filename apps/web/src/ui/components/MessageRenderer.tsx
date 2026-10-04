@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { mxidLocalpart, tokenizeMatrixMentions } from "../mentions/mentionTokens";
 
 interface MessageRendererProps {
@@ -78,6 +78,70 @@ function normalizeMentionDisplayName(value: string): string {
     }
 
     return trimmed.startsWith("@") ? trimmed.slice(1) : trimmed;
+}
+
+// Formatting shown as the same kind of element. Anything not listed here is
+// shown as its text, so a message can't bring its own markup or styles.
+const FORMATTING_TAGS: Record<string, string> = {
+    strong: "strong",
+    b: "strong",
+    em: "em",
+    i: "em",
+    u: "u",
+    s: "s",
+    del: "s",
+    strike: "s",
+    sup: "sup",
+    sub: "sub",
+    p: "p",
+    blockquote: "blockquote",
+    ul: "ul",
+    ol: "ol",
+    li: "li",
+    h1: "h1",
+    h2: "h2",
+    h3: "h3",
+    h4: "h4",
+    h5: "h5",
+    h6: "h6",
+};
+
+// Links open outside the app, and only to the web or an email address.
+function safeLinkHref(href: string | null): string | null {
+    if (!href) {
+        return null;
+    }
+    try {
+        const url = new URL(href);
+        return url.protocol === "https:" || url.protocol === "http:" || url.protocol === "mailto:" ? url.toString() : null;
+    } catch {
+        return null;
+    }
+}
+
+function Spoiler({ children }: { children: React.ReactNode }): React.ReactElement {
+    const [revealed, setRevealed] = useState(false);
+    if (revealed) {
+        return <span className="message-renderer-spoiler is-revealed">{children}</span>;
+    }
+
+    return (
+        <span
+            className="message-renderer-spoiler"
+            role="button"
+            tabIndex={0}
+            aria-label="Spoiler, select to show"
+            onClick={() => setRevealed(true)}
+            onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setRevealed(true);
+                }
+            }}
+        >
+            {children}
+        </span>
+    );
 }
 
 // A mention as clients send it: a matrix.to link to a user.
@@ -202,6 +266,11 @@ function sanitizeNodes(
     nodes.forEach((node, index) => {
         const key = `${keyPrefix}_${index}`;
         if (node.nodeType === Node.TEXT_NODE) {
+            // The line breaks between list items are layout, and text isn't allowed there.
+            const parentTag = node.parentElement?.tagName;
+            if ((parentTag === "UL" || parentTag === "OL") && !(node.textContent ?? "").trim()) {
+                return;
+            }
             rendered.push(
                 ...renderTextNodeWithMentions(
                     node.textContent ?? "",
@@ -270,6 +339,73 @@ function sanitizeNodes(
         const mentionedUserId = tagName === "a" ? userIdFromPermalink(element.getAttribute("href")) : null;
         if (mentionedUserId) {
             rendered.push(renderMentionPill(mentionedUserId, key, resolveMentionDisplayName, ownUserId));
+            return;
+        }
+
+        const renderChildren = (): React.ReactNode[] =>
+            sanitizeNodes(
+                element.childNodes as NodeListOf<ChildNode>,
+                `${key}_child`,
+                resolveImageSource,
+                resolveImageFallbackSource,
+                resolveMentionDisplayName,
+                ownUserId,
+            );
+
+        if (tagName === "hr") {
+            rendered.push(<hr key={key} className="message-renderer-rule" />);
+            return;
+        }
+
+        // Code shows exactly as sent: no mentions, emoji or markup inside it.
+        if (tagName === "pre") {
+            rendered.push(
+                <pre key={key} className="message-renderer-codeblock">
+                    <code>{element.textContent ?? ""}</code>
+                </pre>,
+            );
+            return;
+        }
+        if (tagName === "code") {
+            rendered.push(
+                <code key={key} className="message-renderer-code">
+                    {element.textContent ?? ""}
+                </code>,
+            );
+            return;
+        }
+
+        if (tagName === "span" && element.hasAttribute("data-mx-spoiler")) {
+            rendered.push(<Spoiler key={key}>{renderChildren()}</Spoiler>);
+            return;
+        }
+
+        const href = tagName === "a" ? safeLinkHref(element.getAttribute("href")) : null;
+        if (href) {
+            rendered.push(
+                <a key={key} className="timeline-link" href={href} target="_blank" rel="noopener noreferrer">
+                    {renderChildren()}
+                </a>,
+            );
+            return;
+        }
+
+        // Never shown, not even as text: the old reply quote some clients
+        // still put in front of the message, scripts and styles.
+        if (tagName === "mx-reply" || tagName === "script" || tagName === "style") {
+            return;
+        }
+
+        const formattingTag = FORMATTING_TAGS[tagName];
+        if (formattingTag) {
+            const start = tagName === "ol" ? Number.parseInt(element.getAttribute("start") ?? "", 10) : Number.NaN;
+            rendered.push(
+                React.createElement(
+                    formattingTag,
+                    { key, className: `message-renderer-${formattingTag}`, start: Number.isFinite(start) ? start : undefined },
+                    ...renderChildren(),
+                ),
+            );
             return;
         }
 
@@ -344,7 +480,7 @@ export function MessageRenderer({
     }, [format, formattedBody, ownUserId, resolveImageSource, resolveImageFallbackSource, resolveMentionDisplayName]);
 
     if (sanitizedNodes) {
-        return <>{sanitizedNodes}</>;
+        return <div className="message-renderer-html">{sanitizedNodes}</div>;
     }
 
     return <>{renderTextNodeWithMentions(body, "message_plain", resolveMentionDisplayName, ownUserId)}</>;

@@ -4,7 +4,7 @@
  * The substitution happens in the plain-text body rather than in
  * formatted_body, so what goes out is a real Unicode character that every
  * client renders. That is the opposite of the custom pack shortcodes in
- * formatMessageWithEmojis, which have no Unicode equivalent and so must be
+ * formatMessage, which have no Unicode equivalent and so must be
  * sent as an <img> tag in HTML.
  */
 
