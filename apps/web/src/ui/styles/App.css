@@ -5161,6 +5161,59 @@ select,
     -webkit-app-region: no-drag;
 }
 
+/* Chromium applies drag regions in page order, later ones winning, and counts
+   every box inside the timeline as no-drag where it would be if the timeline
+   didn't clip it. In a long chat the messages scrolled out of view sit over
+   the header and cancel its drag. This layer comes after the timeline in the
+   page, so it wins, and covers the header up to its buttons. */
+.channel-header {
+    anchor-name: --channel-header;
+}
+
+.channel-header-actions {
+    anchor-name: --channel-header-actions;
+}
+
+.main-pane-header-drag {
+    display: none;
+}
+
+.app-shell.is-desktop-runtime .main-pane-header-drag {
+    display: block;
+    position: fixed;
+    top: anchor(--channel-header top, 0px);
+    bottom: anchor(--channel-header bottom, 100%);
+    left: anchor(--channel-header left, 0px);
+    right: anchor(--channel-header-actions left, 100%);
+    pointer-events: none;
+    -webkit-app-region: drag;
+}
+
+/* The same for the top of the channel list: rooms scrolled up out of view in
+   a long list sit over it. */
+.channels-pane > .pane-top {
+    anchor-name: --channels-pane-top;
+}
+
+.channels-pane > .pane-top .pane-top-actions {
+    anchor-name: --channels-pane-top-actions;
+}
+
+.channels-pane-header-drag {
+    display: none;
+}
+
+.app-shell.is-desktop-runtime .channels-pane-header-drag {
+    display: block;
+    position: fixed;
+    top: anchor(--channels-pane-top top, 0px);
+    bottom: anchor(--channels-pane-top bottom, 100%);
+    left: anchor(--channels-pane-top left, 0px);
+    right: anchor(--channels-pane-top-actions left, 100%);
+    pointer-events: none;
+    -webkit-app-region: drag;
+}
+
 /* ---------- status picker ---------- */
 
 .pane-user-row {

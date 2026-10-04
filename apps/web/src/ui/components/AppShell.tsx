@@ -2761,6 +2761,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                         ) : null}
                     </div>
                 </div>
+                <div className="channels-pane-header-drag" aria-hidden="true" />
             </section>
 
             <section className="main-pane">
@@ -2867,6 +2868,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                         </div>
                     </div>
                 ) : null}
+                <div className="main-pane-header-drag" aria-hidden="true" />
             </section>
 
             {shouldRenderRightPanel ? (
