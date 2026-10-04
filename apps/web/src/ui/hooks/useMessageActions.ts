@@ -1,8 +1,9 @@
 import { useMemo } from "react";
-import { EventType, MsgType, RelationType, type MatrixClient, type MatrixEvent, type Room } from "matrix-js-sdk/src/matrix";
+import { EventType, RelationType, type MatrixClient, type MatrixEvent, type Room } from "matrix-js-sdk/src/matrix";
 
 import { REACTION_SHORTCODE_FIELD_STABLE, REACTION_SHORTCODE_FIELD_UNSTABLE } from "../emoji/EmojiPackTypes";
 import type { ReactionSelection } from "../components/ReactionPicker";
+import { canEditMessage } from "../messages/editableMessages";
 import { buildMatrixToEventPermalink } from "../utils/permalink";
 
 interface UseMessageActionsArgs {
@@ -53,8 +54,7 @@ export function useMessageActions({ client, room, event }: UseMessageActionsArgs
 
     const isMine = Boolean(userId && event.getSender() === userId);
     const plainTextBody = useMemo(() => getPlainTextBody(event), [event]);
-    const content = event.getContent() as { msgtype?: unknown };
-    const canEdit = isMine && !event.isRedacted() && event.getType() === EventType.RoomMessage && content.msgtype === MsgType.Text;
+    const canEdit = canEditMessage(event, userId);
     const canDelete = isMine;
 
     const copyToClipboard = async (value: string): Promise<void> => {

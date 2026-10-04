@@ -17,6 +17,7 @@ import { replaceEmoticons } from "../emoji/emoticons";
 import { formatMessage, type FormattedTextMessageContent } from "../formatting/formatMessage";
 import { messagePreviewText } from "../formatting/messagePreviewText";
 import { mentionText } from "../mentions/composerMentions";
+import { findLastEditableMessage } from "../messages/editableMessages";
 import { useRoomTyping } from "../hooks/useRoomTyping";
 import { mediaFromMxc } from "../adapters/media";
 import { mxcThumbnailToHttp } from "../utils/mxc";
@@ -32,6 +33,8 @@ interface ComposerProps {
     activeSpaceId: string | null;
     editingEvent: MatrixEvent | null;
     onCancelEdit: () => void;
+    // Starts editing one of your messages, as its Edit button does.
+    onEditMessage: (event: MatrixEvent) => void;
     replyToEvent: MatrixEvent | null;
     onCancelReply: () => void;
 }
@@ -776,6 +779,7 @@ export function Composer({
     room,
     activeSpaceId,
     editingEvent,
+    onEditMessage,
     onCancelEdit,
     replyToEvent,
     onCancelReply,
@@ -1893,6 +1897,29 @@ export function Composer({
                 event.preventDefault();
                 setEmojiQuery(null);
                 setEmojiSelectionIndex(0);
+                return;
+            }
+        }
+
+        // Up in an empty message box edits your last message. Not while a reply
+        // or files are waiting to go, which editing would set aside.
+        if (
+            event.key === "ArrowUp" &&
+            !event.shiftKey &&
+            !event.altKey &&
+            !event.ctrlKey &&
+            !event.metaKey &&
+            !event.nativeEvent.isComposing &&
+            text.length === 0 &&
+            uploads.length === 0 &&
+            !editingEventId &&
+            !replyToEvent &&
+            room
+        ) {
+            const lastMessage = findLastEditableMessage(room, client.getUserId());
+            if (lastMessage) {
+                event.preventDefault();
+                onEditMessage(lastMessage);
                 return;
             }
         }

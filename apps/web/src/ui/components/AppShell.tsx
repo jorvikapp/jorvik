@@ -25,6 +25,7 @@ import { usePresenceSelection } from "../presence/usePresenceSelection";
 import { StatusMenu } from "./presence/StatusMenu";
 import { ensureDirectRoomMapping, getDirectRoomIds } from "../adapters/dmAdapter";
 import { describeJoinError, joinRoomWithRetry } from "../adapters/joinAdapter";
+import { roomAvatarSources } from "../adapters/avatar";
 import { mediaFromMxc, thumbnailFromMxc } from "../adapters/media";
 import { Composer } from "./Composer";
 import { EmojiUploadDialog } from "./EmojiUploadDialog";
@@ -96,6 +97,8 @@ import { clearVoiceDiscovery, initVoiceDiscovery } from "../voice/voiceDiscovery
 import { isBadgesRoom, startUserBadges } from "../../core/badges/userBadges";
 import { getRoomNotificationMode, RoomNotificationMode } from "../adapters/roomNotificationAdapter";
 import { summarizeUnread, type UnreadSummary } from "../notifications/roomUnread";
+import { QuickSwitcher } from "../quickSwitcher/QuickSwitcher";
+import type { QuickSwitcherItem } from "../quickSwitcher/quickSwitcherSearch";
 import { CHANNEL_ORDER_STATE_EVENT, readChannelOrder, writeChannelOrder } from "../stores/CategoryStore";
 
 interface AppShellProps {
@@ -916,6 +919,34 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     });
     const [replyToEvent, setReplyToEvent] = useState<MatrixEvent | null>(null);
     const [editingEvent, setEditingEvent] = useState<MatrixEvent | null>(null);
+    const startEditing = useCallback((event: MatrixEvent): void => {
+        setReplyToEvent(null);
+        setEditingEvent(event);
+    }, []);
+    const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
+
+    // Ctrl+K (Cmd+K on Apple devices) opens the quick switcher, or closes it.
+    useEffect(() => {
+        const isApple = /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
+        const onKeyDown = (event: KeyboardEvent): void => {
+            const command = isApple ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+            if (!command || event.altKey || event.shiftKey || event.isComposing || event.repeat) {
+                return;
+            }
+            // By position too, for keyboards that don't type a k there.
+            if (event.key.toLowerCase() !== "k" && event.code !== "KeyK") {
+                return;
+            }
+            // Not over settings or another dialog.
+            if (document.querySelector('[aria-modal="true"]:not(.quick-switcher)')) {
+                return;
+            }
+            event.preventDefault();
+            setQuickSwitcherOpen((open) => !open);
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, []);
     const [renderReactionImages, setRenderReactionImages] = useState<boolean>(() => getFeatureRenderReactionImages());
     const [emojiUploadOpen, setEmojiUploadOpen] = useState(false);
     const [emojiUploadTarget, setEmojiUploadTarget] = useState<EmojiPackTarget | null>(null);
@@ -1251,6 +1282,83 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         (room: Room | null): boolean => Boolean(room && (isVoiceChannelRoom(room) || voiceChannelHintRoomIds.has(room.roomId))),
         [voiceChannelHintRoomIds],
     );
+    // Everything the quick switcher can go to, worked out only while it's open.
+    const quickSwitcherItems = useMemo((): QuickSwitcherItem[] => {
+        if (!quickSwitcherOpen) {
+            return [];
+        }
+
+        const ownUserId = client.getUserId() ?? "";
+        const localDomain = client.getDomain();
+        const isMuted = (room: Room): boolean => getRoomNotificationMode(client, room.roomId) === RoomNotificationMode.Mute;
+        // The space a channel opens in: the first one that lists it, as focusRoom picks.
+        const parentSpaceIdByRoomId = new Map<string, string>();
+        for (const space of spaces) {
+            for (const childRoomId of readSpaceChildOrder(space).keys()) {
+                if (!parentSpaceIdByRoomId.has(childRoomId)) {
+                    parentSpaceIdByRoomId.set(childRoomId, space.roomId);
+                }
+            }
+        }
+
+        const items: QuickSwitcherItem[] = [];
+        for (const room of visibleRooms) {
+            if (room.getMyMembership() !== "join") {
+                continue;
+            }
+            const base = { roomId: room.roomId, lastActive: room.getLastActiveTimestamp() };
+
+            if (room.isSpaceRoom()) {
+                const summary = railUnread.get(room.roomId);
+                items.push({
+                    ...base,
+                    kind: "space",
+                    name: room.name || room.roomId,
+                    detail: "Space",
+                    keywords: [],
+                    unread: summary?.unread ?? false,
+                    count: summary?.count ?? 0,
+                    avatarSources: roomAvatarSources(client, room, 48, false),
+                    avatarSeed: room.roomId,
+                });
+                continue;
+            }
+
+            const isDirect = directRoomIds.has(room.roomId);
+            const summary = summarizeUnread([room], ownUserId, isMuted, isDirect);
+            if (isDirect) {
+                const partnerId = getOneToOnePartnerId(room, ownUserId);
+                const accountName = partnerId ? formatUserIdForDisplay(partnerId, localDomain) : null;
+                const name = getOneToOneDirectName(room, ownUserId, localDomain) ?? (room.name || room.roomId);
+                items.push({
+                    ...base,
+                    kind: "dm",
+                    name,
+                    detail: accountName && accountName !== name ? accountName : null,
+                    keywords: accountName ? [accountName] : [],
+                    unread: summary.unread,
+                    count: summary.count,
+                    avatarSources: roomAvatarSources(client, room, 48, true),
+                    avatarSeed: partnerId ?? room.roomId,
+                });
+                continue;
+            }
+
+            const parentSpaceId = parentSpaceIdByRoomId.get(room.roomId);
+            items.push({
+                ...base,
+                kind: isRoomVoiceChannel(room) ? "voice" : "channel",
+                name: room.name || room.getCanonicalAlias() || room.roomId,
+                detail: parentSpaceId ? roomById.get(parentSpaceId)?.name ?? null : null,
+                keywords: [],
+                unread: summary.unread,
+                count: summary.count,
+                avatarSources: [],
+                avatarSeed: room.roomId,
+            });
+        }
+        return items;
+    }, [client, directRoomIds, isRoomVoiceChannel, quickSwitcherOpen, railUnread, roomById, rooms, spaces, visibleRooms]);
     const selectedSpaceRoom = useMemo(
         () =>
             selectedSpaceId === PEOPLE_SPACE_ID
@@ -2177,6 +2285,23 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         [client, directRoomIds, openRoomAtBottom, spaces],
     );
 
+    // Going somewhere from the quick switcher does what clicking it in the
+    // rail or the list does: a voice channel is joined, as it is from the list.
+    const openFromQuickSwitcher = useCallback(
+        (item: QuickSwitcherItem): void => {
+            setQuickSwitcherOpen(false);
+            if (item.kind === "space") {
+                setSelectedSpaceId(item.roomId);
+                return;
+            }
+            focusRoom(item.roomId);
+            if (item.kind === "voice") {
+                selectChannel(item.roomId);
+            }
+        },
+        [focusRoom, selectChannel],
+    );
+
     // A call is a voice session on the DM room, started the way picking a voice channel starts one.
     const startVoiceSession = useCallback((roomId: string): void => {
         setVoiceSessionRoomId(roomId);
@@ -2884,10 +3009,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                                 setEditingEvent(null);
                                 setReplyToEvent(event);
                             }}
-                            onEdit={(event) => {
-                                setReplyToEvent(null);
-                                setEditingEvent(event);
-                            }}
+                            onEdit={startEditing}
                             onSelectUser={selectUser}
                             activeSpaceId={selectedSpaceId === PEOPLE_SPACE_ID ? null : selectedSpaceId}
                             customReactionImagesEnabled={renderReactionImages}
@@ -2902,6 +3024,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                                 activeSpaceId={selectedSpaceId === PEOPLE_SPACE_ID ? null : selectedSpaceId}
                                 editingEvent={editingEvent}
                                 onCancelEdit={() => setEditingEvent(null)}
+                                onEditMessage={startEditing}
                                 replyToEvent={replyToEvent}
                                 onCancelReply={() => setReplyToEvent(null)}
                             />
@@ -3110,6 +3233,14 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     pushToast({ type: "success", message: "Import completed." });
                 }}
             />
+            {quickSwitcherOpen ? (
+                <QuickSwitcher
+                    items={quickSwitcherItems}
+                    currentRoomId={activeRoomId}
+                    onSelect={openFromQuickSwitcher}
+                    onClose={() => setQuickSwitcherOpen(false)}
+                />
+            ) : null}
             <Toast toast={toast} onClose={() => setToast(null)} />
         </div>
     );

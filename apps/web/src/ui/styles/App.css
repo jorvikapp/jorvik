@@ -3583,6 +3583,155 @@ textarea {
     color: #ffffff;
 }
 
+/* The quick switcher (Ctrl+K): a search box with the conversations it finds. */
+.quick-switcher-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 12vh 16px 16px;
+    background: rgba(0, 0, 0, 0.6);
+    animation: fade-in var(--motion-fast) var(--motion-ease-standard);
+}
+
+.quick-switcher {
+    width: min(560px, 100%);
+    max-height: 76vh;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-pane);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+    animation: dialog-enter var(--motion-normal) var(--motion-ease-enter);
+}
+
+.quick-switcher-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    outline: none;
+    background: var(--bg-input);
+    color: var(--text-main);
+    font: inherit;
+    font-size: 1.1rem;
+}
+
+.quick-switcher-input:focus {
+    border-color: var(--accent-soft);
+}
+
+.quick-switcher-results {
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+}
+
+.quick-switcher-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.quick-switcher-option.is-selected {
+    background: var(--bg-active);
+    color: var(--text-main);
+}
+
+.quick-switcher-option.is-unread {
+    color: var(--text-main);
+}
+
+.quick-switcher-option.is-unread .quick-switcher-name {
+    font-weight: 700;
+}
+
+.quick-switcher-avatar,
+.quick-switcher-glyph {
+    flex: none;
+    width: 24px;
+    height: 24px;
+}
+
+.quick-switcher-avatar {
+    border-radius: 6px;
+    font-size: 0.65rem;
+}
+
+.quick-switcher-glyph {
+    display: grid;
+    place-items: center;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.quick-switcher-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.quick-switcher-count {
+    flex: none;
+    min-width: 18px;
+    height: 18px;
+    box-sizing: border-box;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+}
+
+.quick-switcher-detail {
+    flex: none;
+    max-width: 40%;
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.quick-switcher-empty {
+    margin: 6px 4px;
+    color: var(--text-muted);
+}
+
+.quick-switcher-hint {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.quick-switcher-hint kbd {
+    padding: 0 5px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-card);
+    font-family: inherit;
+    font-size: 0.7rem;
+}
+
 .room-dialog-overlay {
     position: fixed;
     inset: 0;
