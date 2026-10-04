@@ -3785,6 +3785,33 @@ textarea {
     background: var(--bg-active);
 }
 
+/* Asking before a link whose text hides where it goes. */
+.link-guard-intro {
+    margin: 0;
+}
+
+.link-guard-url {
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-input);
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+.link-guard-url strong {
+    color: var(--text-main);
+}
+
+.link-guard-trust {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
 .room-dialog-body {
     padding: 12px 16px;
     display: flex;

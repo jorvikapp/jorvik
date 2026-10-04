@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { MessageLink } from "../links/LinkGuard";
 import { mxidLocalpart, tokenizeMatrixMentions } from "../mentions/mentionTokens";
 
 interface MessageRendererProps {
@@ -106,14 +107,22 @@ const FORMATTING_TAGS: Record<string, string> = {
     h6: "h6",
 };
 
-// Links open outside the app, and only to the web or an email address.
+// Links open outside the app, and only to the web or an email address. A web
+// address with a user name in it ("https://example.org@other.site/") is a
+// way to disguise the site, so it isn't a link.
 function safeLinkHref(href: string | null): string | null {
     if (!href) {
         return null;
     }
     try {
         const url = new URL(href);
-        return url.protocol === "https:" || url.protocol === "http:" || url.protocol === "mailto:" ? url.toString() : null;
+        if (url.protocol === "mailto:") {
+            return url.toString();
+        }
+        if ((url.protocol === "https:" || url.protocol === "http:") && !url.username && !url.password) {
+            return url.toString();
+        }
+        return null;
     } catch {
         return null;
     }
@@ -383,9 +392,9 @@ function sanitizeNodes(
         const href = tagName === "a" ? safeLinkHref(element.getAttribute("href")) : null;
         if (href) {
             rendered.push(
-                <a key={key} className="timeline-link" href={href} target="_blank" rel="noopener noreferrer">
+                <MessageLink key={key} href={href} text={element.textContent ?? ""}>
                     {renderChildren()}
-                </a>,
+                </MessageLink>,
             );
             return;
         }

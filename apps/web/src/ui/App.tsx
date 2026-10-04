@@ -7,6 +7,7 @@ import { DeviceVerificationView } from "./components/DeviceVerificationView";
 import { LoginView } from "./components/LoginView";
 import { SecurityRecoveryView } from "./components/SecurityRecoveryView";
 import { IncomingVerificationDialog } from "./components/verification/IncomingVerificationDialog";
+import { LinkGuardProvider } from "./links/LinkGuard";
 import { MatrixProvider, useMatrix } from "./providers/MatrixProvider";
 import "./styles/App.css";
 import "./styles/composer.css";
@@ -87,10 +88,10 @@ function AppRouter(): React.ReactElement {
 
     if (matrix.status === "ready" && matrix.client) {
         return (
-            <>
+            <LinkGuardProvider>
                 <AppShell client={matrix.client} onLogout={matrix.logout} />
                 <IncomingVerificationDialog client={matrix.client} onCompleted={() => void matrix.collectKeysAfterVerification()} />
-            </>
+            </LinkGuardProvider>
         );
     }
 
