@@ -94,6 +94,8 @@ import {
 } from "../voice/voiceChannel";
 import { clearVoiceDiscovery, initVoiceDiscovery } from "../voice/voiceDiscovery";
 import { isBadgesRoom, startUserBadges } from "../../core/badges/userBadges";
+import { getRoomNotificationMode, RoomNotificationMode } from "../adapters/roomNotificationAdapter";
+import { summarizeUnread, type UnreadSummary } from "../notifications/roomUnread";
 import { CHANNEL_ORDER_STATE_EVENT, readChannelOrder, writeChannelOrder } from "../stores/CategoryStore";
 
 interface AppShellProps {
@@ -546,6 +548,28 @@ function getSpaceChannels(spaceRoom: Room, roomById: Map<string, Room>): Room[] 
     });
 
     return channels.map((entry) => entry.room);
+}
+
+// The unread pill at the rail's edge and the red count on an icon in the rail.
+function RailUnreadMarks({ summary, active }: { summary: UnreadSummary | undefined; active: boolean }): React.ReactElement | null {
+    if (!summary) {
+        return null;
+    }
+
+    return (
+        <>
+            {summary.unread && !active ? <span className="rail-unread-pill" /> : null}
+            {summary.count > 0 ? <span className="rail-mention-badge">{summary.count > 99 ? "99+" : summary.count}</span> : null}
+        </>
+    );
+}
+
+function railLabel(name: string, summary: UnreadSummary | undefined, countsMessages: boolean): string {
+    if (summary && summary.count > 0) {
+        const noun = countsMessages ? "unread message" : "mention";
+        return `${name}, ${summary.count} ${noun}${summary.count === 1 ? "" : "s"}`;
+    }
+    return summary?.unread ? `${name}, unread messages` : name;
 }
 
 function getSpaceGlyph(spaceName: string): string {
@@ -1211,6 +1235,18 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             ),
         [directRoomIds, visibleRooms],
     );
+    // What each icon in the rail has waiting. Recomputed with the room list,
+    // which follows unread counts and read receipts.
+    const railUnread = useMemo(() => {
+        const ownUserId = client.getUserId() ?? "";
+        const isMuted = (room: Room): boolean => getRoomNotificationMode(client, room.roomId) === RoomNotificationMode.Mute;
+        const summaries = new Map<string, UnreadSummary>();
+        summaries.set(PEOPLE_SPACE_ID, summarizeUnread(peopleChannels, ownUserId, isMuted, true));
+        for (const space of spaces) {
+            summaries.set(space.roomId, summarizeUnread(getSpaceChannels(space, roomById), ownUserId, isMuted, false));
+        }
+        return summaries;
+    }, [client, peopleChannels, roomById, rooms, spaces]);
     const isRoomVoiceChannel = useCallback(
         (room: Room | null): boolean => Boolean(room && (isVoiceChannelRoom(room) || voiceChannelHintRoomIds.has(room.roomId))),
         [voiceChannelHintRoomIds],
@@ -2488,8 +2524,10 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     className={`rail-icon rail-people${selectedSpaceId === PEOPLE_SPACE_ID ? " is-active" : ""}`}
                     onClick={() => setSelectedSpaceId(PEOPLE_SPACE_ID)}
                     title="People"
+                    aria-label={railLabel("People", railUnread.get(PEOPLE_SPACE_ID), true)}
                 >
                     @
+                    <RailUnreadMarks summary={railUnread.get(PEOPLE_SPACE_ID)} active={selectedSpaceId === PEOPLE_SPACE_ID} />
                 </button>
                 {spaces.map((space) => {
                     const avatarUrl = thumbnailFromMxc(client, space.getMxcAvatarUrl(), 48, 48);
@@ -2500,12 +2538,14 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                             className={`rail-icon${selectedSpaceId === space.roomId ? " is-active" : ""}`}
                             onClick={() => setSelectedSpaceId(space.roomId)}
                             title={getRoomName(space)}
+                            aria-label={railLabel(getRoomName(space), railUnread.get(space.roomId), false)}
                         >
                             {avatarUrl ? (
                                 <img src={avatarUrl} alt="" className="rail-icon-avatar" />
                             ) : (
                                 getSpaceGlyph(getRoomName(space))
                             )}
+                            <RailUnreadMarks summary={railUnread.get(space.roomId)} active={selectedSpaceId === space.roomId} />
                         </button>
                     );
                 })}

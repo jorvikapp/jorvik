@@ -2,8 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     EventType,
     MatrixError,
-    NotificationCountType,
-    M_BEACON,
     RoomStateEvent,
     type MatrixClient,
     type MatrixEvent,
@@ -11,6 +9,7 @@ import {
 } from "matrix-js-sdk/src/matrix";
 
 import { memberAvatarSources, roomAvatarSources } from "../adapters/avatar";
+import { getServerUnreadCount, hasUnreadActivity } from "../notifications/roomUnread";
 import { sharedStateEventDeduperFor } from "../../core/net/stateEventDeduper";
 import { plainUserDisplayName } from "../../core/users/userDisplayName";
 import { mediaFromMxc, thumbnailFromMxc } from "../adapters/media";
@@ -124,61 +123,6 @@ const VOICE_PRESENCE_POLL_ACTIVE_MS = 4_000;
 const VOICE_PRESENCE_POLL_IDLE_MS = 8_000;
 const VOICE_PRESENCE_POLL_HIDDEN_MS = 20_000;
 const VOICE_PRESENCE_POLL_MAX_BACKOFF_MS = 60_000;
-
-function getServerUnreadCount(room: Room): number {
-    const getUnreadNotificationCount = (room as Room & {
-        getUnreadNotificationCount?: (type?: NotificationCountType) => number;
-    }).getUnreadNotificationCount;
-
-    if (!getUnreadNotificationCount) {
-        return 0;
-    }
-
-    try {
-        return getUnreadNotificationCount.call(room, NotificationCountType.Total) ?? 0;
-    } catch {
-        return 0;
-    }
-}
-
-function eventTriggersUnread(event: MatrixEvent, ownUserId: string): boolean {
-    if (event.getSender() === ownUserId) {
-        return false;
-    }
-
-    switch (event.getType()) {
-        case EventType.RoomMember:
-        case EventType.RoomThirdPartyInvite:
-        case EventType.CallAnswer:
-        case EventType.CallHangup:
-        case EventType.RoomCanonicalAlias:
-        case EventType.RoomServerAcl:
-        case M_BEACON.name:
-        case M_BEACON.altName:
-            return false;
-    }
-
-    return !event.isRedacted();
-}
-
-function hasUnreadActivity(room: Room, ownUserId: string): boolean {
-    const events = room.getLiveTimeline()?.getEvents() ?? room.timeline;
-    for (let index = events.length - 1; index >= 0; index--) {
-        const event = events[index];
-        const eventId = event.getId();
-        if (!eventId) {
-            continue;
-        }
-
-        if (!eventTriggersUnread(event, ownUserId)) {
-            continue;
-        }
-
-        return !room.hasUserReadEvent(ownUserId, eventId);
-    }
-
-    return false;
-}
 
 function getRoomName(room: Room): string {
     return room.name || room.getCanonicalAlias() || room.roomId;
