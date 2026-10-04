@@ -70,6 +70,22 @@
   </branding>
 
   <releases>
+    <release version="1.0.18" date="2026-10-04">
+      <description>
+        <p>Text formatting, a quick switcher, unread badges in the rail, and fixes.</p>
+        <ul>
+          <li>Messages can use bold, italic, underline, strikethrough, spoilers, code, quotes, lists, headings and links</li>
+          <li>Ctrl+K (Cmd+K on a Mac) jumps to any channel, DM or space, and the Up arrow edits your last message</li>
+          <li>Each space and your DMs show unread messages and mentions in the left rail</li>
+          <li>People on the same server can be mentioned as just @name</li>
+          <li>A crossed-out bell marks chats set to Mute or Mentions only, and chat settings now hold that choice</li>
+          <li>A link whose text hides where it goes asks before opening</li>
+          <li>Settings list every keyboard shortcut</li>
+          <li>The chat header moves the window in long chats too</li>
+          <li>Clicking outside a dialog or the image viewer closes it, and checkbox labels can be clicked</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.17" date="2026-10-04">
       <description>
         <p>Name badges, developer tools that stay closed, and fixes.</p>
