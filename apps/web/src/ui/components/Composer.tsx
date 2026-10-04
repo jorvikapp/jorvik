@@ -15,6 +15,7 @@ import { subscribeEmojiPackUpdated } from "../emoji/emojiEvents";
 import { normalizeEmojiShortcode } from "../emoji/EmojiPackStore";
 import { replaceEmoticons } from "../emoji/emoticons";
 import { formatMessageWithEmojis } from "../emoji/formatMessageWithEmojis";
+import { findMentions, mentionText, type MentionSpan } from "../mentions/composerMentions";
 import { useRoomTyping } from "../hooks/useRoomTyping";
 import { mediaFromMxc } from "../adapters/media";
 import { mxcThumbnailToHttp } from "../utils/mxc";
@@ -626,8 +627,6 @@ const MENTION_BOUNDARY_PUNCTUATION = new Set([
     "\\",
     "|",
 ]);
-const MENTION_LEADING_TRIM_CHARS = new Set(["(", "[", "{", "<"]);
-const MENTION_TRAILING_TRIM_CHARS = new Set([")", "]", "}", ">", ".", ",", "!", "?", ";", ":"]);
 
 function isWhitespaceCharacter(character: string): boolean {
     return character.trim().length === 0;
@@ -764,81 +763,12 @@ function tokenizeComposerPreview(
     };
 }
 
-function trimMentionTokenEdges(token: string): string {
-    let start = 0;
-    let end = token.length;
-
-    while (start < end && MENTION_LEADING_TRIM_CHARS.has(token[start])) {
-        start += 1;
-    }
-
-    while (end > start && MENTION_TRAILING_TRIM_CHARS.has(token[end - 1])) {
-        end -= 1;
-    }
-
-    return token.slice(start, end);
-}
-
-function normalizeMentionToken(token: string): string {
-    return trimMentionTokenEdges(token);
-}
-
-function splitOnWhitespace(value: string): string[] {
-    const out: string[] = [];
-    let tokenStart = -1;
-
-    for (let index = 0; index < value.length; index++) {
-        if (isWhitespaceCharacter(value[index])) {
-            if (tokenStart >= 0) {
-                out.push(value.slice(tokenStart, index));
-                tokenStart = -1;
-            }
-            continue;
-        }
-
-        if (tokenStart < 0) {
-            tokenStart = index;
-        }
-    }
-
-    if (tokenStart >= 0) {
-        out.push(value.slice(tokenStart));
-    }
-
-    return out;
-}
-
-function extractMentionedUserIds(rawText: string, room: Room): string[] {
-    const mentionedUserIds = new Set<string>();
-    const tokens = splitOnWhitespace(rawText).map(normalizeMentionToken);
-
-    for (const token of tokens) {
-        if (!token.startsWith("@") || !token.includes(":")) {
-            continue;
-        }
-
-        const member = room.getMember(token);
-        if (!member) {
-            continue;
-        }
-
-        if (member.membership !== "join" && member.membership !== "invite" && member.membership !== "knock") {
-            continue;
-        }
-
-        mentionedUserIds.add(token);
-    }
-
-    return Array.from(mentionedUserIds);
-}
-
-function buildMentionsPayload(rawText: string, room: Room): MentionsContent | undefined {
-    const userIds = extractMentionedUserIds(rawText, room);
-    if (userIds.length === 0) {
+function buildMentionsPayload(mentions: readonly MentionSpan[]): MentionsContent | undefined {
+    if (mentions.length === 0) {
         return undefined;
     }
 
-    return { user_ids: userIds };
+    return { user_ids: [...new Set(mentions.map((mention) => mention.userId))] };
 }
 
 export function Composer({
@@ -1279,7 +1209,7 @@ export function Composer({
                 return;
             }
 
-            const replacement = `${candidate.userId} `;
+            const replacement = `${mentionText(candidate.userId, client.getDomain())} `;
             let nextText = "";
             const nextCaret = mentionQuery.start + replacement.length;
 
@@ -1313,7 +1243,7 @@ export function Composer({
                 resizeTextarea();
             });
         },
-        [error, handleTypingActivity, mentionQuery, resizeTextarea],
+        [client, error, handleTypingActivity, mentionQuery, resizeTextarea],
     );
 
     const applyEmojiCandidate = useCallback(
@@ -1538,12 +1468,14 @@ export function Composer({
         setEmojiSelectionIndex(0);
         try {
             if (hasTextToSend) {
-                const mentions = buildMentionsPayload(rawText, room);
+                const mentionSpans = findMentions(rawText, room, client.getDomain());
+                const mentions = buildMentionsPayload(mentionSpans);
                 const formattedMessage = await formatMessageWithEmojis(
                     rawText,
                     {
                         roomId: room.roomId,
                         activeSpaceId,
+                        mentions: mentionSpans,
                     },
                     resolveEmojiShortcode,
                     client,

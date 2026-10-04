@@ -1,6 +1,7 @@
 import type { MatrixClient, Room } from "matrix-js-sdk/src/matrix";
 
 import type { ResolvedEmoji } from "./EmojiPackTypes";
+import type { MentionSpan } from "../mentions/composerMentions";
 import { mxcThumbnailToHttp, mxcToHttp } from "../utils/mxc";
 
 const TOKEN_PATTERN = /:[a-zA-Z0-9_+-]{2,}:/g;
@@ -10,6 +11,8 @@ const TRAILING_URL_PUNCTUATION = ".,!?;:";
 export interface EmojiFormattingContext {
     roomId: string;
     activeSpaceId?: string | null;
+    // Mentions found in the text, sent as links so every client shows a pill.
+    mentions?: readonly MentionSpan[];
 }
 
 export type EmojiShortcodeResolver = (
@@ -138,6 +141,11 @@ function escapeTextSegmentToHtml(text: string): string {
     return escapeHtml(text).replace(/\r\n|\r|\n/g, "<br>");
 }
 
+// The standard Matrix mention: a matrix.to link to the user, as Element sends it.
+function toMentionLink(userId: string, text: string): string {
+    return `<a href="https://matrix.to/#/${escapeHtml(userId)}">${escapeHtml(text)}</a>`;
+}
+
 function toEmojiImageTag(src: string, shortcode: string): string {
     const escapedShortcode = escapeHtml(shortcode);
     const escapedSrc = escapeHtml(src);
@@ -200,43 +208,43 @@ export async function formatMessageWithEmojis(
 
     const urlSpans = collectUrlSpans(rawText);
     const occurrences = collectEligibleTokenOccurrences(rawText, urlSpans);
-    if (occurrences.length === 0) {
+    const mentions = context.mentions ?? [];
+    if (occurrences.length === 0 && mentions.length === 0) {
         return { body: rawText };
     }
 
     const uniqueTokens = [...new Set(occurrences.map((occurrence) => occurrence.token))];
-    const resolvedMap = await resolveTokens(client, room, context.activeSpaceId ?? null, resolver, uniqueTokens);
-    if (resolvedMap.size === 0) {
-        return { body: rawText };
-    }
+    const resolvedMap =
+        uniqueTokens.length > 0
+            ? await resolveTokens(client, room, context.activeSpaceId ?? null, resolver, uniqueTokens)
+            : new Map<string, ResolvedToken>();
 
-    let cursor = 0;
-    let hasReplacement = false;
-    let formattedBody = "";
-
+    // Emoji and mentions in text order; anything overlapping an earlier piece stays text.
+    const pieces: Array<{ start: number; end: number; html: string }> = [];
     for (const occurrence of occurrences) {
-        if (occurrence.start > cursor) {
-            formattedBody += escapeTextSegmentToHtml(rawText.slice(cursor, occurrence.start));
-        }
-
         const resolved = resolvedMap.get(occurrence.token);
         if (resolved) {
-            hasReplacement = true;
-            formattedBody += toEmojiImageTag(resolved.src, resolved.shortcode);
-        } else {
-            formattedBody += escapeTextSegmentToHtml(rawText.slice(occurrence.start, occurrence.end));
+            pieces.push({ start: occurrence.start, end: occurrence.end, html: toEmojiImageTag(resolved.src, resolved.shortcode) });
         }
-
-        cursor = occurrence.end;
     }
-
-    if (cursor < rawText.length) {
-        formattedBody += escapeTextSegmentToHtml(rawText.slice(cursor));
+    for (const mention of mentions) {
+        pieces.push({ start: mention.start, end: mention.end, html: toMentionLink(mention.userId, rawText.slice(mention.start, mention.end)) });
     }
-
-    if (!hasReplacement) {
+    if (pieces.length === 0) {
         return { body: rawText };
     }
+    pieces.sort((left, right) => left.start - right.start);
+
+    let cursor = 0;
+    let formattedBody = "";
+    for (const piece of pieces) {
+        if (piece.start < cursor) {
+            continue;
+        }
+        formattedBody += escapeTextSegmentToHtml(rawText.slice(cursor, piece.start)) + piece.html;
+        cursor = piece.end;
+    }
+    formattedBody += escapeTextSegmentToHtml(rawText.slice(cursor));
 
     return {
         body: rawText,

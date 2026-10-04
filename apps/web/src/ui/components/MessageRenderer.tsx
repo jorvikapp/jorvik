@@ -80,6 +80,22 @@ function normalizeMentionDisplayName(value: string): string {
     return trimmed.startsWith("@") ? trimmed.slice(1) : trimmed;
 }
 
+// A mention as clients send it: a matrix.to link to a user.
+const USER_PERMALINK_PATTERN = /^https:\/\/matrix\.to\/#\/([^/?#]+)/;
+
+function userIdFromPermalink(href: string | null): string | null {
+    const match = href ? USER_PERMALINK_PATTERN.exec(href) : null;
+    if (!match) {
+        return null;
+    }
+    try {
+        const userId = decodeURIComponent(match[1]);
+        return /^@[^:\s]+:\S+$/.test(userId) ? userId : null;
+    } catch {
+        return null;
+    }
+}
+
 function renderMentionPill(
     userId: string,
     key: string,
@@ -248,6 +264,12 @@ function sanitizeNodes(
                     onError={handleSanitizedImageError}
                 />,
             );
+            return;
+        }
+
+        const mentionedUserId = tagName === "a" ? userIdFromPermalink(element.getAttribute("href")) : null;
+        if (mentionedUserId) {
+            rendered.push(renderMentionPill(mentionedUserId, key, resolveMentionDisplayName, ownUserId));
             return;
         }
 

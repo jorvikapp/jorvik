@@ -130,4 +130,41 @@ describe("formatMessageWithEmojis", () => {
         await formatMessageWithEmojis(":party: :party: :party:", { roomId: "!room:example.org" }, resolver, client as any);
         expect(resolver).toHaveBeenCalledTimes(1);
     });
+
+    it("links mentions so every client shows a pill, and escapes the rest", async () => {
+        const client = createClient(true);
+        const resolver = vi.fn(async () => null);
+        const text = "hi @riff & <you>\nbye";
+
+        const result = await formatMessageWithEmojis(
+            text,
+            { roomId: "!room:example.org", mentions: [{ start: 3, end: 8, userId: "@riff:example.org" }] },
+            resolver,
+            client as any,
+        );
+
+        expect(result.body).toBe(text);
+        expect(expectFormattedBody(result)).toBe(
+            'hi <a href="https://matrix.to/#/@riff:example.org">@riff</a> &amp; &lt;you&gt;<br>bye',
+        );
+        expect(resolver).not.toHaveBeenCalled();
+    });
+
+    it("puts mentions and custom emoji in text order", async () => {
+        const client = createClient(true);
+        const resolver = vi.fn(async (_client, _room, token: string) =>
+            token === ":party:" ? { shortcode: ":party:", url: "mxc://example.org/party", name: "party" } : null,
+        );
+
+        const result = await formatMessageWithEmojis(
+            ":party: @riff",
+            { roomId: "!room:example.org", mentions: [{ start: 8, end: 13, userId: "@riff:example.org" }] },
+            resolver,
+            client as any,
+        );
+
+        const html = expectFormattedBody(result);
+        expect(html.indexOf("data-mx-emoticon")).toBeLessThan(html.indexOf("matrix.to"));
+        expect(html.endsWith('<a href="https://matrix.to/#/@riff:example.org">@riff</a>')).toBe(true);
+    });
 });
