@@ -5494,7 +5494,9 @@ select,
 .settings-sidebar,
 .settings-content,
 .settings-table-wrap,
-.voice-room-panel {
+.voice-room-panel,
+.quick-switcher-overlay,
+.link-guard-trust {
     -webkit-app-region: no-drag;
 }
 
