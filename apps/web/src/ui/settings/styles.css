@@ -835,6 +835,23 @@
     border-bottom: 0;
 }
 
+.settings-shortcut-keys {
+    white-space: nowrap;
+    color: var(--text-muted);
+}
+
+.settings-kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    background: var(--bg-card);
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 12px;
+}
+
 .settings-permissions-summary {
     border: 1px solid var(--border);
     background: var(--bg-pane);

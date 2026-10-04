@@ -99,6 +99,7 @@ import { getRoomNotificationMode, RoomNotificationMode } from "../adapters/roomN
 import { summarizeUnread, type UnreadSummary } from "../notifications/roomUnread";
 import { QuickSwitcher } from "../quickSwitcher/QuickSwitcher";
 import type { QuickSwitcherItem } from "../quickSwitcher/quickSwitcherSearch";
+import { commandShortcutLabel, usesCommandKey } from "../utils/keyboard";
 import { CHANNEL_ORDER_STATE_EVENT, readChannelOrder, writeChannelOrder } from "../stores/CategoryStore";
 
 interface AppShellProps {
@@ -927,7 +928,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
 
     // Ctrl+K (Cmd+K on Apple devices) opens the quick switcher, or closes it.
     useEffect(() => {
-        const isApple = /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
+        const isApple = usesCommandKey();
         const onKeyDown = (event: KeyboardEvent): void => {
             const command = isApple ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
             if (!command || event.altKey || event.shiftKey || event.isComposing || event.repeat) {
@@ -2712,6 +2713,16 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                         ) : null}
                     </div>
                 </div>
+                <button
+                    type="button"
+                    className="channels-pane-jump"
+                    onClick={() => setQuickSwitcherOpen(true)}
+                    title="Jump to a channel, DM or space"
+                    aria-keyshortcuts={usesCommandKey() ? "Meta+K" : "Control+K"}
+                >
+                    <span className="channels-pane-jump-label">Jump to…</span>
+                    <kbd className="channels-pane-jump-key">{commandShortcutLabel("K")}</kbd>
+                </button>
                 {showSpaceOnboarding ? (
                     <div className="space-onboarding-card">
                         <div className="space-onboarding-header">

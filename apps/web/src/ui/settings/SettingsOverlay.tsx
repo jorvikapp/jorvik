@@ -13,6 +13,7 @@ import { PermissionsTab } from "./server/tabs/PermissionsTab";
 import { VisibilityTab } from "./server/tabs/VisibilityTab";
 import { AdvancedTab } from "./server/tabs/AdvancedTab";
 import { AppearanceTab } from "./user/tabs/AppearanceTab";
+import { KeyboardTab } from "./user/tabs/KeyboardTab";
 import { AudioTab } from "./user/tabs/AudioTab";
 import { DevicesTab } from "./user/tabs/DevicesTab";
 import { EncryptionTab } from "./user/tabs/EncryptionTab";
@@ -76,6 +77,7 @@ const USER_NAV: SettingsNavSection[] = [
             { id: "appearance", label: "Appearance" },
             { id: "notifications", label: "Notifications" },
             { id: "audio", label: "Audio" },
+            { id: "keyboard", label: "Keyboard" },
         ],
     },
     {
@@ -299,6 +301,8 @@ export function SettingsOverlay({
                         onToast={onToast}
                     />
                 );
+            case "keyboard":
+                return <KeyboardTab />;
             case "appearance":
                 return (
                     <AppearanceTab

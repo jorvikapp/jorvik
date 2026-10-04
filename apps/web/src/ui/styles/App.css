@@ -839,6 +839,51 @@ textarea {
     gap: 10px;
 }
 
+/* Opens the quick switcher, and shows its shortcut. */
+.channels-pane-jump {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 10px 10px 2px;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-input);
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition:
+        color var(--motion-fast) var(--motion-ease-standard),
+        border-color var(--motion-fast) var(--motion-ease-standard);
+}
+
+.channels-pane-jump:hover,
+.channels-pane-jump:focus-visible {
+    color: var(--text-main);
+    border-color: var(--text-muted);
+}
+
+.channels-pane-jump-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.channels-pane-jump-key {
+    flex: none;
+    padding: 1px 5px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-card);
+    font-family: inherit;
+    font-size: 11px;
+}
+
 .space-onboarding-card {
     margin: 10px 10px 4px;
     border: 1px solid var(--primary);

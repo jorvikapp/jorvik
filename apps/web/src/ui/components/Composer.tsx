@@ -1924,6 +1924,12 @@ export function Composer({
             }
         }
 
+        if (event.key === "Escape" && replyToEvent && !editingEventId) {
+            event.preventDefault();
+            onCancelReply();
+            return;
+        }
+
         if (event.key === "Escape" && editingEventId) {
             event.preventDefault();
             setText("");
