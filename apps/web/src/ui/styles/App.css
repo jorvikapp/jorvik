@@ -2664,7 +2664,8 @@ textarea {
     border: 0;
     padding: 0;
     width: fit-content;
-    max-width: 100%;
+    /* The width left beside the margin, so a long preview can't push past the edge. */
+    max-width: calc(100% - 50px);
     background: transparent;
     text-align: left;
     color: var(--text-main);
