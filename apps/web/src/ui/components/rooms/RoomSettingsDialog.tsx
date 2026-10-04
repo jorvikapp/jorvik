@@ -8,6 +8,8 @@ import {
 } from "matrix-js-sdk/src/matrix";
 
 import { getDirectRoomIds } from "../../adapters/dmAdapter";
+import { getRoomNotificationMode, RoomNotificationMode, setRoomNotificationMode } from "../../adapters/roomNotificationAdapter";
+import { describeRoomNotificationMode, RoomNotificationModePicker } from "../../notifications/RoomNotificationModePicker";
 import { getOneToOneDirectLabel, getOneToOneDirectName } from "../rightPanel/directPartner";
 import { RoomDialog } from "./RoomDialog";
 import { getExplicitRoomName, getRoomDisplayName } from "./roomAdminUtils";
@@ -60,6 +62,8 @@ export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: R
     const [joinRule, setJoinRule] = useState<JoinRule>(JoinRule.Invite);
     const [historyVisibility, setHistoryVisibility] = useState<HistoryVisibility>(HistoryVisibility.Shared);
     const [enableEncryption, setEnableEncryption] = useState(false);
+    // Yours alone, so anyone can change it; it's saved with the rest.
+    const [notificationMode, setNotificationMode] = useState<RoomNotificationMode>(RoomNotificationMode.Default);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
@@ -112,10 +116,11 @@ export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: R
         setJoinRule(getJoinRule(room));
         setHistoryVisibility(getHistoryVisibility(room));
         setEnableEncryption(isRoomEncrypted(room));
+        setNotificationMode(getRoomNotificationMode(client, room.roomId));
         setSaving(false);
         setDeleting(false);
         setError(null);
-    }, [open, room]);
+    }, [client, open, room]);
 
     const submit = async (): Promise<void> => {
         if (!room) {
@@ -157,6 +162,10 @@ export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: R
                     { history_visibility: historyVisibility },
                     "",
                 );
+            }
+
+            if (notificationMode !== getRoomNotificationMode(client, room.roomId)) {
+                await setRoomNotificationMode(client, room.roomId, notificationMode);
             }
 
             if (canEnableEncryption && enableEncryption && !encryptedNow) {
@@ -203,7 +212,7 @@ export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: R
     return (
         <RoomDialog
             open={open}
-            title={`Room settings: ${roomLabel}`}
+            title={`${isDirect ? "Chat" : "Channel"} settings: ${roomLabel}`}
             onClose={onClose}
             footer={
                 <>
@@ -217,7 +226,7 @@ export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: R
             }
         >
             <label className="room-dialog-field">
-                <span>Room name</span>
+                <span>{isDirect ? "Chat name" : "Channel name"}</span>
                 <input
                     className="room-dialog-input"
                     type="text"
@@ -238,6 +247,17 @@ export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: R
                     disabled={saving || !canEditTopic}
                 />
             </label>
+
+            <div className="room-dialog-field">
+                <span>Your notifications</span>
+                <RoomNotificationModePicker
+                    className="room-dialog-notification-modes"
+                    value={notificationMode}
+                    onChange={setNotificationMode}
+                    disabled={saving}
+                />
+                <p className="room-dialog-helper">{describeRoomNotificationMode(notificationMode)}</p>
+            </div>
 
             <div className="room-dialog-two-columns">
                 <label className="room-dialog-field">

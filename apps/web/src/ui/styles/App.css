@@ -4046,6 +4046,17 @@ textarea {
     font-size: 12px;
 }
 
+/* Four across in a dialog, where the side panel has room for two. */
+.rs-notification-modes.room-dialog-notification-modes {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 520px) {
+    .rs-notification-modes.room-dialog-notification-modes {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 .room-dialog-tabs {
     display: flex;
     gap: 8px;

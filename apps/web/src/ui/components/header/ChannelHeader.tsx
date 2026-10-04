@@ -243,7 +243,7 @@ export function ChannelHeader({
                     <button
                         type="button"
                         className={`channel-header-icon-btn${menuOpen ? " is-active" : ""}`}
-                        aria-label="More channel actions"
+                        aria-label={isDirectMessage ? "More chat actions" : "More channel actions"}
                         aria-haspopup="menu"
                         aria-expanded={menuOpen}
                         title="More"
@@ -309,7 +309,9 @@ export function ChannelHeader({
                                     setMenuOpen(false);
                                 }}
                             >
-                                {sidebarMode === "info" ? "Hide channel info" : "Channel info"}
+                                {sidebarMode === "info"
+                                    ? isDirectMessage ? "Hide chat info" : "Hide channel info"
+                                    : isDirectMessage ? "Chat info" : "Channel info"}
                             </button>
                             <button
                                 type="button"
@@ -321,7 +323,7 @@ export function ChannelHeader({
                                     setMenuOpen(false);
                                 }}
                             >
-                                Channel settings
+                                {isDirectMessage ? "Chat settings" : "Channel settings"}
                             </button>
                             <button
                                 type="button"
@@ -358,7 +360,7 @@ export function ChannelHeader({
                                     setMenuOpen(false);
                                 }}
                             >
-                                Leave room
+                                {isDirectMessage ? "Leave chat" : "Leave room"}
                             </button>
                         </div>
                     ) : null}

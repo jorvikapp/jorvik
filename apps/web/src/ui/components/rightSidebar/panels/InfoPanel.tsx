@@ -6,6 +6,7 @@ import {
     RoomNotificationMode,
     setRoomNotificationMode,
 } from "../../../adapters/roomNotificationAdapter";
+import { describeRoomNotificationMode, RoomNotificationModePicker } from "../../../notifications/RoomNotificationModePicker";
 
 interface InfoPanelProps {
     client: MatrixClient;
@@ -14,13 +15,6 @@ interface InfoPanelProps {
     onCopyRoomLink: () => Promise<void>;
     onLeaveRoom: () => Promise<void>;
 }
-
-const ROOM_NOTIFICATION_MODE_OPTIONS: Array<{ mode: RoomNotificationMode; label: string }> = [
-    { mode: RoomNotificationMode.Default, label: "Default" },
-    { mode: RoomNotificationMode.AllMessages, label: "All messages" },
-    { mode: RoomNotificationMode.MentionsOnly, label: "Mentions only" },
-    { mode: RoomNotificationMode.Mute, label: "Mute" },
-];
 
 function roomNotificationModeSummary(mode: RoomNotificationMode): string {
     switch (mode) {
@@ -98,7 +92,7 @@ export function InfoPanel({
                 await setRoomNotificationMode(client, room.roomId, mode);
                 setNotificationModeState(mode);
             } catch (error) {
-                const message = error instanceof Error ? error.message : "Failed to update channel notifications.";
+                const message = error instanceof Error ? error.message : "Failed to update notifications.";
                 setNotificationModeError(message);
                 refreshRoomNotificationMode();
             } finally {
@@ -111,7 +105,7 @@ export function InfoPanel({
     return (
         <div className="rs-panel">
             <div className="rs-panel-header">
-                <h2 className="rs-panel-title">Channel info</h2>
+                <h2 className="rs-panel-title">{dm ? "Chat info" : "Channel info"}</h2>
             </div>
 
             <section className="rs-section">
@@ -124,7 +118,7 @@ export function InfoPanel({
                     ) : null}
                 </div>
                 <p className={`rs-about-text${topic.trim() ? "" : " is-empty"}`}>
-                    {topic.trim() || "No topic set for this channel."}
+                    {topic.trim() || (dm ? "No topic set for this chat." : "No topic set for this channel.")}
                 </p>
                 <div className="rs-meta-row">
                     <span>Encryption</span>
@@ -134,34 +128,24 @@ export function InfoPanel({
 
             <section className="rs-section">
                 <div className="rs-section-head">
-                    <h3 className="rs-section-title">Notifications</h3>
+                    <h3 className="rs-section-title">Your notifications</h3>
                     <span className="rs-chip">{roomNotificationModeSummary(notificationMode)}</span>
                 </div>
-                <div className="rs-notification-modes">
-                    {ROOM_NOTIFICATION_MODE_OPTIONS.map((option) => (
-                        <button
-                            key={option.mode}
-                            type="button"
-                            className={`rs-notification-mode${notificationMode === option.mode ? " is-active" : ""}`}
-                            onClick={() => {
-                                void updateRoomNotificationMode(option.mode);
-                            }}
-                            disabled={notificationModePending}
-                        >
-                            {option.label}
-                        </button>
-                    ))}
-                </div>
+                <RoomNotificationModePicker
+                    value={notificationMode}
+                    onChange={(mode) => void updateRoomNotificationMode(mode)}
+                    disabled={notificationModePending}
+                />
                 {notificationModeError ? (
                     <p className="rs-notification-error">{notificationModeError}</p>
                 ) : (
-                    <p className="rs-notification-hint">Applies to this channel for your account.</p>
+                    <p className="rs-notification-hint">{describeRoomNotificationMode(notificationMode)}</p>
                 )}
             </section>
 
             <section className="rs-section">
                 <button type="button" className="rs-row-action" onClick={onOpenRoomSettings}>
-                    Open channel settings
+                    {dm ? "Open chat settings" : "Open channel settings"}
                 </button>
                 <button type="button" className="rs-row-action" onClick={() => void onCopyRoomLink()}>
                     Copy link
@@ -170,7 +154,7 @@ export function InfoPanel({
 
             <section className="rs-section rs-section-danger">
                 <button type="button" className="rs-row-action rs-row-action-danger" onClick={() => void onLeaveRoom()}>
-                    {dm ? "Leave conversation" : "Leave room"}
+                    {dm ? "Leave chat" : "Leave room"}
                 </button>
             </section>
         </div>

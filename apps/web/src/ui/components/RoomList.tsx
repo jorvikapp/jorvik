@@ -988,8 +988,8 @@ export function RoomList({
                         <button
                             type="button"
                             className="room-item-settings-button"
-                            aria-label={`Channel settings for ${roomName}`}
-                            title="Channel settings"
+                            aria-label={`${showHashPrefix ? "Channel" : "Chat"} settings for ${roomName}`}
+                            title={showHashPrefix ? "Channel settings" : "Chat settings"}
                             onClick={(event) => {
                                 event.stopPropagation();
                                 onOpenRoomSettings?.(room.roomId);
@@ -1308,7 +1308,7 @@ export function RoomList({
         <div className="room-list">
             <div className="room-list-header">
                 <div className="room-list-header-row">
-                    <h2>Channels</h2>
+                    <h2>{showHashPrefix ? "Channels" : "Direct messages"}</h2>
                     <div className="room-list-header-actions">
                         {canManageCats ? (
                             <button
