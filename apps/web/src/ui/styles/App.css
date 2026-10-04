@@ -5580,7 +5580,17 @@ select,
 .settings-table-wrap,
 .voice-room-panel,
 .quick-switcher-overlay,
-.link-guard-trust {
+/* Overlays: everything in them takes clicks, and a click on the backdrop
+   closes them. Only settings keeps its header as a window grip. */
+.room-dialog-overlay,
+.timeline-lightbox,
+.message-context-menu,
+.message-actions-reaction-picker-floating,
+.verification-dialog-overlay,
+.emoji-upload-overlay,
+.incoming-call,
+/* The sign-in card stays a grip; its checkbox labels take clicks. */
+.login-checkbox {
     -webkit-app-region: no-drag;
 }
 
