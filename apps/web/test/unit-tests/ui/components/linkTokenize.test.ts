@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { tokenizeMessage } from "../../../../src/ui/components/Timeline";
+import { containsDirectMention, tokenizeMessage } from "../../../../src/ui/components/Timeline";
 
 const links = (body: string) =>
     tokenizeMessage(body)
@@ -21,5 +21,24 @@ describe("tokenizeMessage links", () => {
         expect(segments.map((segment) => segment.value).join("")).toBe("(see https://example.com)");
         expect(links("go to www.example.com, now")).toEqual(["https://www.example.com"]);
         expect(links("is it https://example.com/x?")).toEqual(["https://example.com/x"]);
+    });
+});
+
+describe("containsDirectMention", () => {
+    const ME = "@riff:matrix.jorvik.app";
+
+    it("trusts the message's m.mentions, whatever its text says", () => {
+        expect(containsDirectMention({ "m.mentions": { user_ids: [ME] } }, "@riff look", ME)).toBe(true);
+        expect(containsDirectMention({ "m.mentions": { user_ids: [ME] } }, "Riff look", ME)).toBe(true);
+    });
+
+    it("still finds your full ID in the text of older messages", () => {
+        expect(containsDirectMention({}, "hey @riff:matrix.jorvik.app", ME)).toBe(true);
+    });
+
+    it("is false for anyone else, or for an empty mentions list", () => {
+        expect(containsDirectMention({ "m.mentions": { user_ids: ["@bob:matrix.org"] } }, "@riff", ME)).toBe(false);
+        expect(containsDirectMention({ "m.mentions": {} }, "@riff", ME)).toBe(false);
+        expect(containsDirectMention({ "m.mentions": { user_ids: [ME] } }, "@riff", null)).toBe(false);
     });
 });

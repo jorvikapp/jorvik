@@ -128,6 +128,7 @@ interface MessageContent {
     url?: unknown;
     "m.new_content"?: unknown;
     "m.relates_to"?: unknown;
+    "m.mentions"?: unknown;
     file?: EncryptedAttachmentFile | null;
     info?: {
         mimetype?: unknown;
@@ -1260,9 +1261,21 @@ function renderMessageBody(
     return rendered;
 }
 
-function containsDirectMention(body: string, ownUserId: string | null): boolean {
+/**
+ * Whether a message mentions you. Its m.mentions list is what clients send for
+ * an intentional mention (including Jorvik's short @name and Element's pills,
+ * whose text holds a name, not your ID); older messages only have your full
+ * ID in the text.
+ */
+export function containsDirectMention(content: { "m.mentions"?: unknown }, body: string, ownUserId: string | null): boolean {
     if (!ownUserId) {
         return false;
+    }
+
+    const mentions = content["m.mentions"];
+    const mentionedIds = typeof mentions === "object" && mentions !== null ? (mentions as { user_ids?: unknown }).user_ids : undefined;
+    if (Array.isArray(mentionedIds) && mentionedIds.includes(ownUserId)) {
+        return true;
     }
 
     return tokenizeMatrixMentions(body).some(
@@ -2210,7 +2223,7 @@ export function Timeline({
                             (replyJumpTargetEventId && replyJumpTargetEventId === eventId),
                     );
                     const isDirectMentionEvent =
-                        hasTextBody && senderId !== ownUserId && containsDirectMention(body, ownUserId);
+                        hasTextBody && senderId !== ownUserId && containsDirectMention(content, body, ownUserId);
                     const replySenderLabel =
                         reply && reply.senderName.startsWith("@") ? reply.senderName : reply ? `@${reply.senderName}` : null;
                     const messageKey = event.getId() ?? key;
