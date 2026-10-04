@@ -1908,6 +1908,34 @@ textarea {
     background: var(--text-main);
 }
 
+.room-item-quiet {
+    flex: none;
+    display: grid;
+    place-items: center;
+    margin-left: auto;
+    color: var(--text-muted);
+}
+
+.room-item-unread + .room-item-quiet,
+.room-item-activity + .room-item-quiet {
+    margin-left: 6px;
+}
+
+.room-item-quiet svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.room-item.is-muted .room-item-name,
+.room-item.is-muted .room-item-avatar {
+    opacity: 0.55;
+}
+
 .pane-bottom {
     border-top: 1px solid var(--border);
     padding: 10px;

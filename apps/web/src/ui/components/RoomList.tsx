@@ -10,6 +10,7 @@ import {
 
 import { memberAvatarSources, roomAvatarSources } from "../adapters/avatar";
 import { getServerUnreadCount, hasUnreadActivity } from "../notifications/roomUnread";
+import { getRoomNotificationMode, RoomNotificationMode } from "../adapters/roomNotificationAdapter";
 import { sharedStateEventDeduperFor } from "../../core/net/stateEventDeduper";
 import { plainUserDisplayName } from "../../core/users/userDisplayName";
 import { mediaFromMxc, thumbnailFromMxc } from "../adapters/media";
@@ -123,6 +124,18 @@ const VOICE_PRESENCE_POLL_ACTIVE_MS = 4_000;
 const VOICE_PRESENCE_POLL_IDLE_MS = 8_000;
 const VOICE_PRESENCE_POLL_HIDDEN_MS = 20_000;
 const VOICE_PRESENCE_POLL_MAX_BACKOFF_MS = 60_000;
+
+// A bell with a line through it, for chats that don't notify of every message.
+function QuietBellIcon(): React.ReactElement {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6 16v-5a6 6 0 0 1 12 0v5" />
+            <path d="M4 16h16" />
+            <path d="M10 20a2 2 0 0 0 4 0" />
+            <path d="M3 3l18 18" />
+        </svg>
+    );
+}
 
 function getRoomName(room: Room): string {
     return room.name || room.getCanonicalAlias() || room.roomId;
@@ -773,7 +786,12 @@ export function RoomList({
     ): React.ReactElement => {
         const { indexInGroup, groupSize, catId } = opts;
         const unreadCount = getServerUnreadCount(room);
-        const showActivityDot = unreadCount === 0 && ownUserId ? hasUnreadActivity(room, ownUserId) : false;
+        // A chat set to notify less says so in the list. Muted ones also stay
+        // quiet here, as they do in the rail.
+        const notificationMode = getRoomNotificationMode(client, room.roomId);
+        const isMuted = notificationMode === RoomNotificationMode.Mute;
+        const quietLabel = isMuted ? "Muted" : notificationMode === RoomNotificationMode.MentionsOnly ? "Mentions only" : null;
+        const showActivityDot = unreadCount === 0 && ownUserId && !isMuted ? hasUnreadActivity(room, ownUserId) : false;
         const isActive = room.roomId === activeRoomId;
         // In the DM list (no # prefix) a one-to-one DM is named after the person.
         const roomName = (!showHashPrefix ? getOneToOneDirectName(room, ownUserId, localDomain) : null) ?? getRoomName(room);
@@ -904,7 +922,7 @@ export function RoomList({
             <div
                 key={room.roomId}
                 role="listitem"
-                className={`room-item${isActive ? " is-active" : ""}${dragClass}`}
+                className={`room-item${isActive ? " is-active" : ""}${isMuted ? " is-muted" : ""}${dragClass}`}
                 draggable={orderingControlsEnabled}
                 onDragStart={(event) => {
                     if (!orderingControlsEnabled) {
@@ -961,6 +979,11 @@ export function RoomList({
                     </button>
                     {unreadCount > 0 ? <span className="room-item-unread">{unreadCount}</span> : null}
                     {unreadCount === 0 && showActivityDot ? <span className="room-item-activity" /> : null}
+                    {quietLabel ? (
+                        <span className="room-item-quiet" role="img" aria-label={quietLabel} title={quietLabel}>
+                            <QuietBellIcon />
+                        </span>
+                    ) : null}
                     {showChannelSettingsButton ? (
                         <button
                             type="button"
