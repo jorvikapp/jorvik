@@ -11,6 +11,7 @@ interface Shortcut {
 function shortcuts(): Shortcut[] {
     return [
         { keys: [commandShortcutLabel("K")], action: "Jump to a channel, DM or space" },
+        { keys: ["Shift+Page Up"], action: "Jump to the first new message in a chat" },
         { keys: ["Enter"], action: "Send your message" },
         { keys: ["Shift+Enter"], action: "Start a new line" },
         { keys: ["↑"], action: "Edit your last message, from an empty message box" },

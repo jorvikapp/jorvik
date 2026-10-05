@@ -20,6 +20,8 @@ import { normalizeEmojiShortcode, resetPersonalEmojiPackCache, resetSpaceEmojiPa
 import { PERSONAL_EMOJI_PACK_EVENT_TYPE, SPACE_EMOJI_PACK_EVENT_TYPE } from "../emoji/EmojiPackTypes";
 import { loadAvailableEmojis } from "../emoji/EmojiResolver";
 import { mxidLocalpart, tokenizeMatrixMentions } from "../mentions/mentionTokens";
+import { locateNewMessages, mayBeMessage, newMessagesLabel, readUpToEventIds } from "../messages/newMessages";
+import { getServerUnreadCount, hasUnreadActivity } from "../notifications/roomUnread";
 import { mxcThumbnailToHttp } from "../utils/mxc";
 import { Avatar } from "./Avatar";
 import { UserBadges } from "./badges/UserBadges";
@@ -50,6 +52,18 @@ interface LightboxState {
     src: string;
     alt: string;
     zoomed: boolean;
+}
+
+interface NewMessagesLineState {
+    roomId: string;
+    // The receipts and fully-read marker from before catching up.
+    readUpTo: string[];
+    // The server's unread count then, for the bar while the line isn't loaded.
+    serverCount: number;
+    // The line has been on screen, or the bar dismissed: no more bar.
+    seen: boolean;
+    // The line is loaded but out of view, so the bar shows.
+    offscreen: boolean;
 }
 
 interface RenderEvent {
@@ -1349,6 +1363,12 @@ export function Timeline({
     const replyJumpResetTimeoutRef = useRef<number | null>(null);
     const lastReadEventIdByRoomRef = useRef<Map<string, string>>(new Map());
     const readMarkerInFlightByRoomRef = useRef<Set<string>>(new Set());
+    // Where the user had read up to on arriving, so the line for new messages
+    // stays put while they read: catching up moves the receipts.
+    const [newMessagesLine, setNewMessagesLine] = useState<NewMessagesLineState | null>(null);
+    // The room the line was placed for on this visit. Cleared while the user is
+    // away, so whatever arrives meanwhile gets a line when they are back.
+    const newMessagesPlacedForRoomRef = useRef<string | null>(null);
 
     const refreshEvents = useCallback(() => {
         setEvents(extractMessageEvents(room));
@@ -1441,6 +1461,57 @@ export function Timeline({
         },
         [client, focusEventById, paginating, pushToast, refreshEvents, room],
     );
+
+    const scrollToNewMessagesLine = useCallback((behavior: ScrollBehavior): boolean => {
+        const line = scrollContainerRef.current?.querySelector<HTMLElement>(".timeline-new-messages-line");
+        if (!line) {
+            return false;
+        }
+
+        // Or an image finishing on the way would pull the view back down.
+        stickToBottomRef.current = false;
+        line.scrollIntoView({ behavior, block: "start" });
+        return true;
+    }, []);
+
+    const jumpToNewMessages = useCallback(async (): Promise<void> => {
+        if (!room || paginating) {
+            return;
+        }
+
+        if (scrollToNewMessagesLine("smooth")) {
+            return;
+        }
+
+        // Reading stopped further back than is loaded: load older messages
+        // until the line has somewhere to go.
+        const maxScrollbackAttempts = 8;
+        setPaginating(true);
+        try {
+            for (let attempt = 0; attempt < maxScrollbackAttempts; attempt += 1) {
+                await client.scrollback(room, 40);
+                refreshEvents();
+                for (let frame = 0; frame < 3; frame += 1) {
+                    await nextAnimationFrame();
+                    if (scrollToNewMessagesLine("auto")) {
+                        return;
+                    }
+                }
+                if (room.oldState.paginationToken === null) {
+                    break;
+                }
+            }
+        } catch {
+            // no-op: handled below with a toast if the line still has nowhere to go
+        } finally {
+            setPaginating(false);
+        }
+
+        pushToast({
+            type: "info",
+            message: "The first new message is further back than Jorvik could load.",
+        });
+    }, [client, paginating, pushToast, refreshEvents, room, scrollToNewMessagesLine]);
 
     const enqueueDecrypt = useCallback((item: DecryptQueueItem, force = false): void => {
         if (decryptedMediaUrlsRef.current[item.key] !== undefined && !force) {
@@ -1903,6 +1974,11 @@ export function Timeline({
         setContextMenuState(null);
         setToast(null);
         setReplyJumpTargetEventId(null);
+        // Each visit places its own line; keep one already placed for this room.
+        setNewMessagesLine((current) => (current?.roomId === room?.roomId ? current : null));
+        if (newMessagesPlacedForRoomRef.current !== room?.roomId) {
+            newMessagesPlacedForRoomRef.current = null;
+        }
     }, [room?.roomId]);
 
     useEffect(
@@ -1991,6 +2067,33 @@ export function Timeline({
         };
     }, [focusBottomNonce, room?.roomId]);
 
+    const placeNewMessagesLine = useCallback((targetRoom: Room, ownUserId: string): void => {
+        // Only when the room counts as unread, by the same rule as its dot in the list.
+        if (!hasUnreadActivity(targetRoom, ownUserId)) {
+            return;
+        }
+
+        const readUpTo = readUpToEventIds(targetRoom, ownUserId);
+        if (readUpTo.length === 0) {
+            return;
+        }
+
+        const timeline = targetRoom.getLiveTimeline()?.getEvents() ?? targetRoom.timeline;
+        if (locateNewMessages(timeline, timeline.filter(mayBeMessage), readUpTo, ownUserId).count === 0) {
+            return;
+        }
+
+        const placed: NewMessagesLineState = {
+            roomId: targetRoom.roomId,
+            readUpTo,
+            serverCount: getServerUnreadCount(targetRoom),
+            seen: false,
+            offscreen: false,
+        };
+        // A line not seen yet stays: everything after it is still new.
+        setNewMessagesLine((current) => (current?.roomId === targetRoom.roomId && !current.seen ? current : placed));
+    }, []);
+
     const markActiveRoomReadToLatest = useCallback(async (): Promise<void> => {
         if (!room || events.length === 0) {
             return;
@@ -2010,6 +2113,13 @@ export function Timeline({
         // timeline for a render, and Synapse rejects a marker from another room.
         if (latestEvent.getRoomId() !== room.roomId) {
             return;
+        }
+
+        // The first catch-up of a visit, or the first since the user was away,
+        // places the line while the receipts still show where reading stopped.
+        if (newMessagesPlacedForRoomRef.current !== room.roomId) {
+            newMessagesPlacedForRoomRef.current = room.roomId;
+            placeNewMessagesLine(room, ownUserId);
         }
 
         if (room.hasUserReadEvent(ownUserId, latestEventId)) {
@@ -2037,7 +2147,7 @@ export function Timeline({
         } finally {
             readMarkerInFlightByRoomRef.current.delete(room.roomId);
         }
-    }, [client, events, room]);
+    }, [client, events, placeNewMessagesLine, room]);
 
     const markReadIfAtBottom = useCallback((): void => {
         const container = scrollContainerRef.current;
@@ -2048,6 +2158,8 @@ export function Timeline({
         // would also make Synapse put an idle device back online, so the
         // status would flash Online with every message.
         if (!isTimelineUserVisible() || userAway) {
+            // Place the line again on their return, above what arrives meanwhile.
+            newMessagesPlacedForRoomRef.current = null;
             return;
         }
 
@@ -2156,6 +2268,94 @@ export function Timeline({
         [client, visibleEvents, latestEditEventsByTarget, room],
     );
     const ownUserId = client.getUserId() ?? null;
+    const newMessages = useMemo(() => {
+        if (!room || !ownUserId || !newMessagesLine || newMessagesLine.roomId !== room.roomId) {
+            return null;
+        }
+
+        const timeline = room.getLiveTimeline()?.getEvents() ?? room.timeline;
+        const position = locateNewMessages(timeline, visibleEvents, newMessagesLine.readUpTo, ownUserId);
+        return position.count > 0 ? position : null;
+    }, [newMessagesLine, ownUserId, room, visibleEvents]);
+    const firstNewEventId = newMessages?.firstNewEventId ?? null;
+    // The first new message starts a new group under the line.
+    const timelineItems = useMemo(
+        () =>
+            firstNewEventId === null
+                ? renderEvents
+                : renderEvents.map((item) =>
+                      item.event.getId() === firstNewEventId && !item.showHeader ? { ...item, showHeader: true } : item,
+                  ),
+        [firstNewEventId, renderEvents],
+    );
+    const newMessagesLineSeen = newMessagesLine?.seen ?? true;
+    const newMessagesReadUpTo = newMessagesLine?.readUpTo;
+
+    // The bar shows while the line is out of view, until it has been seen once.
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container || firstNewEventId === null || newMessagesLineSeen) {
+            return undefined;
+        }
+
+        const line = container.querySelector<HTMLElement>(".timeline-new-messages-line");
+        if (!line) {
+            return undefined;
+        }
+
+        const markLine = (onScreen: boolean): void => {
+            setNewMessagesLine((current) => {
+                if (!current || current.seen) {
+                    return current;
+                }
+                if (onScreen) {
+                    return { ...current, seen: true };
+                }
+                return current.offscreen ? current : { ...current, offscreen: true };
+            });
+        };
+        if (typeof IntersectionObserver === "undefined") {
+            markLine(false);
+            return undefined;
+        }
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const entry = entries[entries.length - 1];
+                if (entry) {
+                    markLine(entry.isIntersecting);
+                }
+            },
+            // Under the bar doesn't count as seen.
+            { root: container, rootMargin: "-48px 0px 0px 0px" },
+        );
+        observer.observe(line);
+        return () => {
+            observer.disconnect();
+        };
+    }, [firstNewEventId, newMessagesLineSeen, newMessagesReadUpTo]);
+
+    const hasNewMessages = newMessages !== null;
+    // Shift+Page Up jumps to the line, as listed in Settings > Keyboard.
+    useEffect(() => {
+        if (!hasNewMessages) {
+            return undefined;
+        }
+
+        const onKeyDown = (event: KeyboardEvent): void => {
+            if (event.key !== "PageUp" || !event.shiftKey || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) {
+                return;
+            }
+            // Not over settings or another dialog.
+            if (document.querySelector('[aria-modal="true"]')) {
+                return;
+            }
+            event.preventDefault();
+            void jumpToNewMessages();
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [hasNewMessages, jumpToNewMessages]);
     const readReceiptsByEventId = useMemo<Map<string, ReadReceiptEntry[]>>(
         () =>
             showReadReceipts && room
@@ -2192,11 +2392,46 @@ export function Timeline({
         return <div className="timeline-empty">Pick a room to start chatting.</div>;
     }
 
+    let newMessagesBarLabel: string | null = null;
+    if (newMessages && newMessagesLine && !newMessagesLine.seen && (firstNewEventId === null || newMessagesLine.offscreen)) {
+        const firstNewEvent = firstNewEventId === null ? undefined : visibleEvents.find((event) => event.getId() === firstNewEventId);
+        newMessagesBarLabel = firstNewEvent
+            ? newMessagesLabel(newMessages.count, firstNewEvent.getTs())
+            : newMessagesLabel(Math.max(newMessages.count, newMessagesLine.serverCount), null);
+    }
+    const dismissNewMessagesBar = (): void => {
+        setNewMessagesLine((current) => (current ? { ...current, seen: true } : current));
+    };
+    const newMessagesLineElement = (
+        <div key="new-messages-line" className="timeline-new-messages-line" role="separator" aria-label="New messages">
+            <span className="timeline-new-messages-line-label">New</span>
+        </div>
+    );
+
     return (
         <>
             <div className="timeline" ref={scrollContainerRef} onScroll={(event) => void handleScroll(event)}>
+                <div className="timeline-new-messages-bar-anchor">
+                    {newMessagesBarLabel !== null ? (
+                        <div className="timeline-new-messages-bar">
+                            <button type="button" className="timeline-new-messages-jump" onClick={() => void jumpToNewMessages()}>
+                                <span className="timeline-new-messages-summary">{newMessagesBarLabel}</span>
+                                <span className="timeline-new-messages-jump-label">Jump</span>
+                            </button>
+                            <button
+                                type="button"
+                                className="timeline-new-messages-dismiss"
+                                aria-label="Dismiss"
+                                title="Dismiss"
+                                onClick={dismissNewMessagesBar}
+                            >
+                                ×
+                            </button>
+                        </div>
+                    ) : null}
+                </div>
                 {paginating ? <div className="timeline-paginating">Loading older messages...</div> : null}
-                {renderEvents.map(({ event, content, edited, showHeader, body, reply, senderName, senderAvatarUrl, senderAvatarSources, timeLabel }) => {
+                {timelineItems.flatMap(({ event, content, edited, showHeader, body, reply, senderName, senderAvatarUrl, senderAvatarSources, timeLabel }) => {
                     const key = eventKey(event);
                     const eventId = event.getId();
                     const senderId = event.getSender();
@@ -2249,7 +2484,7 @@ export function Timeline({
                               }
                             : null;
 
-                    return (
+                    const eventElement = (
                         <div
                             className={`timeline-event${isActiveReplyTarget ? " timeline-event-reply-target" : ""}${isDirectMentionEvent ? " timeline-event-direct-mention" : ""}${isPendingEvent(event) ? " timeline-event-pending" : ""}${hasSendFailed(event) ? " timeline-event-failed" : ""}`}
                             key={key}
@@ -2560,6 +2795,9 @@ export function Timeline({
                             ) : null}
                         </div>
                     );
+                    return firstNewEventId !== null && eventId === firstNewEventId
+                        ? [newMessagesLineElement, eventElement]
+                        : [eventElement];
                 })}
             </div>
             {lightbox ? (

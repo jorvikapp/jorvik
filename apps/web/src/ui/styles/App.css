@@ -2561,6 +2561,133 @@ textarea {
     padding-bottom: 8px;
 }
 
+/* Where the messages that came in since you last read the room begin. */
+.timeline-new-messages-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    /* Clear of the hover toolbar of the message below, which rises 10px above it. */
+    margin: 10px 12px 10px 0;
+    color: var(--danger);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    /* Jumping here keeps a little of what you had read in view above it. */
+    scroll-margin-top: 96px;
+}
+
+.timeline-new-messages-line::before {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--danger);
+}
+
+/* Holds the bar at the top of the timeline without taking any room in it
+   (the margin cancels the timeline's gap), so no message moves when the bar
+   comes or goes. Inside the timeline, the bar takes clicks in the desktop app. */
+.timeline-new-messages-bar-anchor {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    flex-shrink: 0;
+    height: 0;
+    margin-bottom: -2px;
+    overflow-anchor: none;
+}
+
+.timeline-new-messages-bar {
+    position: absolute;
+    top: -6px;
+    left: 0;
+    right: 12px;
+    display: flex;
+    align-items: stretch;
+    border: 1px solid rgba(237, 66, 69, 0.45);
+    border-radius: 10px;
+    background: rgba(47, 49, 54, 0.97);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+    animation: timeline-new-messages-bar-in var(--motion-normal) var(--motion-ease-enter);
+}
+
+@keyframes timeline-new-messages-bar-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+}
+
+.timeline-new-messages-jump {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 12px;
+    border: 0;
+    background: transparent;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.timeline-new-messages-summary {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.timeline-new-messages-summary::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 8px;
+    border-radius: 50%;
+    background: var(--danger);
+    vertical-align: 1px;
+}
+
+.timeline-new-messages-jump-label {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.timeline-new-messages-dismiss {
+    flex-shrink: 0;
+    width: 36px;
+    border: 0;
+    border-left: 1px solid rgba(185, 187, 190, 0.16);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.timeline-new-messages-jump:hover,
+.timeline-new-messages-jump:focus-visible,
+.timeline-new-messages-dismiss:hover,
+.timeline-new-messages-dismiss:focus-visible {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.timeline-new-messages-jump:hover .timeline-new-messages-jump-label,
+.timeline-new-messages-jump:focus-visible .timeline-new-messages-jump-label,
+.timeline-new-messages-dismiss:hover,
+.timeline-new-messages-dismiss:focus-visible {
+    color: var(--text-main);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .timeline-new-messages-bar {
+        animation: none;
+    }
+}
+
 .timeline-event {
     position: relative;
     display: flex;

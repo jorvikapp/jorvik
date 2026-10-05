@@ -29,6 +29,6 @@ describe("KeyboardTab", () => {
             root.render(<KeyboardTab />);
         });
         const rows = [...container.querySelectorAll("tbody tr")].map((row) => [...row.querySelectorAll("kbd")].map((key) => key.textContent));
-        expect(rows).toEqual([["Ctrl+K"], ["Enter"], ["Shift+Enter"], ["↑"], ["Esc"], ["Tab", "Enter"], ["Ctrl+Shift+I"]]);
+        expect(rows).toEqual([["Ctrl+K"], ["Shift+Page Up"], ["Enter"], ["Shift+Enter"], ["↑"], ["Esc"], ["Tab", "Enter"], ["Ctrl+Shift+I"]]);
     });
 });
