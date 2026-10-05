@@ -2091,7 +2091,9 @@ export function Timeline({
         lastScrollTopRef.current = container.scrollTop;
         stickToBottomRef.current = distanceFromBottom < 100 || (stickToBottomRef.current && !movedUp);
         if (distanceFromBottom <= READ_MARK_BOTTOM_THRESHOLD_PX) {
-            void markActiveRoomReadToLatest();
+            // With the same checks as for arriving messages: keeping the view
+            // pinned to them scrolls it, seen or not.
+            markReadIfAtBottom();
         }
 
         if (!room || paginating || container.scrollTop > 24) {
