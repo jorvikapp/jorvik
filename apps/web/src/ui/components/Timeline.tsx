@@ -2006,6 +2006,11 @@ export function Timeline({
         if (!latestEvent || !latestEventId) {
             return;
         }
+        // Right after a room switch, events still holds the previous room's
+        // timeline for a render, and Synapse rejects a marker from another room.
+        if (latestEvent.getRoomId() !== room.roomId) {
+            return;
+        }
 
         if (room.hasUserReadEvent(ownUserId, latestEventId)) {
             lastReadEventIdByRoomRef.current.set(room.roomId, latestEventId);
