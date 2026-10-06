@@ -1370,7 +1370,14 @@ export function Timeline({
     // away, so whatever arrives meanwhile gets a line when they are back.
     const newMessagesPlacedForRoomRef = useRef<string | null>(null);
 
+    // Loading older messages takes a while, and by the time it finishes the
+    // user may be in another room: its refresh must not fill this one.
+    const openRoomIdRef = useRef<string | null>(room?.roomId ?? null);
+    openRoomIdRef.current = room?.roomId ?? null;
     const refreshEvents = useCallback(() => {
+        if ((room?.roomId ?? null) !== openRoomIdRef.current) {
+            return;
+        }
         setEvents(extractMessageEvents(room));
     }, [room]);
 
@@ -2066,6 +2073,45 @@ export function Timeline({
             window.clearTimeout(timeoutId);
         };
     }, [focusBottomNonce, room?.roomId]);
+
+    // Older history loads when the view is scrolled near the top, but a
+    // timeline that fits on screen can't scroll: after a sign-in each room
+    // has only a few messages loaded. Keep loading until it can, or until
+    // the room's start. Bounded, as events we don't show load nothing visible.
+    const fillScrollbackAttemptsRef = useRef<{ roomId: string | null; attempts: number }>({
+        roomId: null,
+        attempts: 0,
+    });
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!room || !container || paginating) {
+            return;
+        }
+        const fill = fillScrollbackAttemptsRef.current;
+        if (fill.roomId !== room.roomId) {
+            fill.roomId = room.roomId;
+            fill.attempts = 0;
+        }
+        const maxFillAttempts = 5;
+        if (
+            fill.attempts >= maxFillAttempts ||
+            container.clientHeight === 0 ||
+            container.scrollHeight > container.clientHeight + 24 ||
+            room.oldState.paginationToken === null
+        ) {
+            return;
+        }
+
+        fill.attempts += 1;
+        setPaginating(true);
+        void client
+            .scrollback(room, 30)
+            .catch(() => undefined)
+            .finally(() => {
+                refreshEvents();
+                setPaginating(false);
+            });
+    }, [client, events, paginating, refreshEvents, room]);
 
     const placeNewMessagesLine = useCallback((targetRoom: Room, ownUserId: string): void => {
         // Only when the room counts as unread, by the same rule as its dot in the list.
