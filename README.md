@@ -49,13 +49,13 @@ sudo dnf install jorvik
 # A new release not showing up yet? sudo dnf upgrade --refresh
 
 # Flatpak, from Jorvik's own repository
-flatpak install --user https://flatpak.jorvik.app/app.jorvik.Jorvik.flatpakref
+flatpak install --user -y https://flatpak.jorvik.app/app.jorvik.Jorvik.flatpakref
 ```
 
-The Flatpak command also adds Flathub for the runtime, and updates arrive with
-`flatpak update` or your software centre. If you installed a `.flatpak` file
-from the releases page before, run `flatpak uninstall app.jorvik.Jorvik` first;
-your sign-in and settings stay.
+The Flatpak command also adds Flathub for the runtime (`-y` answers flatpak's
+questions for you), and updates arrive with `flatpak update` or your software
+centre. If you installed a `.flatpak` file from the releases page before, run
+`flatpak uninstall app.jorvik.Jorvik` first; your sign-in and settings stay.
 
 Debian and RPM packages, an AppImage and a plain tarball are attached to every
 release if you would rather not add a repository.
