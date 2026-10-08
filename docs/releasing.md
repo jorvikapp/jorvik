@@ -27,6 +27,12 @@ releases is normal.
    `SNAPCRAFT_STORE_CREDENTIALS` repository secret. Nothing to do, but if that
    step fails the release is incomplete even though the GitHub assets exist.
    The credential expires; `snapcraft export-login` issues a new one.
+   The Flatpak repository at https://flatpak.jorvik.app publishes itself too:
+   a timer on the server adds the release's `.flatpak` within 15 minutes
+   (`flatpak/README.md` in the server's stack). `sudo systemctl start
+   jorvik-flatpak-sync` does it at once; `flatpak remote-info --user jorvik
+   app.jorvik.Jorvik` on any machine shows the version it serves as the
+   Subject.
 6. **Deploy the web app** if the release contains web changes:
    `cd /root/matrix-stack && docker compose build heorot && docker compose up -d heorot`.
    This is separate from the release; the desktop client carries its own copy of

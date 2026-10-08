@@ -48,12 +48,14 @@ sudo dnf copr enable xuruh/Jorvik
 sudo dnf install jorvik
 # A new release not showing up yet? sudo dnf upgrade --refresh
 
-# Flatpak: download Jorvik-<version>-x86_64.flatpak from the releases page
-flatpak install --user Jorvik-<version>-x86_64.flatpak
+# Flatpak, from Jorvik's own repository
+flatpak install --user https://flatpak.jorvik.app/app.jorvik.Jorvik.flatpakref
 ```
 
-The Flatpak fetches its runtime from Flathub the first time. It does not update
-itself yet: install a newer release's file the same way.
+The Flatpak command also adds Flathub for the runtime, and updates arrive with
+`flatpak update` or your software centre. If you installed a `.flatpak` file
+from the releases page before, run `flatpak uninstall app.jorvik.Jorvik` first;
+your sign-in and settings stay.
 
 Debian and RPM packages, an AppImage and a plain tarball are attached to every
 release if you would rather not add a repository.
