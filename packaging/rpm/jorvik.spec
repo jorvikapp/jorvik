@@ -3,7 +3,7 @@
 # network. The tarball is payload only, so the desktop entry and the icon set
 # are produced here.
 Name:           jorvik
-Version:        1.0.18
+Version:        1.0.19
 Release:        1%{?dist}
 Summary:        Chat and voice for Matrix
 
@@ -112,6 +112,9 @@ appstream-util validate-relax --nonet \
 %{_datadir}/dnf5/repos.override.d/80-jorvik-copr.repo
 
 %changelog
+* Fri Oct 09 2026 Jorvik contributors <admin@jorvik.app> - 1.0.19-1
+- Update to 1.0.19
+
 * Sun Oct 04 2026 Jorvik contributors <admin@jorvik.app> - 1.0.18-1
 - Update to 1.0.18
 
