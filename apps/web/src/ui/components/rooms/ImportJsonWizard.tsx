@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import {
+    defaultChannelImportConfig,
     getSupportedChannels,
     parseJsonExport,
     runJsonImport,
@@ -22,10 +23,6 @@ interface ImportJsonWizardProps {
 }
 
 type WizardStep = "select" | "configure" | "importing" | "done";
-
-function defaultConfig(channel: JsonExportChannel): ChannelImportConfig {
-    return { minPL: 0, isPublic: false, isEncrypted: channel.type !== "voice" };
-}
 
 function ImportChannelRow({
     channel,
@@ -51,16 +48,14 @@ function ImportChannelRow({
                     <option value="invite">Invite</option>
                     <option value="public">Public</option>
                 </select>
-                {!isVoice && (
-                    <select
-                        className="import-tree-channel-select"
-                        value={config.isEncrypted ? "enc" : "plain"}
-                        onChange={(e) => onChange({ ...config, isEncrypted: e.target.value === "enc" })}
-                    >
-                        <option value="enc">Encrypted</option>
-                        <option value="plain">Unencrypted</option>
-                    </select>
-                )}
+                <select
+                    className="import-tree-channel-select"
+                    value={config.isEncrypted ? "enc" : "plain"}
+                    onChange={(e) => onChange({ ...config, isEncrypted: e.target.value === "enc" })}
+                >
+                    <option value="enc">Encrypted</option>
+                    <option value="plain">Unencrypted</option>
+                </select>
                 <select
                     className="import-tree-channel-select"
                     value={config.minPL}
@@ -334,7 +329,7 @@ export function ImportJsonWizard({
                                 <ImportChannelRow
                                     key={ch.id}
                                     channel={ch}
-                                    config={channelConfig[ch.id] ?? defaultConfig(ch)}
+                                    config={channelConfig[ch.id] ?? defaultChannelImportConfig()}
                                     onChange={(val) => setChannelConfig((prev) => ({ ...prev, [ch.id]: val }))}
                                 />
                             ));
@@ -353,7 +348,7 @@ export function ImportJsonWizard({
                                             <ImportChannelRow
                                                 key={ch.id}
                                                 channel={ch}
-                                                config={channelConfig[ch.id] ?? defaultConfig(ch)}
+                                                config={channelConfig[ch.id] ?? defaultChannelImportConfig()}
                                                 onChange={(val) =>
                                                     setChannelConfig((prev) => ({ ...prev, [ch.id]: val }))
                                                 }

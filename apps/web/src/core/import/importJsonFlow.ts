@@ -140,7 +140,12 @@ export interface ImportSignal {
 export interface ChannelImportConfig {
     minPL: 0 | 50 | 100;
     isPublic: boolean;
-    isEncrypted: boolean; // only meaningful for text channels
+    isEncrypted: boolean;
+}
+
+/** What a channel gets unless the import says otherwise: encrypted, like channels made in Jorvik. */
+export function defaultChannelImportConfig(): ChannelImportConfig {
+    return { minPL: 0, isPublic: false, isEncrypted: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -243,11 +248,7 @@ export async function runJsonImport(
         const isVoice = channel.type === "voice";
 
         try {
-            const cfg: ChannelImportConfig = channelConfig[channel.id] ?? {
-                minPL: 0,
-                isPublic: false,
-                isEncrypted: !isVoice,
-            };
+            const cfg: ChannelImportConfig = channelConfig[channel.id] ?? defaultChannelImportConfig();
             const initialState: Array<{ type: string; state_key: string; content: Record<string, unknown> }> = [];
 
             if (cfg.isPublic) {
