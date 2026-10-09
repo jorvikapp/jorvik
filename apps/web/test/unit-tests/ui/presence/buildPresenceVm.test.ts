@@ -44,6 +44,23 @@ describe("buildPresenceVm", () => {
 
         expect(vm.secondaryLabel).toBe("Last seen 5m ago");
     });
+
+    it("counts on from when the presence update arrived", () => {
+        const now = 1_800_000_000_000;
+        const vm = buildPresenceVm(
+            {
+                presence: "unavailable",
+                currentlyActive: false,
+                lastActiveAgo: 5 * 60_000,
+                receivedAt: now - 20 * 60_000,
+            },
+            now,
+        );
+
+        expect(vm.primaryLabel).toBe("Idle");
+        expect(vm.secondaryLabel).toBe("Last active 25m ago");
+        expect(vm.lastActiveAgo).toBe(25 * 60_000);
+    });
 });
 
 describe("presence helpers", () => {

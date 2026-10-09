@@ -16,10 +16,29 @@ function sanitizeUserIds(userIds: string[]): string[] {
     return out;
 }
 
+/** The current time, refreshed every 30 seconds while active: enough for minute labels. */
+function usePresenceClock(active: boolean): number {
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        if (!active) {
+            return undefined;
+        }
+        setNow(Date.now());
+        const timer = setInterval(() => setNow(Date.now()), 30_000);
+        return () => clearInterval(timer);
+    }, [active]);
+    return now;
+}
+
+/**
+ * Presence for each user. Pass `now` from a ticking clock where "Last active ..." is shown;
+ * without it the labels are worked out once per update, which is enough for status dots.
+ */
 export function usePresenceMap(
     client: MatrixClient | null,
     userIds: string[],
     enabled: boolean,
+    now?: number,
 ): Map<string, PresenceVm> {
     const idsKey = useMemo(() => userIds.join("\u0000"), [userIds]);
     const normalizedUserIds = useMemo(() => sanitizeUserIds(userIds), [idsKey]);
@@ -58,16 +77,20 @@ export function usePresenceMap(
             const user = client.getUser(userId);
             output.set(
                 userId,
-                buildPresenceVm({
-                    presence: user?.presence,
-                    currentlyActive: user?.currentlyActive,
-                    lastActiveAgo: user?.lastActiveAgo,
-                }),
+                buildPresenceVm(
+                    {
+                        presence: user?.presence,
+                        currentlyActive: user?.currentlyActive,
+                        lastActiveAgo: user?.lastActiveAgo,
+                        receivedAt: user?.lastPresenceTs,
+                    },
+                    now ?? Date.now(),
+                ),
             );
         }
 
         return output;
-    }, [client, enabled, normalizedIdsKey, normalizedUserIds, revision]);
+    }, [client, enabled, normalizedIdsKey, normalizedUserIds, revision, now]);
 }
 
 export function usePresenceVm(
@@ -76,7 +99,9 @@ export function usePresenceVm(
     enabled: boolean,
 ): PresenceVm | null {
     const normalizedUserId = typeof userId === "string" && userId.length > 0 ? userId : null;
-    const map = usePresenceMap(client, normalizedUserId ? [normalizedUserId] : [], enabled);
+    // One user's presence is shown with its "Last active ..." label, so keep it current.
+    const now = usePresenceClock(enabled && normalizedUserId !== null);
+    const map = usePresenceMap(client, normalizedUserId ? [normalizedUserId] : [], enabled, now);
     if (!normalizedUserId) {
         return null;
     }

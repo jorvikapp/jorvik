@@ -12,6 +12,8 @@ export interface PresenceSource {
     presence?: string | null;
     currentlyActive?: boolean | null;
     lastActiveAgo?: number | null;
+    /** When the presence update arrived, in ms since the epoch (the SDK's User.lastPresenceTs). */
+    receivedAt?: number | null;
 }
 
 const BUSY_PRESENCE_NAMES = new Set(["busy", "org.matrix.msc3026.busy"]);
@@ -102,10 +104,18 @@ function mapPresenceState(rawPresence: string | null | undefined): PresenceState
     return "unknown";
 }
 
-export function buildPresenceVm(source: PresenceSource | null | undefined): PresenceVm {
+export function buildPresenceVm(source: PresenceSource | null | undefined, now: number = Date.now()): PresenceVm {
     const state = mapPresenceState(source?.presence ?? null);
     const isCurrentlyActive = source?.currentlyActive === true;
-    const lastActiveAgo = normalizeLastActiveAgo(source?.lastActiveAgo ?? null);
+    // last_active_ago is how long ago they were active when the server sent the update.
+    // The server sends nothing more while someone stays idle, so count on from when the
+    // update arrived, or "Last active 5m ago" stays at 5m for good.
+    const reportedAgo = normalizeLastActiveAgo(source?.lastActiveAgo ?? null);
+    const receivedAt = source?.receivedAt;
+    const lastActiveAgo =
+        reportedAgo !== null && typeof receivedAt === "number" && receivedAt > 0
+            ? reportedAgo + Math.max(0, now - receivedAt)
+            : reportedAgo;
     let secondaryLabel: string | null = null;
 
     if (!isCurrentlyActive && lastActiveAgo !== null) {
