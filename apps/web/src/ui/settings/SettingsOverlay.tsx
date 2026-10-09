@@ -76,7 +76,7 @@ const USER_NAV: SettingsNavSection[] = [
         items: [
             { id: "appearance", label: "Appearance" },
             { id: "notifications", label: "Notifications" },
-            { id: "audio", label: "Audio" },
+            { id: "audio", label: "Voice and video" },
             { id: "keyboard", label: "Keyboard" },
         ],
     },

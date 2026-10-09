@@ -36,6 +36,10 @@ export function AudioTab({ settings, onChange }: AudioTabProps): React.ReactElem
     const analyserRef = useRef<AnalyserNode | null>(null);
     const rafRef = useRef<number | null>(null);
     const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
+    const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
+    const [cameraPreviewActive, setCameraPreviewActive] = useState(false);
+    const cameraStreamRef = useRef<MediaStream | null>(null);
+    const cameraPreviewRef = useRef<HTMLVideoElement | null>(null);
 
     const supportsAudioOutputSelection = useMemo(() => "setSinkId" in HTMLMediaElement.prototype, []);
 
@@ -44,15 +48,18 @@ export function AudioTab({ settings, onChange }: AudioTabProps): React.ReactElem
         const loadDevices = async (): Promise<void> => {
             setError(null);
             try {
-                const [inputs, outputs] = await Promise.all([
+                const [inputs, outputs, cameras] = await Promise.all([
                     Room.getLocalDevices("audioinput"),
                     Room.getLocalDevices("audiooutput"),
+                    // Listed without asking for the camera; the preview asks.
+                    Room.getLocalDevices("videoinput", false).catch(() => [] as MediaDeviceInfo[]),
                 ]);
                 if (disposed) {
                     return;
                 }
                 setAudioInputs(inputs);
                 setAudioOutputs(outputs);
+                setVideoInputs(cameras);
             } catch (deviceError) {
                 if (!disposed) {
                     setError(deviceError instanceof Error ? deviceError.message : "Unable to enumerate audio devices.");
@@ -152,10 +159,52 @@ export function AudioTab({ settings, onChange }: AudioTabProps): React.ReactElem
         }
     };
 
+    const stopCameraPreview = (): void => {
+        cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+        cameraStreamRef.current = null;
+        setCameraPreviewActive(false);
+    };
+
+    const startCameraPreview = async (deviceId: string): Promise<void> => {
+        setError(null);
+        try {
+            const constraints: MediaTrackConstraints = { width: { ideal: 1280 }, height: { ideal: 720 } };
+            if (deviceId && deviceId !== "default") {
+                constraints.deviceId = { exact: deviceId };
+            }
+            const stream = await navigator.mediaDevices.getUserMedia({ video: constraints, audio: false });
+            cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+            cameraStreamRef.current = stream;
+            setCameraPreviewActive(true);
+            // Camera names and ids are only given once the camera is allowed.
+            setVideoInputs(await Room.getLocalDevices("videoinput", false));
+        } catch (cameraError) {
+            stopCameraPreview();
+            const name = cameraError instanceof Error ? cameraError.name : "";
+            setError(
+                name === "NotAllowedError" || name === "SecurityError"
+                    ? "Jorvik isn't allowed to use your camera. Allow it in your system's privacy settings, then try again."
+                    : name === "NotFoundError"
+                      ? "No camera was found."
+                      : "Your camera couldn't be started. Another app may be using it.",
+            );
+        }
+    };
+
+    // Show the stream once the preview element is there.
+    useEffect(() => {
+        if (cameraPreviewActive && cameraPreviewRef.current) {
+            cameraPreviewRef.current.srcObject = cameraStreamRef.current;
+        }
+    }, [cameraPreviewActive]);
+
+    // The camera goes off when you leave this tab.
+    useEffect(() => () => cameraStreamRef.current?.getTracks().forEach((track) => track.stop()), []);
+
     return (
         <div className="settings-tab">
-            <h2 className="settings-tab-title">Audio</h2>
-            <p className="settings-tab-description">Microphone, speaker, and voice processing settings.</p>
+            <h2 className="settings-tab-title">Voice and video</h2>
+            <p className="settings-tab-description">Microphone, speaker, camera and voice processing settings.</p>
 
             <label className="settings-field">
                 <span>Microphone input</span>
@@ -270,6 +319,52 @@ export function AudioTab({ settings, onChange }: AudioTabProps): React.ReactElem
                         }}
                     >
                         {micTestActive ? "Stop test" : "Start test"}
+                    </button>
+                </div>
+            </div>
+
+            <div className="settings-section-card">
+                <h3>Camera</h3>
+                <label className="settings-field">
+                    <span>Camera for video in calls</span>
+                    <select
+                        className="room-dialog-input"
+                        value={settings.preferredVideoInputId}
+                        onChange={(event) => {
+                            const deviceId = event.target.value;
+                            onChange({ ...settings, preferredVideoInputId: deviceId });
+                            if (cameraPreviewActive) {
+                                void startCameraPreview(deviceId);
+                            }
+                        }}
+                    >
+                        <option value="default">System default</option>
+                        {/* Until the camera has been allowed, the system gives no ids or names. */}
+                        {videoInputs
+                            .filter((device) => device.deviceId)
+                            .map((device) => (
+                                <option key={device.deviceId} value={device.deviceId}>
+                                    {formatDeviceLabel(device)}
+                                </option>
+                            ))}
+                    </select>
+                </label>
+                {cameraPreviewActive ? (
+                    <video ref={cameraPreviewRef} className="settings-camera-preview" autoPlay playsInline muted />
+                ) : null}
+                <div className="settings-actions-row">
+                    <button
+                        type="button"
+                        className="settings-button"
+                        onClick={() => {
+                            if (cameraPreviewActive) {
+                                stopCameraPreview();
+                            } else {
+                                void startCameraPreview(settings.preferredVideoInputId);
+                            }
+                        }}
+                    >
+                        {cameraPreviewActive ? "Stop preview" : "Preview camera"}
                     </button>
                 </div>
             </div>

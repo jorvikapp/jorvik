@@ -53,6 +53,10 @@
       "zip"
     ],
     "category": "public.app-category.social-networking",
+    "extendInfo": {
+      "NSCameraUsageDescription": "Jorvik uses your camera for video in calls and voice channels.",
+      "NSMicrophoneUsageDescription": "Jorvik uses your microphone for calls and voice channels."
+    },
     "hardenedRuntime": true,
     "gatekeeperAssess": true,
     "strictVerify": true,

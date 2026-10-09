@@ -973,6 +973,15 @@
     }
 }
 
-
-
-
+/* Your own camera in Settings, mirrored as in calls. */
+.settings-camera-preview {
+    display: block;
+    width: 100%;
+    max-width: 360px;
+    aspect-ratio: 16 / 9;
+    margin: 4px 0 10px;
+    border-radius: 8px;
+    background: #000;
+    object-fit: cover;
+    transform: scaleX(-1);
+}

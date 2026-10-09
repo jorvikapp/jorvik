@@ -28,6 +28,7 @@ function createAudioSettings(): AudioSettings {
     return {
         preferredAudioInputId: "default",
         preferredAudioOutputId: "default",
+        preferredVideoInputId: "default",
         micTestLoopbackEnabled: false,
         autoGainControlEnabled: true,
         echoCancellationEnabled: true,
@@ -47,6 +48,31 @@ function createAudioTrack(trackSid: string): FakeTrack {
         },
         detach: (element?: HTMLAudioElement) => (element ? [element] : []),
     };
+}
+
+interface FakeVideoTrack {
+    kind: string;
+    sid: string;
+    attached: HTMLMediaElement[];
+    attach: (element: HTMLMediaElement) => HTMLMediaElement;
+    detach: (element?: HTMLMediaElement) => HTMLMediaElement[];
+}
+
+function createVideoTrack(trackSid: string): FakeVideoTrack {
+    const track: FakeVideoTrack = {
+        kind: "video",
+        sid: trackSid,
+        attached: [],
+        attach: (element: HTMLMediaElement) => {
+            track.attached.push(element);
+            return element;
+        },
+        detach: (element?: HTMLMediaElement) => {
+            track.attached = track.attached.filter((attached) => attached !== element);
+            return element ? [element] : [];
+        },
+    };
+    return track;
 }
 
 function createAudioPublication(trackSid: string): FakePublication {
@@ -79,6 +105,9 @@ describe("voice room smoke", () => {
         publication: FakePublication;
     }>;
     let playAttempts: string[];
+    let cameraCalls: unknown[][];
+    let cameraFailure: Error | null;
+    let localCameraTrack: FakeVideoTrack | null;
 
     beforeEach(async () => {
         vi.resetModules();
@@ -90,6 +119,9 @@ describe("voice room smoke", () => {
         createdRooms = [];
         seededRemotePublications = [];
         playAttempts = [];
+        cameraCalls = [];
+        cameraFailure = null;
+        localCameraTrack = null;
 
         Object.defineProperty(HTMLMediaElement.prototype, "play", {
             configurable: true,
@@ -119,6 +151,8 @@ describe("voice room smoke", () => {
                 LocalAudioSilenceDetected: "LocalAudioSilenceDetected",
                 LocalTrackPublished: "LocalTrackPublished",
                 LocalTrackUnpublished: "LocalTrackUnpublished",
+                TrackMuted: "TrackMuted",
+                TrackUnmuted: "TrackUnmuted",
                 Disconnected: "Disconnected",
                 MediaDevicesChanged: "MediaDevicesChanged",
                 MediaDevicesError: "MediaDevicesError",
@@ -132,6 +166,7 @@ describe("voice room smoke", () => {
                 },
                 Source: {
                     Microphone: "microphone",
+                    Camera: "camera",
                     ScreenShare: "screen_share",
                     ScreenShareAudio: "screen_share_audio",
                 },
@@ -179,6 +214,22 @@ describe("voice room smoke", () => {
                             });
                         },
                         setScreenShareEnabled: async () => undefined,
+                        // Like LiveKit: turning the camera off mutes its publication.
+                        setCameraEnabled: async (enabled: boolean, ...rest: unknown[]) => {
+                            cameraCalls.push([enabled, ...rest]);
+                            if (cameraFailure) {
+                                throw cameraFailure;
+                            }
+                            const existing = this.localParticipant.trackPublications.get(Track.Source.Camera);
+                            if (existing) {
+                                existing.isMuted = !enabled;
+                                return existing;
+                            }
+                            localCameraTrack = createVideoTrack("cam-self");
+                            const publication = { kind: "video", source: Track.Source.Camera, isMuted: !enabled, track: localCameraTrack };
+                            this.localParticipant.trackPublications.set(Track.Source.Camera, publication);
+                            return publication;
+                        },
                     };
 
                     for (const seed of seededRemotePublications) {
@@ -249,7 +300,9 @@ describe("voice room smoke", () => {
                     music: "music",
                 },
                 VideoPresets: {
-                    h720: { resolution: { width: 1280, height: 720 } },
+                    h180: { resolution: { width: 320, height: 180 } },
+                    h360: { resolution: { width: 640, height: 360 } },
+                    h720: { resolution: { width: 1280, height: 720 }, encoding: { maxBitrate: 1_700_000, maxFramerate: 30 } },
                     h1080: { resolution: { width: 1920, height: 1080 } },
                     h1440: { resolution: { width: 2560, height: 1440 } },
                 },
@@ -441,6 +494,99 @@ describe("voice room smoke", () => {
         )?.textContent;
 
         expect(ownTileName).toBe("Self");
+    });
+
+    async function renderJoined(): Promise<ReturnType<typeof createRef<VoiceRoomHandle>>> {
+        const ref = createRef<VoiceRoomHandle>();
+        await act(async () => {
+            root.render(
+                React.createElement(VoiceRoom, {
+                    ref,
+                    client: {
+                        getUserId: () => "@self:example.org",
+                        getUser: () => ({ rawDisplayName: "Self" }),
+                        mxcUrlToHttp: () => null,
+                    },
+                    matrixRoomId: "!voice:example.org",
+                    matrixRoom: null,
+                    audioSettings: createAudioSettings(),
+                    onAudioSettingsChange: () => undefined,
+                }),
+            );
+        });
+        await act(async () => {
+            await ref.current?.join();
+        });
+        return ref;
+    }
+
+    async function clickButton(title: string): Promise<void> {
+        const button = container.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
+        expect(button, title).not.toBeNull();
+        await act(async () => {
+            button!.click();
+        });
+    }
+
+    it("turns your camera on at 720p with smaller copies, and shows it mirrored", async () => {
+        await renderJoined();
+        await clickButton("Turn camera on");
+
+        expect(cameraCalls[0][0]).toBe(true);
+        expect(cameraCalls[0][1]).toMatchObject({ resolution: { width: 1280, height: 720 } });
+        expect(cameraCalls[0][2]).toMatchObject({ simulcast: true });
+        const video = container.querySelector<HTMLVideoElement>(".voice-room-video-grid video.is-mirrored");
+        expect(video).not.toBeNull();
+        expect(localCameraTrack?.attached).toContain(video);
+        // Your tile moved up into the video grid.
+        expect(container.querySelectorAll(".voice-room-participants-list > li")).toHaveLength(0);
+
+        await clickButton("Turn camera off");
+        expect(cameraCalls[1][0]).toBe(false);
+        expect(container.querySelector(".voice-room-video-grid")).toBeNull();
+        expect(localCameraTrack?.attached).toHaveLength(0);
+    });
+
+    it("shows someone's camera when it arrives, and their picture again when it goes off", async () => {
+        seededRemotePublications.push({
+            participantIdentity: "@alice:example.org::device-a",
+            participantSid: "remote-a",
+            publication: createAudioPublication("aud-alice"),
+        });
+        await renderJoined();
+        const room = createdRooms[0] as unknown as {
+            emit: (event: string, ...args: unknown[]) => void;
+            remoteParticipants: Map<string, { trackPublications: Map<string, unknown> }>;
+        };
+        const alice = room.remoteParticipants.get("remote-a")!;
+        const track = createVideoTrack("cam-alice");
+        const publication = { kind: "video", source: "camera", isMuted: false, isSubscribed: true, trackSid: "cam-alice", track };
+        alice.trackPublications.set("cam-alice", publication);
+
+        await act(async () => {
+            room.emit(RoomEvent.TrackSubscribed, track, publication, alice);
+        });
+        const video = container.querySelector<HTMLVideoElement>(".voice-room-video-grid video");
+        expect(video).not.toBeNull();
+        expect(video?.classList.contains("is-mirrored")).toBe(false);
+        expect(track.attached).toContain(video);
+
+        publication.isMuted = true;
+        await act(async () => {
+            room.emit(RoomEvent.TrackMuted, publication, alice);
+        });
+        expect(container.querySelector(".voice-room-video-grid")).toBeNull();
+        expect(container.querySelectorAll(".voice-room-participants-list > li")).toHaveLength(2);
+    });
+
+    it("says so when the camera isn't allowed", async () => {
+        cameraFailure = Object.assign(new Error("Permission denied"), { name: "NotAllowedError" });
+        await renderJoined();
+        await clickButton("Turn camera on");
+
+        expect(container.textContent).toContain("isn't allowed to use your camera");
+        expect(container.querySelector('button[title="Turn camera on"]')?.getAttribute("aria-pressed")).toBe("false");
+        expect(container.querySelector(".voice-room-video-grid")).toBeNull();
     });
 });
 

@@ -33,6 +33,7 @@ const DEFAULT_AUTO_IDLE_MINUTES = 10;
 export interface AudioSettings {
     preferredAudioInputId: string;
     preferredAudioOutputId: string;
+    preferredVideoInputId: string;
     micTestLoopbackEnabled: boolean;
     autoGainControlEnabled: boolean;
     echoCancellationEnabled: boolean;
@@ -76,6 +77,7 @@ const DEFAULT_SETTINGS: UserLocalSettings = {
     audio: {
         preferredAudioInputId: "default",
         preferredAudioOutputId: "default",
+        preferredVideoInputId: "default",
         micTestLoopbackEnabled: false,
         autoGainControlEnabled: true,
         echoCancellationEnabled: true,
@@ -153,6 +155,10 @@ function normalizeSettings(raw: unknown): UserLocalSettings {
             preferredAudioOutputId:
                 typeof audio.preferredAudioOutputId === "string" && audio.preferredAudioOutputId.trim().length > 0
                     ? audio.preferredAudioOutputId
+                    : "default",
+            preferredVideoInputId:
+                typeof audio.preferredVideoInputId === "string" && audio.preferredVideoInputId.trim().length > 0
+                    ? audio.preferredVideoInputId
                     : "default",
             micTestLoopbackEnabled: audio.micTestLoopbackEnabled === true,
             autoGainControlEnabled: audio.autoGainControlEnabled !== false,

@@ -32,6 +32,7 @@ import {
 import { useMatrix } from "../../providers/MatrixProvider";
 import type { AudioSettings } from "../../settings/user/settingsStore";
 import { RoomDialog } from "../rooms/RoomDialog";
+import { ParticipantVideo } from "./ParticipantVideo";
 
 export type VoiceSessionStatus = "disconnected" | "joining" | "connected";
 
@@ -72,6 +73,7 @@ interface VoiceParticipantState {
     isLocal: boolean;
     isSpeaking: boolean;
     isScreenSharing: boolean;
+    hasCamera: boolean;
 }
 
 interface DesktopCaptureSource {
@@ -174,7 +176,8 @@ function areParticipantListsEqual(left: VoiceParticipantState[], right: VoicePar
             left[index].matrixUserId !== right[index].matrixUserId ||
             left[index].isLocal !== right[index].isLocal ||
             left[index].isSpeaking !== right[index].isSpeaking ||
-            left[index].isScreenSharing !== right[index].isScreenSharing
+            left[index].isScreenSharing !== right[index].isScreenSharing ||
+            left[index].hasCamera !== right[index].hasCamera
         ) {
             return false;
         }
@@ -253,6 +256,45 @@ function isParticipantScreenSharing(participant: Participant | LocalParticipant)
         return false;
     }
     return Boolean(publication.track || publication.videoTrack || publication.isSubscribed);
+}
+
+/** Whether a participant's camera is on and its picture can be shown here. */
+function isParticipantCameraOn(participant: Participant | LocalParticipant): boolean {
+    const publication = participant.getTrackPublication?.(Track.Source.Camera);
+    return Boolean(publication && publication.track && !publication.isMuted);
+}
+
+type CameraCaptureOptions = NonNullable<Parameters<LocalParticipant["setCameraEnabled"]>[1]>;
+type CameraPublishOptions = NonNullable<Parameters<LocalParticipant["setCameraEnabled"]>[2]>;
+
+// Captured at 720p and sent at 720p, 360p and 180p, so each viewer gets the size that
+// fits their window and connection.
+function buildCameraCaptureOptions(settings: AudioSettings): CameraCaptureOptions {
+    const capture: CameraCaptureOptions = { resolution: VideoPresets.h720.resolution };
+    if (settings.preferredVideoInputId && settings.preferredVideoInputId !== "default") {
+        capture.deviceId = settings.preferredVideoInputId;
+    }
+    return capture;
+}
+
+const CAMERA_PUBLISH_OPTIONS: CameraPublishOptions = {
+    simulcast: true,
+    videoEncoding: VideoPresets.h720.encoding,
+    videoSimulcastLayers: [VideoPresets.h180, VideoPresets.h360],
+};
+
+function describeCameraError(error: unknown): string {
+    const name = error instanceof Error ? error.name : "";
+    if (name === "NotAllowedError" || name === "SecurityError") {
+        return "Jorvik isn't allowed to use your camera. Allow it in your system's privacy settings, then try again.";
+    }
+    if (name === "NotFoundError" || name === "OverconstrainedError") {
+        return "No camera was found.";
+    }
+    if (name === "NotReadableError" || name === "AbortError") {
+        return "Your camera couldn't be started. Another app may be using it.";
+    }
+    return "Your camera couldn't be started.";
 }
 
 function isUnsupportedScreenShareError(error: unknown): boolean {
@@ -564,6 +606,10 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
     const [remoteAudioSubscribedCount, setRemoteAudioSubscribedCount] = useState(0);
     const [micTrackSettingsSummary, setMicTrackSettingsSummary] = useState<string | null>(null);
     const [localScreenSharing, setLocalScreenSharing] = useState(false);
+    const [localCameraEnabled, setLocalCameraEnabled] = useState(false);
+    // Changes when any camera track comes, goes or is muted, so video elements re-attach.
+    const [cameraTrackRevision, setCameraTrackRevision] = useState(0);
+    const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
     const [activeScreenShareIdentity, setActiveScreenShareIdentity] = useState<string | null>(null);
     const [screenShareQualityProfileId, setScreenShareQualityProfileId] = useState<ScreenShareQualityProfileId>(
         DEFAULT_SCREEN_SHARE_QUALITY_PROFILE_ID,
@@ -600,12 +646,15 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
 
     const refreshDevices = async (): Promise<void> => {
         try {
-            const [inputs, outputs] = await Promise.all([
+            const [inputs, outputs, cameras] = await Promise.all([
                 Room.getLocalDevices("audioinput"),
                 Room.getLocalDevices("audiooutput"),
+                // Listed without asking for the camera: that waits until it is turned on.
+                Room.getLocalDevices("videoinput", false).catch(() => [] as MediaDeviceInfo[]),
             ]);
             setAudioInputs(inputs);
             setAudioOutputs(outputs);
+            setVideoInputs(cameras);
         } catch (deviceError) {
             setError(deviceError instanceof Error ? deviceError.message : "Unable to enumerate audio devices.");
         }
@@ -640,6 +689,7 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                 isLocal: true,
                 isSpeaking: isParticipantSpeaking(room.localParticipant),
                 isScreenSharing: isParticipantScreenSharing(room.localParticipant),
+                hasCamera: isParticipantCameraOn(room.localParticipant),
             });
         }
         for (const participant of room.remoteParticipants.values()) {
@@ -650,6 +700,7 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                 isLocal: false,
                 isSpeaking: isParticipantSpeaking(participant),
                 isScreenSharing: isParticipantScreenSharing(participant),
+                hasCamera: isParticipantCameraOn(participant),
             });
         }
         setParticipants((current) => (areParticipantListsEqual(current, next) ? current : next));
@@ -696,6 +747,16 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
             void room.switchActiveDevice("audiooutput", audioSettings.preferredAudioOutputId).catch(() => undefined);
         }
     }, [audioSettings.preferredAudioInputId, audioSettings.preferredAudioOutputId, connectionState, supportsAudioOutputSelection]);
+
+    useEffect(() => {
+        const room = roomRef.current;
+        if (!room || connectionState !== ConnectionState.Connected || !localCameraEnabled) {
+            return;
+        }
+        if (audioSettings.preferredVideoInputId && audioSettings.preferredVideoInputId !== "default") {
+            void room.switchActiveDevice("videoinput", audioSettings.preferredVideoInputId).catch(() => undefined);
+        }
+    }, [audioSettings.preferredVideoInputId, connectionState, localCameraEnabled]);
 
     useEffect(() => {
         const room = roomRef.current;
@@ -1046,7 +1107,9 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                         return;
                     }
                     attachRemoteAudioTrack(track, publication, participant);
-                    if (track.kind === Track.Kind.Audio) {
+                    if (publication.source === Track.Source.Camera) {
+                        setCameraTrackRevision((current) => current + 1);
+                        syncParticipants();
                     }
                     if (
                         publication.source === Track.Source.ScreenShare ||
@@ -1065,6 +1128,10 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                         return;
                     }
                     detachRemoteAudioTrack(track, publication);
+                    if (publication.source === Track.Source.Camera) {
+                        setCameraTrackRevision((current) => current + 1);
+                        syncParticipants();
+                    }
                     if (
                         publication.source === Track.Source.ScreenShare ||
                         publication.source === Track.Source.ScreenShareAudio
@@ -1091,6 +1158,10 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                     if (!isCurrentJoinRequest()) {
                         return;
                     }
+                    if (publication.source === Track.Source.Camera) {
+                        setCameraTrackRevision((current) => current + 1);
+                        syncParticipants();
+                    }
                     if (
                         publication.source === Track.Source.ScreenShare ||
                         publication.source === Track.Source.ScreenShareAudio
@@ -1107,6 +1178,10 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                     if (!isCurrentJoinRequest()) {
                         return;
                     }
+                    if (publication.source === Track.Source.Camera) {
+                        setCameraTrackRevision((current) => current + 1);
+                        syncParticipants();
+                    }
                     if (
                         publication.source === Track.Source.ScreenShare ||
                         publication.source === Track.Source.ScreenShareAudio
@@ -1119,6 +1194,22 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                     }
                     refreshAudioDiagnostics(room);
                 })
+                .on(RoomEvent.TrackMuted, (publication: { source?: Track.Source }) => {
+                    runIfCurrentJoin(() => {
+                        if (publication.source === Track.Source.Camera) {
+                            setCameraTrackRevision((current) => current + 1);
+                            syncParticipants();
+                        }
+                    });
+                })
+                .on(RoomEvent.TrackUnmuted, (publication: { source?: Track.Source }) => {
+                    runIfCurrentJoin(() => {
+                        if (publication.source === Track.Source.Camera) {
+                            setCameraTrackRevision((current) => current + 1);
+                            syncParticipants();
+                        }
+                    });
+                })
                 .on(RoomEvent.Disconnected, () => {
                     if (!isCurrentJoinRequest()) {
                         return;
@@ -1128,6 +1219,7 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                     expectedDisconnectReasonByRoomIdRef.current.delete(targetRoomId);
                     setConnectionState(ConnectionState.Disconnected);
                     setMicMuted(true);
+                    setLocalCameraEnabled(false);
                     setAudioPlaybackBlocked(false);
                     setParticipants([]);
                     setLocalAudioPublished(false);
@@ -1734,6 +1826,28 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
         }
     };
 
+    const toggleCamera = async (): Promise<void> => {
+        const room = roomRef.current;
+        if (!room) {
+            return;
+        }
+        const enable = !localCameraEnabled;
+        try {
+            await room.localParticipant.setCameraEnabled(enable, buildCameraCaptureOptions(audioSettings), CAMERA_PUBLISH_OPTIONS);
+            setLocalCameraEnabled(enable);
+            setError(null);
+            if (enable) {
+                // Camera names are only shown once the camera may be used.
+                void refreshDevices();
+            }
+        } catch (cameraError) {
+            setLocalCameraEnabled(false);
+            setError(describeCameraError(cameraError));
+        }
+        setCameraTrackRevision((current) => current + 1);
+        syncParticipants();
+    };
+
     const toggleStageFullscreen = async (): Promise<void> => {
         const stageElement = stageVideoWrapRef.current;
         if (!stageElement) {
@@ -1849,8 +1963,96 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
         leave: leaveVoice,
         toggleMute,
         toggleAudioMute,
-        toggleCamera: () => Promise.resolve(),
+        toggleCamera,
     }));
+
+    // One participant's tile: their camera when it is on, otherwise their picture.
+    const renderParticipantTile = (p: VoiceParticipantState): React.ReactElement => {
+        const info = getParticipantDisplayInfo(
+            matrixRoom,
+            p.identity,
+            p.matrixUserId,
+            p.isLocal,
+            ownDisplayName,
+        );
+        const isYou = p.isLocal || p.matrixUserId === ownUserId;
+        const avatarSources = memberAvatarSources(
+            client,
+            info.member,
+            PARTICIPANT_AVATAR_SIZE,
+            "crop",
+        );
+        const participantVolumeKey = resolveVolumeParticipantKey(p.matrixUserId, p.identity);
+        const participantVolumePercent = getParticipantVolumePercent(participantVolumeKey);
+        return (
+            <li
+                key={p.identity}
+                className={`voice-room-participant${p.isSpeaking ? " is-speaking" : ""}${p.isScreenSharing ? " is-sharing" : ""}${p.hasCamera ? " has-video" : ""}`}
+            >
+                {p.hasCamera ? (
+                    <div className="voice-room-participant-video-wrap">
+                        <ParticipantVideo participant={p.participant} mirrored={p.isLocal} revision={cameraTrackRevision} />
+                    </div>
+                ) : (
+                    <div className="voice-room-participant-avatar-wrap">
+                        <Avatar
+                            className="voice-room-participant-avatar avatar"
+                            name={info.displayName}
+                            src={avatarSources[0] ?? null}
+                            sources={avatarSources}
+                            seed={info.userId}
+                            userId={info.userId}
+                        />
+                        <span
+                            className={`voice-room-speaking-indicator${p.isSpeaking ? " is-speaking" : ""}`}
+                            aria-hidden="true"
+                        />
+                    </div>
+                )}
+                <span className="voice-room-participant-name">{info.displayName}</span>
+                {p.isScreenSharing ? (
+                    <span className="voice-room-participant-live">LIVE</span>
+                ) : null}
+                <span
+                    className={`voice-room-speaking-bars${p.isSpeaking ? " is-speaking" : ""}`}
+                    aria-hidden="true"
+                >
+                    <span />
+                    <span />
+                    <span />
+                </span>
+                {!isYou ? (
+                    <label className="voice-room-participant-volume">
+                        <span className="voice-room-participant-volume-label">Volume</span>
+                        <input
+                            className="voice-room-participant-volume-slider"
+                            type="range"
+                            min={PARTICIPANT_VOLUME_MIN_PERCENT}
+                            max={PARTICIPANT_VOLUME_MAX_PERCENT}
+                            step={5}
+                            value={participantVolumePercent}
+                            onChange={(event) =>
+                                setParticipantVolumePercent(participantVolumeKey, Number(event.target.value))
+                            }
+                        />
+                        {participantVolumePercent !== PARTICIPANT_VOLUME_DEFAULT_PERCENT ? (
+                            <button
+                                type="button"
+                                className="voice-room-participant-volume-reset"
+                                onClick={() => resetParticipantVolume(participantVolumeKey)}
+                            >
+                                Reset
+                            </button>
+                        ) : null}
+                        <span className="voice-room-participant-volume-value">{participantVolumePercent}%</span>
+                    </label>
+                ) : null}
+            </li>
+        );
+    };
+    // People with their camera on get the big tiles, above everyone else.
+    const videoParticipants = participants.filter((p) => p.hasCamera);
+    const audioParticipants = participants.filter((p) => !p.hasCamera);
 
     return (
         <section className="voice-room-panel">
@@ -1962,85 +2164,12 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                                 </button>
                             ) : null}
                         </div>
-                        <ul className="voice-room-participants-list">
-                        {participants.map((p) => {
-                            const info = getParticipantDisplayInfo(
-                                matrixRoom,
-                                p.identity,
-                                p.matrixUserId,
-                                p.isLocal,
-                                ownDisplayName,
-                            );
-                            const isYou = p.isLocal || p.matrixUserId === ownUserId;
-                            const avatarSources = memberAvatarSources(
-                                client,
-                                info.member,
-                                PARTICIPANT_AVATAR_SIZE,
-                                "crop",
-                            );
-                            const participantVolumeKey = resolveVolumeParticipantKey(p.matrixUserId, p.identity);
-                            const participantVolumePercent = getParticipantVolumePercent(participantVolumeKey);
-                            return (
-                                <li
-                                    key={p.identity}
-                                    className={`voice-room-participant${p.isSpeaking ? " is-speaking" : ""}${p.isScreenSharing ? " is-sharing" : ""}`}
-                                >
-                                    <div className="voice-room-participant-avatar-wrap">
-                                        <Avatar
-                                            className="voice-room-participant-avatar avatar"
-                                            name={info.displayName}
-                                            src={avatarSources[0] ?? null}
-                                            sources={avatarSources}
-                                            seed={info.userId}
-                                            userId={info.userId}
-                                        />
-                                        <span
-                                            className={`voice-room-speaking-indicator${p.isSpeaking ? " is-speaking" : ""}`}
-                                            aria-hidden="true"
-                                        />
-                                    </div>
-                                    <span className="voice-room-participant-name">{info.displayName}</span>
-                                    {p.isScreenSharing ? (
-                                        <span className="voice-room-participant-live">LIVE</span>
-                                    ) : null}
-                                    <span
-                                        className={`voice-room-speaking-bars${p.isSpeaking ? " is-speaking" : ""}`}
-                                        aria-hidden="true"
-                                    >
-                                        <span />
-                                        <span />
-                                        <span />
-                                    </span>
-                                    {!isYou ? (
-                                        <label className="voice-room-participant-volume">
-                                            <span className="voice-room-participant-volume-label">Volume</span>
-                                            <input
-                                                className="voice-room-participant-volume-slider"
-                                                type="range"
-                                                min={PARTICIPANT_VOLUME_MIN_PERCENT}
-                                                max={PARTICIPANT_VOLUME_MAX_PERCENT}
-                                                step={5}
-                                                value={participantVolumePercent}
-                                                onChange={(event) =>
-                                                    setParticipantVolumePercent(participantVolumeKey, Number(event.target.value))
-                                                }
-                                            />
-                                            {participantVolumePercent !== PARTICIPANT_VOLUME_DEFAULT_PERCENT ? (
-                                                <button
-                                                    type="button"
-                                                    className="voice-room-participant-volume-reset"
-                                                    onClick={() => resetParticipantVolume(participantVolumeKey)}
-                                                >
-                                                    Reset
-                                                </button>
-                                            ) : null}
-                                            <span className="voice-room-participant-volume-value">{participantVolumePercent}%</span>
-                                        </label>
-                                    ) : null}
-                                </li>
-                            );
-                        })}
-                        </ul>
+                        {videoParticipants.length > 0 ? (
+                            <ul className="voice-room-video-grid">{videoParticipants.map(renderParticipantTile)}</ul>
+                        ) : null}
+                        {audioParticipants.length > 0 ? (
+                            <ul className="voice-room-participants-list">{audioParticipants.map(renderParticipantTile)}</ul>
+                        ) : null}
                     </>
                 ) : (
                     <div className="voice-room-idle">
@@ -2119,6 +2248,29 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                                         {formatDeviceLabel(device)}
                                     </option>
                                 ))}
+                            </select>
+                        </label>
+                        <label className="settings-field">
+                            <span>Camera</span>
+                            <select
+                                className="room-dialog-input"
+                                value={audioSettings.preferredVideoInputId}
+                                onChange={(event) =>
+                                    onAudioSettingsChange({
+                                        ...audioSettings,
+                                        preferredVideoInputId: event.target.value,
+                                    })
+                                }
+                            >
+                                <option value="default">System default</option>
+                                {/* Until the camera has been allowed, the system gives no ids or names. */}
+                                {videoInputs
+                                    .filter((device) => device.deviceId)
+                                    .map((device) => (
+                                        <option key={device.deviceId} value={device.deviceId}>
+                                            {formatDeviceLabel(device)}
+                                        </option>
+                                    ))}
                             </select>
                         </label>
                     </div>
@@ -2222,6 +2374,26 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                             </svg>
                         )}
                         <span className="voice-ctrl-label">{micMuted ? "Unmute" : "Mute"}</span>
+                    </button>
+
+                    {/* Camera */}
+                    <button
+                        type="button"
+                        className={`voice-ctrl-btn${localCameraEnabled ? " is-active" : ""}`}
+                        onClick={() => void toggleCamera()}
+                        title={localCameraEnabled ? "Turn camera off" : "Turn camera on"}
+                        aria-pressed={localCameraEnabled}
+                    >
+                        <svg className="voice-ctrl-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            {localCameraEnabled ? (
+                                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
+                                    d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+                            ) : (
+                                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
+                                    d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M12 18.75H4.5a2.25 2.25 0 0 1-2.25-2.25V9m12.841 9.091L16.5 19.5m-1.409-1.409c.407-.407.659-.97.659-1.591v-9a2.25 2.25 0 0 0-2.25-2.25h-9c-.621 0-1.184.252-1.591.659m12.182 12.182L2.909 5.909M1.5 4.5l1.409 1.409" />
+                            )}
+                        </svg>
+                        <span className="voice-ctrl-label">{localCameraEnabled ? "Stop video" : "Start video"}</span>
                     </button>
 
                     {/* Screen share */}

@@ -5002,6 +5002,43 @@ img.voice-ctrl-icon {
     border-color: rgba(79, 163, 199, 0.75);
 }
 
+/* People with their camera on: bigger tiles, above everyone else. */
+.voice-room-video-grid {
+    margin: 0 0 16px;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    align-content: start;
+}
+
+.voice-room-participant.has-video {
+    padding: 8px 8px 12px;
+    gap: 8px;
+}
+
+.voice-room-participant-video-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #000;
+}
+
+.voice-room-participant-video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Your own camera, the way a mirror shows you. */
+.voice-room-participant-video.is-mirrored {
+    transform: scaleX(-1);
+}
+
 .voice-room-participant-avatar-wrap {
     position: relative;
     flex-shrink: 0;
