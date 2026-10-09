@@ -111,6 +111,7 @@ export function RightPanel({
                             onOpenRoomSettings={onOpenRoomSettings}
                             onCopyRoomLink={onCopyRoomLink}
                             onLeaveRoom={onLeaveRoom}
+                            onClose={onCloseRoomPanel}
                         />
                     ) : null}
                 </>

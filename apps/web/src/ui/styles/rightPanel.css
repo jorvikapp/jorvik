@@ -52,6 +52,31 @@
     padding: 12px;
 }
 
+.rs-panel-header-closable {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+/* Overhangs the header's padding so the header stays as tall as the others. */
+.rs-panel-close {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    margin: -6px 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-pane);
+    color: var(--text-main);
+    cursor: pointer;
+    line-height: 1;
+}
+
+.rs-panel-close:hover {
+    background: var(--bg-active);
+}
+
 .rs-panel-title {
     margin: 0;
     font-size: 12px;

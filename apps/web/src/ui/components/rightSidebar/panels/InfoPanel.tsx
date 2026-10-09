@@ -14,6 +14,7 @@ interface InfoPanelProps {
     onOpenRoomSettings: () => void;
     onCopyRoomLink: () => Promise<void>;
     onLeaveRoom: () => Promise<void>;
+    onClose: () => void;
 }
 
 function roomNotificationModeSummary(mode: RoomNotificationMode): string {
@@ -49,6 +50,7 @@ export function InfoPanel({
     onOpenRoomSettings,
     onCopyRoomLink,
     onLeaveRoom,
+    onClose,
 }: InfoPanelProps): React.ReactElement {
     const ownUserId = client.getUserId() ?? "";
     const topic = getRoomTopic(room);
@@ -104,8 +106,17 @@ export function InfoPanel({
 
     return (
         <div className="rs-panel">
-            <div className="rs-panel-header">
+            {/* No header icon toggles this panel, so it closes from here. */}
+            <div className="rs-panel-header rs-panel-header-closable">
                 <h2 className="rs-panel-title">{dm ? "Chat info" : "Channel info"}</h2>
+                <button
+                    type="button"
+                    className="rs-panel-close"
+                    onClick={onClose}
+                    aria-label={dm ? "Close chat info" : "Close channel info"}
+                >
+                    x
+                </button>
             </div>
 
             <section className="rs-section">
