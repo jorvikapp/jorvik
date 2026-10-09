@@ -389,7 +389,10 @@
 
 
 
-.app-shell.is-desktop-runtime .right-panel-body:not(.right-panel-body-user) .rs-panel-header {
+/* In the desktop app the window's own buttons and the drag strip cover the top
+   of the panel, so a panel's header starts below them; a button there (the close
+   button of Channel info) would otherwise be under the strip and never get a click. */
+.app-shell.is-desktop-runtime .right-panel .rs-panel-header {
     padding-top: calc(12px + var(--desktop-titlebar-overlay-height, 0px));
 }
 .rp-room-header {
