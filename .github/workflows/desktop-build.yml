@@ -148,6 +148,15 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      # Only the notes script and the metainfo it reads. Checkout cleans the
+      # workspace, so it comes before the downloads.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            apps/desktop/scripts
+            apps/desktop/metainfo
+      - name: Release notes from the metainfo
+        run: node apps/desktop/scripts/release-notes.mjs "${GITHUB_REF_NAME#v}" release-notes.md
       - uses: actions/download-artifact@v4
         with:
           pattern: jorvik-*
@@ -173,5 +182,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Jorvik ${{ github.ref_name }}
+          # The version's notes from the metainfo; GitHub appends its compare link.
+          body_path: release-notes.md
           generate_release_notes: true
           files: release-files/*

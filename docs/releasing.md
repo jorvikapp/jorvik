@@ -43,6 +43,10 @@ releases is normal.
    then check it with `appstreamcli validate` -- AppImage hub rejects a metainfo
    file that fails validation, and it ships inside the AppImage. Because it
    ships in the build, commit it with step 1's bump, before the tag.
+   These notes are also the GitHub release's text: the publish job runs
+   `apps/desktop/scripts/release-notes.mjs` on the tagged metainfo (a version
+   without notes still publishes, with a warning), and www.jorvik.app/changelog
+   reads them from the latest release.
 8. **Bump the COPR spec and trigger a rebuild.** `packaging/rpm/jorvik.spec`:
    set `Version`, reset `Release` to `1%{?dist}`, add a `%changelog` entry.
    A webhook on the repository rebuilds COPR on every push to `main`, so
