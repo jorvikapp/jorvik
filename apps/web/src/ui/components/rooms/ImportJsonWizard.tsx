@@ -34,7 +34,7 @@ function ImportChannelRow({
     onChange: (val: ChannelImportConfig) => void;
 }): React.ReactElement {
     const isVoice = channel.type === "voice";
-    const icon = isVoice ? "đź”Š" : "#";
+    const icon = isVoice ? "🔊" : "#";
     return (
         <div className="import-tree-channel">
             <span className="import-tree-channel-icon">{icon}</span>
