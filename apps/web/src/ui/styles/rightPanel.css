@@ -818,6 +818,12 @@
     gap: 2px;
 }
 
+/* When hanging left from the button would cross the panel's edge. */
+.rp-profile-menu-panel.is-hanging-right {
+    right: auto;
+    left: 0;
+}
+
 .rp-profile-menu-item {
     border: 0;
     border-radius: 7px;

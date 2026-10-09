@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { Avatar } from "../Avatar";
 import { UserBadges } from "../badges/UserBadges";
@@ -24,6 +24,16 @@ interface ProfileHeaderProps {
     onEditBadges?: () => void;
 }
 
+/** The left edge of the nearest ancestor that clips what sticks out of it, or of the window. */
+function clippingLeftEdge(element: HTMLElement): number {
+    for (let node = element.parentElement; node; node = node.parentElement) {
+        if (["auto", "scroll", "hidden", "clip"].includes(getComputedStyle(node).overflowX)) {
+            return node.getBoundingClientRect().left;
+        }
+    }
+    return 0;
+}
+
 function hashToHue(value: string): number {
     let hash = 0;
     for (let index = 0; index < value.length; index++) {
@@ -47,7 +57,12 @@ export function ProfileHeader({
     onEditBadges,
 }: ProfileHeaderProps): React.ReactElement {
     const [menuOpen, setMenuOpen] = useState(false);
+    // The menu hangs left from its button. In a narrow window the buttons wrap and the
+    // button starts a row, so hanging left would put the menu past the panel's edge,
+    // which clips it; then it hangs right instead. Measured before the menu is painted.
+    const [menuHangsRight, setMenuHangsRight] = useState(false);
     const menuRef = useRef<HTMLDivElement | null>(null);
+    const menuPanelRef = useRef<HTMLDivElement | null>(null);
     const hue = useMemo(() => hashToHue(userId), [userId]);
     const bannerStyle = useMemo(
         () => ({
@@ -55,6 +70,17 @@ export function ProfileHeader({
         }),
         [hue],
     );
+
+    useLayoutEffect(() => {
+        if (!menuOpen) {
+            setMenuHangsRight(false);
+            return;
+        }
+        const panel = menuPanelRef.current;
+        if (panel && panel.getBoundingClientRect().left < clippingLeftEdge(panel)) {
+            setMenuHangsRight(true);
+        }
+    }, [menuOpen]);
 
     useEffect(() => {
         if (!menuOpen) {
@@ -131,7 +157,11 @@ export function ProfileHeader({
                         ...
                     </button>
                     {menuOpen ? (
-                        <div className="rp-profile-menu-panel" role="menu">
+                        <div
+                            ref={menuPanelRef}
+                            className={`rp-profile-menu-panel${menuHangsRight ? " is-hanging-right" : ""}`}
+                            role="menu"
+                        >
                             <button
                                 type="button"
                                 className="rp-profile-menu-item"
