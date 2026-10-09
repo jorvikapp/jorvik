@@ -273,6 +273,10 @@
     gap: 10px;
 }
 
+.space-encrypt-dialog-text {
+    margin: 0 0 10px;
+}
+
 .settings-section-card h3 {
     margin: 0;
     font-size: 14px;

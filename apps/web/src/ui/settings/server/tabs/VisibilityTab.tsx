@@ -9,6 +9,7 @@ import {
     Visibility,
 } from "matrix-js-sdk/src/matrix";
 
+import { RoomDialog } from "../../../components/rooms/RoomDialog";
 import type { ToastState } from "../../../components/Toast";
 
 interface VisibilityTabProps {
@@ -41,6 +42,10 @@ function readHistoryVisibility(room: Room): HistoryVisibility {
     return HistoryVisibility.Shared;
 }
 
+function readEncrypted(room: Room): boolean {
+    return Boolean(room.currentState.getStateEvents(EventType.RoomEncryption, ""));
+}
+
 function readGuestAccessEnabled(room: Room): boolean {
     const event = room.currentState.getStateEvents(EventType.RoomGuestAccess, "");
     const content = event?.getContent() as { guest_access?: unknown } | undefined;
@@ -58,6 +63,12 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
     const [published, setPublished] = useState(false);
     const [initialPublished, setInitialPublished] = useState(false);
     const [directoryStatus, setDirectoryStatus] = useState<"loading" | "ready" | "unavailable">("loading");
+    // Encryption is apart from the settings above: it can't be turned off, so it isn't
+    // saved with them but confirmed on its own.
+    const [encrypted, setEncrypted] = useState<boolean>(() => readEncrypted(spaceRoom));
+    const [encryptDialogOpen, setEncryptDialogOpen] = useState(false);
+    const [encrypting, setEncrypting] = useState(false);
+    const [encryptError, setEncryptError] = useState<string | null>(null);
 
     const myUserId = client.getUserId() ?? "";
     const canEditJoinRule = Boolean(myUserId && spaceRoom.currentState.maySendStateEvent(EventType.RoomJoinRules, myUserId));
@@ -67,6 +78,7 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
     const canEditGuestAccess = Boolean(
         myUserId && spaceRoom.currentState.maySendStateEvent(EventType.RoomGuestAccess, myUserId),
     );
+    const canEncrypt = Boolean(myUserId && spaceRoom.currentState.maySendStateEvent(EventType.RoomEncryption, myUserId));
 
     useEffect(() => {
         let cancelled = false;
@@ -102,6 +114,9 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
         setGuestAccessEnabled(readGuestAccessEnabled(spaceRoom));
         setSaving(false);
         setError(null);
+        setEncrypted(readEncrypted(spaceRoom));
+        setEncryptDialogOpen(false);
+        setEncryptError(null);
     }, [spaceRoom.roomId]);
 
     const hasChanges = useMemo(() => {
@@ -189,6 +204,21 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
         }
     };
 
+    const encrypt = async (): Promise<void> => {
+        setEncrypting(true);
+        setEncryptError(null);
+        try {
+            await client.sendStateEvent(spaceRoom.roomId, EventType.RoomEncryption, { algorithm: "m.megolm.v1.aes-sha2" }, "");
+            setEncrypted(true);
+            setEncryptDialogOpen(false);
+            onToast({ type: "success", message: "This Space is now end-to-end encrypted." });
+        } catch (encryptFailure) {
+            setEncryptError(encryptFailure instanceof Error ? encryptFailure.message : "Failed to encrypt this Space.");
+        } finally {
+            setEncrypting(false);
+        }
+    };
+
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Visibility</h2>
@@ -267,6 +297,57 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
                     {saving ? "Saving..." : "Save changes"}
                 </button>
             </div>
+
+            <div className="settings-section-card">
+                <h3>End-to-end encryption</h3>
+                <p className="settings-inline-note">
+                    {encrypted
+                        ? "This Space is end-to-end encrypted."
+                        : "This Space isn't end-to-end encrypted. Its channels are encrypted separately, and new ones are by default."}
+                </p>
+                {!encrypted && canEncrypt ? (
+                    <div className="settings-actions-row">
+                        <button
+                            type="button"
+                            className="settings-button settings-button-secondary"
+                            onClick={() => setEncryptDialogOpen(true)}
+                        >
+                            Encrypt this Space
+                        </button>
+                    </div>
+                ) : null}
+            </div>
+
+            <RoomDialog
+                open={encryptDialogOpen}
+                title="Encrypt this Space?"
+                onClose={() => {
+                    if (!encrypting) setEncryptDialogOpen(false);
+                }}
+                footer={
+                    <>
+                        <button
+                            type="button"
+                            className="room-dialog-button room-dialog-button-secondary"
+                            onClick={() => setEncryptDialogOpen(false)}
+                            disabled={encrypting}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            className="room-dialog-button room-dialog-button-primary"
+                            onClick={() => void encrypt()}
+                            disabled={encrypting}
+                        >
+                            {encrypting ? "Encrypting..." : "Encrypt"}
+                        </button>
+                    </>
+                }
+            >
+                <p className="space-encrypt-dialog-text">Encryption can't be turned off again once it's on.</p>
+                {encryptError ? <p className="room-dialog-error">{encryptError}</p> : null}
+            </RoomDialog>
         </div>
     );
 }

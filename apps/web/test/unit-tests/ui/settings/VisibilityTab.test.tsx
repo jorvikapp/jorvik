@@ -120,3 +120,79 @@ describe("VisibilityTab directory publishing", () => {
         expect(publishToggle()).toBeNull();
     });
 });
+
+describe("VisibilityTab encryption", () => {
+    function encryptionRoom({ encrypted = false, canEncrypt = true } = {}) {
+        return {
+            roomId: "!space:example.org",
+            currentState: {
+                getStateEvents: (type: string) =>
+                    type === "m.room.encryption" && encrypted ? { getContent: () => ({ algorithm: "m.megolm.v1.aes-sha2" }) } : null,
+                maySendStateEvent: (type: string) => type !== "m.room.encryption" || canEncrypt,
+            },
+        } as never;
+    }
+
+    function encryptionCard(): Element {
+        const card = Array.from(container.querySelectorAll(".settings-section-card")).find((candidate) =>
+            candidate.querySelector("h3")?.textContent?.includes("End-to-end encryption"),
+        );
+        if (!card) {
+            throw new Error("expected the encryption card");
+        }
+        return card;
+    }
+
+    function buttonNamed(text: string): HTMLButtonElement | undefined {
+        return Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.trim() === text);
+    }
+
+    it("lets an admin encrypt the Space once they confirm", async () => {
+        const client = makeClient();
+        await renderTab(client, encryptionRoom());
+        expect(encryptionCard().textContent).toContain("This Space isn't end-to-end encrypted.");
+
+        await act(async () => {
+            buttonNamed("Encrypt this Space")?.click();
+        });
+        expect(container.textContent).toContain("Encrypt this Space?");
+        await act(async () => {
+            buttonNamed("Encrypt")?.click();
+        });
+
+        expect((client as { sendStateEvent: ReturnType<typeof vi.fn> }).sendStateEvent).toHaveBeenCalledWith(
+            "!space:example.org",
+            "m.room.encryption",
+            { algorithm: "m.megolm.v1.aes-sha2" },
+            "",
+        );
+        expect(encryptionCard().textContent).toContain("This Space is end-to-end encrypted.");
+        expect(buttonNamed("Encrypt this Space")).toBeUndefined();
+    });
+
+    it("sends nothing when the confirmation is cancelled", async () => {
+        const client = makeClient();
+        await renderTab(client, encryptionRoom());
+        await act(async () => {
+            buttonNamed("Encrypt this Space")?.click();
+        });
+        await act(async () => {
+            buttonNamed("Cancel")?.click();
+        });
+
+        expect((client as { sendStateEvent: ReturnType<typeof vi.fn> }).sendStateEvent).not.toHaveBeenCalled();
+        expect(container.textContent).not.toContain("Encrypt this Space?");
+    });
+
+    it("says so when the Space is already encrypted, with nothing to press", async () => {
+        await renderTab(makeClient(), encryptionRoom({ encrypted: true }));
+        expect(encryptionCard().textContent).toContain("This Space is end-to-end encrypted.");
+        expect(buttonNamed("Encrypt this Space")).toBeUndefined();
+    });
+
+    it("offers encryption only to those allowed to turn it on", async () => {
+        await renderTab(makeClient(), encryptionRoom({ canEncrypt: false }));
+        expect(encryptionCard().textContent).toContain("This Space isn't end-to-end encrypted.");
+        expect(buttonNamed("Encrypt this Space")).toBeUndefined();
+    });
+});

@@ -83,6 +83,7 @@ export function CreateSpaceDialog({
     const [name, setName] = useState("");
     const [topic, setTopic] = useState("");
     const [aliasLocalPart, setAliasLocalPart] = useState("");
+    const [enableEncryption, setEnableEncryption] = useState(true);
     const [saving, setSaving] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
     const [supportsPublic, setSupportsPublic] = useState(true);
@@ -127,6 +128,7 @@ export function CreateSpaceDialog({
         setName("");
         setTopic("");
         setAliasLocalPart("");
+        setEnableEncryption(true);
         setSaving(false);
         setCreateError(null);
         setSupportsPublic(true);
@@ -171,6 +173,13 @@ export function CreateSpaceDialog({
                     },
                 },
             ];
+            if (enableEncryption) {
+                initialState.push({
+                    type: EventType.RoomEncryption,
+                    state_key: "",
+                    content: { algorithm: "m.megolm.v1.aes-sha2" },
+                });
+            }
 
             const options: Parameters<MatrixClient["createRoom"]>[0] = {
                 name: name.trim(),
@@ -450,6 +459,15 @@ export function CreateSpaceDialog({
                                     />
                                 </label>
                             ) : null}
+                            <label className="room-dialog-checkbox">
+                                <input
+                                    type="checkbox"
+                                    checked={enableEncryption}
+                                    onChange={(event) => setEnableEncryption(event.target.checked)}
+                                    disabled={saving}
+                                />
+                                Enable end-to-end encryption
+                            </label>
                         </>
                     )}
                     {createError ? <p className="room-dialog-error">{createError}</p> : null}

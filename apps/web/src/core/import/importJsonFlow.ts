@@ -222,6 +222,12 @@ export async function runJsonImport(
                     state_key: "",
                     content: { join_rule: "invite" },
                 },
+                // Spaces are encrypted by default, like channels.
+                {
+                    type: EventType.RoomEncryption,
+                    state_key: "",
+                    content: { algorithm: "m.megolm.v1.aes-sha2" },
+                },
             ],
         }),
         rateLimitState,
