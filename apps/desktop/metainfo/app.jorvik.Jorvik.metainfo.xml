@@ -71,6 +71,19 @@
   </branding>
 
   <releases>
+    <release version="1.0.20" date="2026-10-09">
+      <description>
+        <p>Video in calls, and end-to-end encrypted calls.</p>
+        <ul>
+          <li>Turn your camera on in a voice channel or call, and people with their camera on get big tiles above everyone else</li>
+          <li>Settings, now called Voice and video, picks your camera and can preview it</li>
+          <li>Calls in encrypted chats are end-to-end encrypted, voice, video and screen share alike: only the people in the call can hear and see it</li>
+          <li>DMs are encrypted, and new voice channels now are too; an existing channel can be encrypted from its call</li>
+          <li>A call says whether it is end-to-end encrypted, and everyone in an encrypted call needs this version or the web app</li>
+          <li>On macOS, Jorvik says why it asks for the camera and microphone</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.19" date="2026-10-09">
       <description>
         <p>A line where new messages begin, dates on messages, and fixes.</p>
