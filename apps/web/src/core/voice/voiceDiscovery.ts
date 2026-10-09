@@ -4,6 +4,8 @@ export interface VoiceDiscoveryResult {
     features: {
         participants: boolean;
         audioState: boolean;
+        /** The relay keeps end-to-end encrypted calls in rooms of their own (and names devices). */
+        e2eeRooms: boolean;
     };
 }
 
@@ -35,7 +37,7 @@ async function doFetchVoiceDiscovery(homeserverUrl: string): Promise<VoiceDiscov
             ok?: boolean;
             apiBaseUrl?: string;
             livekitWsUrl?: string;
-            features?: { participants?: boolean; audioState?: boolean };
+            features?: { participants?: boolean; audioState?: boolean; e2eeRooms?: boolean };
         };
         if (!body.ok || typeof body.apiBaseUrl !== "string" || typeof body.livekitWsUrl !== "string") {
             return null;
@@ -46,6 +48,7 @@ async function doFetchVoiceDiscovery(homeserverUrl: string): Promise<VoiceDiscov
             features: {
                 participants: body.features?.participants ?? false,
                 audioState: body.features?.audioState ?? false,
+                e2eeRooms: body.features?.e2eeRooms === true,
             },
         };
     } catch {

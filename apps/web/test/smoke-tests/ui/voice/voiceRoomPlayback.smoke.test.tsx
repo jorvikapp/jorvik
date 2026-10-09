@@ -108,6 +108,11 @@ describe("voice room smoke", () => {
     let cameraCalls: unknown[][];
     let cameraFailure: Error | null;
     let localCameraTrack: FakeVideoTrack | null;
+    let createdRoomOptions: Array<Record<string, unknown>>;
+    let e2eeEnabledCalls: boolean[];
+    let tokenRequests: Array<Record<string, unknown> | undefined>;
+    let relaySupportsE2ee: boolean;
+    let unencryptedCallParticipants: Array<{ identity: string; matrixUserId?: string }>;
 
     beforeEach(async () => {
         vi.resetModules();
@@ -122,6 +127,11 @@ describe("voice room smoke", () => {
         cameraCalls = [];
         cameraFailure = null;
         localCameraTrack = null;
+        createdRoomOptions = [];
+        e2eeEnabledCalls = [];
+        tokenRequests = [];
+        relaySupportsE2ee = true;
+        unencryptedCallParticipants = [];
 
         Object.defineProperty(HTMLMediaElement.prototype, "play", {
             configurable: true,
@@ -185,7 +195,8 @@ describe("voice room smoke", () => {
 
                 private readonly handlers = new Map<string, Set<(...args: unknown[]) => void>>();
 
-                public constructor() {
+                public constructor(options: Record<string, unknown> = {}) {
+                    createdRoomOptions.push(options);
                     this.localParticipant = {
                         identity: "@self:example.org::local",
                         sid: "local-sid",
@@ -276,6 +287,14 @@ describe("voice room smoke", () => {
                     this.emit(RoomEvent.ConnectionStateChanged, ConnectionState.Connected);
                 }
 
+                public async setE2EEEnabled(enabled: boolean): Promise<void> {
+                    e2eeEnabledCalls.push(enabled);
+                }
+
+                public off(): this {
+                    return this;
+                }
+
                 public async startAudio(): Promise<void> {
                     this.canPlaybackAudio = true;
                 }
@@ -290,11 +309,18 @@ describe("voice room smoke", () => {
                 }
             }
 
+            class BaseKeyProvider {
+                protected onSetEncryptionKey(): void {}
+            }
+
             return {
                 Room,
                 RoomEvent,
                 ConnectionState,
                 Track,
+                BaseKeyProvider,
+                isE2EESupported: () => true,
+                createKeyMaterialFromBuffer: async () => ({}),
                 AudioPresets: {
                     speech: "speech",
                     music: "music",
@@ -310,13 +336,31 @@ describe("voice room smoke", () => {
         });
 
         vi.doMock("../../../../src/ui/adapters/voiceAdapter", () => ({
-            fetchLiveKitToken: vi.fn(async () => ({
+            fetchLiveKitToken: vi.fn(async (_client: unknown, _config: unknown, _roomId: unknown, options?: Record<string, unknown>) => {
+                tokenRequests.push(options);
+                return {
                 token: "token",
                 wsUrl: "wss://livekit.example/ws",
                 livekitRoom: "voice-room",
                 expiresAt: "2026-01-01T00:00:00.000Z",
-            })),
+            };
+            }),
             updateVoiceParticipantState: vi.fn(async () => undefined),
+            // Asked without the encrypted flag: who is in the channel's unencrypted call.
+            fetchVoiceParticipants: vi.fn(async () => ({ participants: unencryptedCallParticipants })),
+        }));
+
+        vi.doMock("../../../../src/core/voice/voiceDiscovery", () => ({
+            getVoiceDiscovery: () => ({
+                apiBaseUrl: "https://relay.example/voice",
+                livekitWsUrl: "wss://livekit.example/ws",
+                features: { participants: true, audioState: true, e2eeRooms: relaySupportsE2ee },
+            }),
+            initVoiceDiscovery: vi.fn(async () => undefined),
+        }));
+
+        vi.doMock("../../../../src/core/voice/e2eeWorker", () => ({
+            createE2EEWorker: () => ({ terminate: vi.fn() }),
         }));
 
         vi.doMock("../../../../src/ui/providers/MatrixProvider", () => ({
@@ -369,6 +413,12 @@ describe("voice room smoke", () => {
                     ref,
                     client: {
                         getUserId: () => "@self:example.org",
+                        getRoom: () => null,
+                        on: vi.fn(),
+                        removeListener: vi.fn(),
+                        off: vi.fn(),
+                        encryptAndSendToDevice: vi.fn(async () => undefined),
+                        getCrypto: () => ({ prepareToEncrypt: vi.fn() }),
                         getUser: () => ({ rawDisplayName: "Self" }),
                         mxcUrlToHttp: () => null,
                     },
@@ -428,11 +478,19 @@ describe("voice room smoke", () => {
                     ref,
                     client: {
                         getUserId: () => "@self:example.org",
+                        getRoom: () => null,
+                        on: vi.fn(),
+                        removeListener: vi.fn(),
+                        off: vi.fn(),
+                        encryptAndSendToDevice: vi.fn(async () => undefined),
+                        getCrypto: () => ({ prepareToEncrypt: vi.fn() }),
                         getUser: () => null,
                         mxcUrlToHttp: (mxc: string) => `https://hs.example/${mxc.slice("mxc://".length)}`,
                     },
                     matrixRoomId: "!dm:example.org",
                     matrixRoom: {
+                        hasEncryptionStateEvent: () => false,
+                        currentState: { maySendStateEvent: () => false },
                         getMember: (userId: string) => ({
                             userId,
                             rawDisplayName: userId,
@@ -468,6 +526,12 @@ describe("voice room smoke", () => {
                     ref,
                     client: {
                         getUserId: () => "@self:example.org",
+                        getRoom: () => null,
+                        on: vi.fn(),
+                        removeListener: vi.fn(),
+                        off: vi.fn(),
+                        encryptAndSendToDevice: vi.fn(async () => undefined),
+                        getCrypto: () => ({ prepareToEncrypt: vi.fn() }),
                         // What the SDK store leaves on the User after a room
                         // where someone else is also called "Self".
                         getUser: () => ({
@@ -504,6 +568,12 @@ describe("voice room smoke", () => {
                     ref,
                     client: {
                         getUserId: () => "@self:example.org",
+                        getRoom: () => null,
+                        on: vi.fn(),
+                        removeListener: vi.fn(),
+                        off: vi.fn(),
+                        encryptAndSendToDevice: vi.fn(async () => undefined),
+                        getCrypto: () => ({ prepareToEncrypt: vi.fn() }),
                         getUser: () => ({ rawDisplayName: "Self" }),
                         mxcUrlToHttp: () => null,
                     },
@@ -587,6 +657,95 @@ describe("voice room smoke", () => {
         expect(container.textContent).toContain("isn't allowed to use your camera");
         expect(container.querySelector('button[title="Turn camera on"]')?.getAttribute("aria-pressed")).toBe("false");
         expect(container.querySelector(".voice-room-video-grid")).toBeNull();
+    });
+
+    async function renderJoinedIn(matrixRoom: Record<string, unknown>): Promise<void> {
+        const ref = createRef<VoiceRoomHandle>();
+        await act(async () => {
+            root.render(
+                React.createElement(VoiceRoom, {
+                    ref,
+                    client: {
+                        getUserId: () => "@self:example.org",
+                        getRoom: () => matrixRoom,
+                        on: vi.fn(),
+                        removeListener: vi.fn(),
+                        off: vi.fn(),
+                        encryptAndSendToDevice: vi.fn(async () => undefined),
+                        getCrypto: () => ({ prepareToEncrypt: vi.fn() }),
+                        getUser: () => ({ rawDisplayName: "Self" }),
+                        mxcUrlToHttp: () => null,
+                    },
+                    matrixRoomId: "!voice:example.org",
+                    matrixRoom,
+                    audioSettings: createAudioSettings(),
+                    onAudioSettingsChange: () => undefined,
+                }),
+            );
+        });
+        await act(async () => {
+            await ref.current?.join();
+        });
+    }
+
+    function channel(encrypted: boolean, mayEncrypt = true): Record<string, unknown> {
+        return {
+            hasEncryptionStateEvent: () => encrypted,
+            getMember: () => null,
+            currentState: { maySendStateEvent: () => mayEncrypt },
+        };
+    }
+
+    it("encrypts the call end to end in an encrypted channel", async () => {
+        await renderJoinedIn(channel(true));
+
+        expect(tokenRequests[0]).toMatchObject({ e2ee: true });
+        expect(createdRoomOptions[0].e2ee).toMatchObject({ keyProvider: expect.anything(), worker: expect.anything() });
+        expect(e2eeEnabledCalls).toEqual([true]);
+        expect(container.querySelector(".voice-room-encryption.is-encrypted")?.textContent).toContain("End-to-end encrypted");
+    });
+
+    it("stays out of an encrypted channel's call rather than join it in clear", async () => {
+        relaySupportsE2ee = false;
+        await renderJoinedIn(channel(true));
+
+        expect(createdRooms).toHaveLength(0);
+        expect(container.textContent).toContain("voice relay can't do encrypted calls yet");
+    });
+
+    it("says when a channel's calls aren't encrypted, and offers to encrypt it to those allowed", async () => {
+        await renderJoinedIn(channel(false));
+
+        expect(tokenRequests[0]?.e2ee).toBe(false);
+        expect(createdRoomOptions[0].e2ee).toBeUndefined();
+        const status = container.querySelector(".voice-room-encryption");
+        expect(status?.classList.contains("is-encrypted")).toBe(false);
+        expect(status?.textContent).toContain("Not end-to-end encrypted");
+        expect(status?.textContent).toContain("Encrypt this channel");
+    });
+
+    it("names whoever is stuck in the channel's older, unencrypted call", async () => {
+        unencryptedCallParticipants = [{ identity: "@bob:example.org::4c1b2a77-0000-1111-2222-333344445555", matrixUserId: "@bob:example.org" }];
+        await renderJoinedIn({
+            ...channel(true),
+            getMember: (userId: string) => (userId === "@bob:example.org" ? { rawDisplayName: "Bob", name: "Bob" } : null),
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        const note = container.querySelector(".voice-room-encryption-note");
+        expect(note?.textContent).toBe(
+            "Bob is in a separate, unencrypted call here, on an older version of Jorvik. You can't hear each other until they update.",
+        );
+    });
+
+    it("says nothing about an unencrypted call when nobody is in it", async () => {
+        await renderJoinedIn(channel(true));
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(container.querySelector(".voice-room-encryption-note")).toBeNull();
     });
 });
 

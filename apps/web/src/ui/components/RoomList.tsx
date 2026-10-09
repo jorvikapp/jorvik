@@ -36,6 +36,7 @@ import {
     type HeorotCategory,
 } from "../stores/CategoryStore";
 import { isVoiceChannelRoom } from "../voice/voiceChannel";
+import { usesEncryptedCallRoom } from "../../core/voice/callEncryptionMode";
 import { Avatar } from "./Avatar";
 import { getOneToOneDirectName } from "./rightPanel/directPartner";
 import micMuteIcon from "./icons/mic-02.svg";
@@ -529,7 +530,10 @@ export function RoomList({
             await Promise.all(
                 voiceRooms.map(async (room) => {
                     try {
-                        const payload = await fetchVoiceParticipants(client, config, room.roomId);
+                        // Encrypted channels hold their calls in the relay's encrypted call room.
+                        const payload = await fetchVoiceParticipants(client, config, room.roomId, {
+                            e2ee: usesEncryptedCallRoom(room),
+                        });
                         const participantsByMatrixUserId = new Map<string, VoiceParticipantInfo>();
 
                         for (const participant of payload.participants) {

@@ -91,7 +91,8 @@ export function CreateRoomDialog({
 
         try {
             const initialState: Array<{ type: string; state_key: string; content: Record<string, unknown> }> = [];
-            if (enableEncryption && !voiceChannel) {
+            // Voice channels too: a call is end-to-end encrypted when its room is.
+            if (enableEncryption) {
                 initialState.push({
                     type: EventType.RoomEncryption,
                     state_key: "",
@@ -258,7 +259,7 @@ export function CreateRoomDialog({
                     type="checkbox"
                     checked={enableEncryption}
                     onChange={(event) => setEnableEncryption(event.target.checked)}
-                    disabled={saving || voiceChannel}
+                    disabled={saving}
                 />
                 Enable end-to-end encryption
             </label>

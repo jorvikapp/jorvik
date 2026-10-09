@@ -12,15 +12,25 @@ import {
     type RemoteTrack,
     type RemoteTrackPublication,
 } from "livekit-client";
-import type { MatrixClient, Room as MatrixRoom, RoomMember } from "matrix-js-sdk/src/matrix";
+import {
+    EventType,
+    RoomStateEvent,
+    type MatrixClient,
+    type MatrixEvent,
+    type Room as MatrixRoom,
+    type RoomMember,
+} from "matrix-js-sdk/src/matrix";
 
 import { Avatar } from "../Avatar";
 import micMutedIcon from "../icons/mic-02.svg";
 import volumeMutedIcon from "../icons/volume-mute-02.svg";
 
 import { plainUserDisplayName } from "../../../core/users/userDisplayName";
+import { CallKeyManager, CallKeyProvider } from "../../../core/voice/callEncryption";
+import { describeUnavailableCallEncryption, resolveCallEncryptionMode } from "../../../core/voice/callEncryptionMode";
+import { createE2EEWorker } from "../../../core/voice/e2eeWorker";
 import { memberAvatarSources } from "../../adapters/avatar";
-import { fetchLiveKitToken, updateVoiceParticipantState } from "../../adapters/voiceAdapter";
+import { fetchLiveKitToken, fetchVoiceParticipants, updateVoiceParticipantState } from "../../adapters/voiceAdapter";
 import {
     playVoiceJoinSound,
     playVoiceLeaveSound,
@@ -226,6 +236,21 @@ function resolveParticipantMatrixUserId(participant: Participant | LocalParticip
         return fromMetadata;
     }
     return parseMatrixUserIdFromIdentity(participant.identity);
+}
+
+// How often an encrypted call looks for people stuck in the channel's older, unencrypted one.
+const UNENCRYPTED_CALL_CHECK_MS = 15_000;
+
+function describeUnencryptedCall(names: string[]): string {
+    const who =
+        names.length === 1
+            ? `${names[0]} is`
+            : names.length === 2
+              ? `${names[0]} and ${names[1]} are`
+              : names.length === 3
+                ? `${names[0]}, ${names[1]} and ${names[2]} are`
+                : `${names[0]}, ${names[1]} and ${names.length - 2} others are`;
+    return `${who} in a separate, unencrypted call here, on an older version of Jorvik. You can't hear each other until they update.`;
 }
 
 function getParticipantDisplayInfo(
@@ -610,6 +635,16 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
     // Changes when any camera track comes, goes or is muted, so video elements re-attach.
     const [cameraTrackRevision, setCameraTrackRevision] = useState(0);
     const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
+    // Whether the call we're in is end-to-end encrypted (null when not in one).
+    const [callEncrypted, setCallEncrypted] = useState<boolean | null>(null);
+    // Who we have a key from (LiveKit identities), to show who is still waiting.
+    const [keysReceivedFrom, setKeysReceivedFrom] = useState<ReadonlySet<string>>(() => new Set());
+    const [roomEncrypted, setRoomEncrypted] = useState(false);
+    const [encryptDialogOpen, setEncryptDialogOpen] = useState(false);
+    const [encryptingChannel, setEncryptingChannel] = useState(false);
+    // People in this channel's unencrypted call while we're in its encrypted one: on an older
+    // Jorvik, they land in a separate call and can't hear us.
+    const [unencryptedCallNames, setUnencryptedCallNames] = useState<string[]>([]);
     const [activeScreenShareIdentity, setActiveScreenShareIdentity] = useState<string | null>(null);
     const [screenShareQualityProfileId, setScreenShareQualityProfileId] = useState<ScreenShareQualityProfileId>(
         DEFAULT_SCREEN_SHARE_QUALITY_PROFILE_ID,
@@ -661,6 +696,53 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
     };
 
     const speakingSidsRef = useRef<Set<string>>(new Set());
+
+    // Whether this channel is encrypted, kept current: someone may turn it on during a call.
+    useEffect(() => {
+        const room = matrixRoom ?? client.getRoom(matrixRoomId);
+        setRoomEncrypted(Boolean(room?.hasEncryptionStateEvent()));
+        const onStateEvent = (event: MatrixEvent): void => {
+            if (event.getRoomId() === matrixRoomId && event.getType() === EventType.RoomEncryption) {
+                setRoomEncrypted(true);
+            }
+        };
+        client.on(RoomStateEvent.Events, onStateEvent);
+        return () => {
+            client.removeListener(RoomStateEvent.Events, onStateEvent);
+        };
+    }, [client, matrixRoom, matrixRoomId]);
+
+    useEffect(() => {
+        if (connectionState !== ConnectionState.Connected || !callEncrypted) {
+            setUnencryptedCallNames([]);
+            return;
+        }
+        let cancelled = false;
+        const check = async (): Promise<void> => {
+            try {
+                const payload = await fetchVoiceParticipants(client, config, matrixRoomId);
+                if (cancelled) {
+                    return;
+                }
+                const room = matrixRoom ?? client.getRoom(matrixRoomId);
+                const names = payload.participants.map(
+                    (participant) =>
+                        getParticipantDisplayInfo(room, participant.identity, participant.matrixUserId ?? undefined, false)
+                            .displayName,
+                );
+                const unique = [...new Set(names)];
+                setUnencryptedCallNames((current) => (current.join("\n") === unique.join("\n") ? current : unique));
+            } catch {
+                // Keep the last answer; this is only a hint.
+            }
+        };
+        void check();
+        const timer = setInterval(() => void check(), UNENCRYPTED_CALL_CHECK_MS);
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    }, [callEncrypted, client, config, connectionState, matrixRoom, matrixRoomId]);
 
     const syncParticipants = useCallback((): void => {
         const room = roomRef.current;
@@ -1016,6 +1098,7 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
             onSessionStateChange?.({ roomId: targetRoomId, status: "joining" });
         }
         let inFlightRoom: Room | null = null;
+        let cleanUpEncryption: () => void = () => undefined;
         try {
             const previousRoom = roomRef.current;
             const previousRoomId = connectedRoomIdRef.current;
@@ -1030,9 +1113,19 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
             }
             ensureCurrentJoinRequest();
 
+            // Encrypted rooms get encrypted calls; a client that can't encrypt stays out.
+            const encryptionMode = await resolveCallEncryptionMode(client, matrixRoom ?? client.getRoom(targetRoomId));
+            ensureCurrentJoinRequest();
+            const encryptionUnavailable = describeUnavailableCallEncryption(encryptionMode);
+            if (encryptionUnavailable) {
+                throw Object.assign(new Error(encryptionUnavailable), { name: "CallEncryptionUnavailable" });
+            }
+            const encrypted = encryptionMode === "encrypted";
+
             const credentials = await withTimeout(
                 fetchLiveKitToken(client, config, targetRoomId, {
                     signal: joinAbortController.signal,
+                    e2ee: encrypted,
                 }),
                 VOICE_JOIN_TOKEN_TIMEOUT_MS,
                 "Voice token request timed out.",
@@ -1041,13 +1134,27 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                 },
             );
             ensureCurrentJoinRequest();
+            const keyProvider = encrypted ? new CallKeyProvider() : null;
+            const e2eeWorker = encrypted ? createE2EEWorker() : null;
+            let keyManager: CallKeyManager | null = null;
+            cleanUpEncryption = () => {
+                keyManager?.stop();
+                keyManager = null;
+                e2eeWorker?.terminate();
+            };
             const room = new Room({
                 adaptiveStream: true,
                 dynacast: true,
                 audioCaptureDefaults: buildMicrophoneCaptureOptions(audioSettings),
                 publishDefaults: buildMicrophonePublishOptions(audioSettings),
+                ...(keyProvider && e2eeWorker ? { e2ee: { keyProvider, worker: e2eeWorker } } : {}),
             });
             inFlightRoom = room;
+            // However this call ends, its keys and worker go with it.
+            room.on(RoomEvent.Disconnected, cleanUpEncryption);
+            if (keyProvider) {
+                await room.setE2EEEnabled(true);
+            }
 
             room
                 .on(RoomEvent.ConnectionStateChanged, (state: ConnectionState) => {
@@ -1220,6 +1327,8 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                     setConnectionState(ConnectionState.Disconnected);
                     setMicMuted(true);
                     setLocalCameraEnabled(false);
+                    setCallEncrypted(null);
+                    setKeysReceivedFrom(new Set());
                     setAudioPlaybackBlocked(false);
                     setParticipants([]);
                     setLocalAudioPublished(false);
@@ -1266,6 +1375,23 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
             }
             roomRef.current = room;
             connectedRoomIdRef.current = targetRoomId;
+            setCallEncrypted(encrypted);
+            setKeysReceivedFrom(new Set());
+            if (keyProvider) {
+                // Before the microphone publishes, so its first frame is already encrypted.
+                const manager = new CallKeyManager(client, targetRoomId, room, keyProvider, {
+                    onKeyReceived: (identity) =>
+                        runIfCurrentJoin(() =>
+                            setKeysReceivedFrom((current) =>
+                                current.has(identity) ? current : new Set([...current, identity]),
+                            ),
+                        ),
+                    onError: (keyError) => console.warn("[voice] call key exchange failed", keyError),
+                });
+                keyManager = manager;
+                await manager.start();
+                ensureCurrentJoinRequest();
+            }
 
             try {
                 await room.startAudio();
@@ -1318,6 +1444,7 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
             void playVoiceJoinSound().catch(() => undefined);
             onSessionStateChange?.({ roomId: targetRoomId, status: "connected" });
         } catch (joinError) {
+            cleanUpEncryption();
             if (inFlightRoom) {
                 void inFlightRoom.disconnect().catch(() => undefined);
                 inFlightRoom = null;
@@ -1682,6 +1809,32 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
         onSessionStateChange?.({ roomId: currentRoomId, status: "disconnected" });
     };
 
+    // Leaves and joins again, e.g. to move into the encrypted call once the channel is encrypted.
+    const rejoinCall = async (): Promise<void> => {
+        await leaveVoice();
+        await joinVoice();
+    };
+
+    const encryptChannel = async (): Promise<void> => {
+        setEncryptingChannel(true);
+        try {
+            await client.sendStateEvent(matrixRoomId, EventType.RoomEncryption, { algorithm: "m.megolm.v1.aes-sha2" }, "");
+            // The call follows once the room is encrypted here too, which takes a sync.
+            const room = matrixRoom ?? client.getRoom(matrixRoomId);
+            for (let attempt = 0; attempt < 50 && !room?.hasEncryptionStateEvent(); attempt += 1) {
+                await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+            setRoomEncrypted(true);
+            setEncryptDialogOpen(false);
+            await rejoinCall();
+        } catch (encryptError) {
+            const reason = encryptError instanceof Error ? encryptError.message : String(encryptError);
+            setError(`This channel couldn't be encrypted: ${reason}`);
+        } finally {
+            setEncryptingChannel(false);
+        }
+    };
+
     const toggleMute = async (): Promise<void> => {
         const room = roomRef.current;
         if (!room) {
@@ -2010,6 +2163,9 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                     </div>
                 )}
                 <span className="voice-room-participant-name">{info.displayName}</span>
+                {callEncrypted && !p.isLocal && !keysReceivedFrom.has(p.identity) ? (
+                    <span className="voice-room-participant-keys">Waiting for keys…</span>
+                ) : null}
                 {p.isScreenSharing ? (
                     <span className="voice-room-participant-live">LIVE</span>
                 ) : null}
@@ -2050,6 +2206,10 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
             </li>
         );
     };
+    const roomForPermissions = matrixRoom ?? client.getRoom(matrixRoomId);
+    const canEncryptChannel = Boolean(
+        ownUserId && roomForPermissions?.currentState.maySendStateEvent(EventType.RoomEncryption, ownUserId),
+    );
     // People with their camera on get the big tiles, above everyone else.
     const videoParticipants = participants.filter((p) => p.hasCamera);
     const audioParticipants = participants.filter((p) => !p.hasCamera);
@@ -2150,6 +2310,44 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                 {/* Participant tile grid */}
                 {connected ? (
                     <>
+                        <div className={`voice-room-encryption${callEncrypted ? " is-encrypted" : ""}`}>
+                            <svg className="voice-room-encryption-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="1.5"
+                                    d={
+                                        callEncrypted
+                                            ? "M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
+                                            : "M13.5 10.5V6.75a4.5 4.5 0 1 1 9 0v3.75M3.75 21.75h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H3.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
+                                    }
+                                />
+                            </svg>
+                            <span>
+                                {callEncrypted
+                                    ? "End-to-end encrypted"
+                                    : roomEncrypted
+                                      ? "Not end-to-end encrypted yet: this channel is now encrypted. Rejoin to encrypt the call."
+                                      : "Not end-to-end encrypted: this channel isn't encrypted."}
+                            </span>
+                            {!callEncrypted && roomEncrypted ? (
+                                <button type="button" className="voice-room-encryption-action" onClick={() => void rejoinCall()}>
+                                    Rejoin
+                                </button>
+                            ) : null}
+                            {!callEncrypted && !roomEncrypted && canEncryptChannel ? (
+                                <button type="button" className="voice-room-encryption-action" onClick={() => setEncryptDialogOpen(true)}>
+                                    Encrypt this channel
+                                </button>
+                            ) : null}
+                        </div>
+                        {callEncrypted && unencryptedCallNames.length > 0 ? (
+                            <p className="voice-room-encryption-note" role="status">
+                                {describeUnencryptedCall(unencryptedCallNames)}
+                            </p>
+                        ) : null}
                         <div className="voice-room-participants-toolbar">
                             <p className="voice-room-participants-toolbar-note">
                                 Per-user volume is saved for this channel.
@@ -2467,6 +2665,40 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
             ) : null}
 
             <div ref={audioSinkRef} aria-hidden="true" style={{ display: "none" }} />
+
+            <RoomDialog
+                open={encryptDialogOpen}
+                title="Encrypt this channel?"
+                onClose={() => setEncryptDialogOpen(false)}
+                footer={
+                    <>
+                        <button
+                            type="button"
+                            className="room-dialog-button room-dialog-button-secondary"
+                            onClick={() => setEncryptDialogOpen(false)}
+                            disabled={encryptingChannel}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            className="room-dialog-button room-dialog-button-primary"
+                            onClick={() => void encryptChannel()}
+                            disabled={encryptingChannel}
+                        >
+                            {encryptingChannel ? "Encrypting..." : "Encrypt"}
+                        </button>
+                    </>
+                }
+            >
+                <p className="voice-encrypt-dialog-text">
+                    Calls here will be end-to-end encrypted from now on: only the people in a call can hear and see it, not the
+                    server. This can't be turned off.
+                </p>
+                <p className="voice-encrypt-dialog-text">
+                    Everyone in the call moves over when they rejoin, and needs a current version of Jorvik.
+                </p>
+            </RoomDialog>
 
             <RoomDialog
                 open={desktopCaptureDialogOpen}

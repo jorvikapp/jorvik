@@ -252,15 +252,15 @@ export async function runJsonImport(
                 });
             }
 
-            if (!isVoice) {
-                if (cfg.isEncrypted) {
-                    initialState.push({
-                        type: EventType.RoomEncryption,
-                        state_key: "",
-                        content: { algorithm: "m.megolm.v1.aes-sha2" },
-                    });
-                }
-            } else {
+            // Voice channels too: a call is end-to-end encrypted when its room is.
+            if (cfg.isEncrypted) {
+                initialState.push({
+                    type: EventType.RoomEncryption,
+                    state_key: "",
+                    content: { algorithm: "m.megolm.v1.aes-sha2" },
+                });
+            }
+            if (isVoice) {
                 initialState.push({
                     type: HEOROT_VOICE_CHANNEL_EVENT,
                     state_key: "",

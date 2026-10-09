@@ -5002,6 +5002,56 @@ img.voice-ctrl-icon {
     border-color: rgba(79, 163, 199, 0.75);
 }
 
+/* Whether the call is end-to-end encrypted, above the tiles. */
+.voice-room-encryption {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    margin: 0 0 12px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.voice-room-encryption.is-encrypted {
+    color: var(--status-online);
+}
+
+.voice-room-encryption-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.voice-room-encryption-action {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-pane);
+    color: var(--text-main);
+    font-size: 12px;
+    padding: 3px 8px;
+    cursor: pointer;
+}
+
+.voice-room-encryption-action:hover {
+    background: var(--bg-hover);
+}
+
+.voice-room-encryption-note {
+    margin: -6px 0 12px;
+    color: var(--status-idle);
+    font-size: 12px;
+}
+
+.voice-room-participant-keys {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.voice-encrypt-dialog-text {
+    margin: 0 0 10px;
+}
+
 /* People with their camera on: bigger tiles, above everyone else. */
 .voice-room-video-grid {
     margin: 0 0 16px;

@@ -139,7 +139,7 @@ export async function fetchLiveKitToken(
     client: MatrixClient,
     config: CoreConfig | null,
     matrixRoomId: string,
-    options?: { signal?: AbortSignal },
+    options?: { signal?: AbortSignal; e2ee?: boolean },
 ): Promise<LiveKitTokenResponse> {
     const apiBaseUrl = getVoiceApiBaseUrl(client, config);
     const response = await fetch(`${apiBaseUrl}/livekit/token`, {
@@ -149,7 +149,7 @@ export async function fetchLiveKitToken(
             Authorization: `Bearer ${getMatrixAccessToken(client)}`,
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({ matrixRoomId }),
+        body: JSON.stringify(options?.e2ee ? { matrixRoomId, e2ee: true } : { matrixRoomId }),
     });
 
     if (!response.ok) {
@@ -173,10 +173,11 @@ export async function fetchVoiceParticipants(
     client: MatrixClient,
     config: CoreConfig | null,
     matrixRoomId: string,
+    options?: { e2ee?: boolean },
 ): Promise<VoiceParticipantsResponse> {
     const apiBaseUrl = getVoiceApiBaseUrl(client, config);
     const response = await fetch(
-        `${apiBaseUrl}/livekit/participants?matrixRoomId=${encodeURIComponent(matrixRoomId)}`,
+        `${apiBaseUrl}/livekit/participants?matrixRoomId=${encodeURIComponent(matrixRoomId)}${options?.e2ee ? "&e2ee=1" : ""}`,
         {
             method: "GET",
             headers: {
