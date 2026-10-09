@@ -20,7 +20,9 @@ import { normalizeEmojiShortcode, resetPersonalEmojiPackCache, resetSpaceEmojiPa
 import { PERSONAL_EMOJI_PACK_EVENT_TYPE, SPACE_EMOJI_PACK_EVENT_TYPE } from "../emoji/EmojiPackTypes";
 import { loadAvailableEmojis } from "../emoji/EmojiResolver";
 import { mxidLocalpart, tokenizeMatrixMentions } from "../mentions/mentionTokens";
+import { formatDayDivider, formatFullTimestamp, formatMessageTime, localDayKey } from "../messages/messageTime";
 import { locateNewMessages, mayBeMessage, newMessagesLabel, readUpToEventIds } from "../messages/newMessages";
+import { useCurrentDay } from "../messages/useCurrentDay";
 import { getServerUnreadCount, hasUnreadActivity } from "../notifications/roomUnread";
 import { mxcThumbnailToHttp } from "../utils/mxc";
 import { Avatar } from "./Avatar";
@@ -77,6 +79,9 @@ interface RenderEvent {
     senderAvatarUrl: string | null;
     senderAvatarSources: string[];
     timeLabel: string;
+    timeTitle: string;
+    /** "Today", "Yesterday" or a date, on the first message of each day. */
+    dayDivider: string | null;
 }
 
 interface ReplySummary {
@@ -699,13 +704,6 @@ function extractMessageEvents(room: Room | null): MatrixEvent[] {
     return events;
 }
 
-function formatTime(timestamp: number): string {
-    return new Date(timestamp).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-    });
-}
-
 function getSenderMetadata(
     client: MatrixClient,
     room: Room | null,
@@ -890,16 +888,19 @@ function toRenderEvents(
     room: Room | null,
     events: MatrixEvent[],
     latestEditEventsByTarget: Map<string, MatrixEvent>,
+    now: Date,
 ): RenderEvent[] {
     return events.map((event, index) => {
         const previous = events[index - 1];
+        const newDay = !previous || localDayKey(previous.getTs()) !== localDayKey(event.getTs());
         const sender = getSenderMetadata(client, room, event, 84);
         const { content, edited } = getDisplayContentForEvent(event, latestEditEventsByTarget);
         const rawBody = getTextBody(content) ?? "";
         const body = getReplyEventId(event) ? stripPlainReplyFallback(rawBody) : rawBody;
 
+        // A new day starts a new group under its divider.
         let showHeader = true;
-        if (previous) {
+        if (previous && !newDay) {
             const sameSender = previous.getSender() === event.getSender();
             const sameWindow = Math.abs(event.getTs() - previous.getTs()) <= 5 * 60 * 1000;
             showHeader = !(sameSender && sameWindow);
@@ -918,7 +919,9 @@ function toRenderEvents(
             senderName: sender.name,
             senderAvatarUrl: sender.avatarUrl,
             senderAvatarSources: sender.avatarSources,
-            timeLabel: formatTime(event.getTs()),
+            timeLabel: formatMessageTime(event.getTs(), now),
+            timeTitle: formatFullTimestamp(event.getTs()),
+            dayDivider: newDay ? formatDayDivider(event.getTs(), now) : null,
         };
     });
 }
@@ -2309,9 +2312,11 @@ export function Timeline({
         return ignored.size === 0 ? events : events.filter((event) => !ignored.has(event.getSender() ?? ""));
     }, [client, events, ignoredUsersRevision]);
 
+    // Renewed at midnight, so "Today" turns into "Yesterday" in a chat left open.
+    const currentDay = useCurrentDay();
     const renderEvents = useMemo(
-        () => toRenderEvents(client, room, visibleEvents, latestEditEventsByTarget),
-        [client, visibleEvents, latestEditEventsByTarget, room],
+        () => toRenderEvents(client, room, visibleEvents, latestEditEventsByTarget, currentDay),
+        [client, visibleEvents, latestEditEventsByTarget, room, currentDay],
     );
     const ownUserId = client.getUserId() ?? null;
     const newMessages = useMemo(() => {
@@ -2477,7 +2482,7 @@ export function Timeline({
                     ) : null}
                 </div>
                 {paginating ? <div className="timeline-paginating">Loading older messages...</div> : null}
-                {timelineItems.flatMap(({ event, content, edited, showHeader, body, reply, senderName, senderAvatarUrl, senderAvatarSources, timeLabel }) => {
+                {timelineItems.flatMap(({ event, content, edited, showHeader, body, reply, senderName, senderAvatarUrl, senderAvatarSources, timeLabel, timeTitle, dayDivider }) => {
                     const key = eventKey(event);
                     const eventId = event.getId();
                     const senderId = event.getSender();
@@ -2613,7 +2618,13 @@ export function Timeline({
                                         <span className="timeline-sender">{senderName}</span>
                                         <UserBadges userId={senderId} />
                                     </button>
-                                    <span className="timeline-time">{timeLabel}</span>
+                                    <time
+                                        className="timeline-time"
+                                        dateTime={new Date(event.getTs()).toISOString()}
+                                        title={timeTitle}
+                                    >
+                                        {timeLabel}
+                                    </time>
                                     {edited ? <span className="timeline-edited">(edited)</span> : null}
                                 </div>
                             ) : null}
@@ -2841,9 +2852,19 @@ export function Timeline({
                             ) : null}
                         </div>
                     );
-                    return firstNewEventId !== null && eventId === firstNewEventId
-                        ? [newMessagesLineElement, eventElement]
-                        : [eventElement];
+                    const elements: React.ReactElement[] = [];
+                    if (dayDivider) {
+                        elements.push(
+                            <div key={`day-${key}`} className="timeline-day-divider" role="separator" aria-label={dayDivider}>
+                                <span className="timeline-day-divider-label">{dayDivider}</span>
+                            </div>,
+                        );
+                    }
+                    if (firstNewEventId !== null && eventId === firstNewEventId) {
+                        elements.push(newMessagesLineElement);
+                    }
+                    elements.push(eventElement);
+                    return elements;
                 })}
             </div>
             {lightbox ? (

@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { EventType, type MatrixEvent, type Room } from "matrix-js-sdk/src/matrix";
 
 import { messagePreviewText } from "../../../formatting/messagePreviewText";
+import { formatFullTimestamp, formatMessageTime } from "../../../messages/messageTime";
 
 interface PinsPanelProps {
     room: Room;
@@ -68,9 +69,9 @@ export function PinsPanel({ room }: PinsPanelProps): React.ReactElement {
                         <div className="rs-pin-item" key={item.eventId}>
                             <div className="rs-pin-head">
                                 <span className="rs-pin-sender">{item.senderLabel}</span>
-                                <span className="rs-pin-time">
-                                    {new Date(item.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                </span>
+                                <time className="rs-pin-time" dateTime={new Date(item.ts).toISOString()} title={formatFullTimestamp(item.ts)}>
+                                    {formatMessageTime(item.ts)}
+                                </time>
                             </div>
                             <p className="rs-pin-body">{item.body}</p>
                         </div>

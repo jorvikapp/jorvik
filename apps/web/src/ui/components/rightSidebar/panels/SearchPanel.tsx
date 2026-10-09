@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { EventType, type MatrixEvent, type Room } from "matrix-js-sdk/src/matrix";
 
 import { messagePreviewText } from "../../../formatting/messagePreviewText";
+import { formatFullTimestamp, formatMessageTime } from "../../../messages/messageTime";
 
 interface SearchPanelProps {
     room: Room;
@@ -88,9 +89,9 @@ export function SearchPanel({ room, query, onQueryChange }: SearchPanelProps): R
                     <div className="rs-search-result" key={result.eventId}>
                         <div className="rs-search-result-head">
                             <span className="rs-search-sender">{result.senderLabel}</span>
-                            <span className="rs-search-time">
-                                {new Date(result.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                            </span>
+                            <time className="rs-search-time" dateTime={new Date(result.ts).toISOString()} title={formatFullTimestamp(result.ts)}>
+                                {formatMessageTime(result.ts)}
+                            </time>
                         </div>
                         <p className="rs-search-body">{result.body}</p>
                     </div>
