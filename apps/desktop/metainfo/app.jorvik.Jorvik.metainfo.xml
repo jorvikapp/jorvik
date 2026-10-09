@@ -18,8 +18,9 @@
       encryption is on by default.
     </p>
     <p>
-      It talks to any Matrix homeserver, so conversations are not tied to one
-      provider, and it can be pointed at a server you run yourself.
+      It is built on Matrix, an open network: an account on matrix.jorvik.app
+      can talk with people on other Matrix servers, and the same account works
+      in other Matrix apps.
     </p>
     <p>Features:</p>
     <ul>
@@ -70,6 +71,22 @@
   </branding>
 
   <releases>
+    <release version="1.0.19" date="2026-10-09">
+      <description>
+        <p>A line where new messages begin, dates on messages, and fixes.</p>
+        <ul>
+          <li>A red line marks where new messages begin, and a bar jumps to it (also Shift+Page Up)</li>
+          <li>A line marks where each day begins, messages say "Yesterday at 14:02" or the date, and hovering a time shows the full date</li>
+          <li>Messages are no longer marked as read while you are away from Jorvik</li>
+          <li>A chat whose messages fit on the screen loads its older messages</li>
+          <li>Older messages that finish loading after you switch chats stay in their own chat</li>
+          <li>A profile's "Last active" time keeps counting while someone is idle</li>
+          <li>Channel and chat info have a close button</li>
+          <li>A profile's menu is no longer cut off in a narrow window</li>
+          <li>Security fixes from Electron 44.7.0</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.18" date="2026-10-04">
       <description>
         <p>Text formatting, a quick switcher, unread badges in the rail, and fixes.</p>

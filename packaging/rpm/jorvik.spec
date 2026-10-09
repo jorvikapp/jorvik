@@ -48,7 +48,8 @@ ExclusiveArch:  x86_64
 %description
 Jorvik is a Matrix client that arranges a homeserver the way a chat app should
 feel: Spaces are servers, rooms are channels, and end-to-end encryption is on by
-default. It talks to any Matrix homeserver, including one you run yourself.
+default. It is built on Matrix, an open network: an account on matrix.jorvik.app
+can talk with people on other Matrix servers and works in other Matrix apps.
 
 %prep
 %setup -q -n Jorvik-%{version}
