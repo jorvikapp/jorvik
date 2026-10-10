@@ -58,6 +58,7 @@ import {
 import { RoomList, type DiscoverableSpaceChannel, type SubspaceGroupView } from "./RoomList";
 import { Timeline } from "./Timeline";
 import { Toast, type ToastState } from "./Toast";
+import { RailContextMenu } from "./RailContextMenu";
 import { Avatar } from "./Avatar";
 import { CreateRoomDialog } from "./rooms/CreateRoomDialog";
 import { CreateSpaceDialog } from "./rooms/CreateSpaceDialog";
@@ -97,6 +98,7 @@ import { clearVoiceDiscovery, initVoiceDiscovery } from "../voice/voiceDiscovery
 import { isBadgesRoom, startUserBadges } from "../../core/badges/userBadges";
 import { getRoomNotificationMode, RoomNotificationMode } from "../adapters/roomNotificationAdapter";
 import { summarizeUnread, type UnreadSummary } from "../notifications/roomUnread";
+import { markRoomsRead } from "../notifications/markRead";
 import { QuickSwitcher } from "../quickSwitcher/QuickSwitcher";
 import type { QuickSwitcherItem } from "../quickSwitcher/quickSwitcherSearch";
 import { commandShortcutLabel, usesCommandKey } from "../utils/keyboard";
@@ -907,6 +909,10 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const [voiceDiscoveryReady, setVoiceDiscoveryReady] = useState(false);
     const [rooms, setRooms] = useState<Room[]>(() => [...client.getRooms()]);
     const [selectedSpaceId, setSelectedSpaceId] = useState<string>(PEOPLE_SPACE_ID);
+    // The menu on a right-clicked rail icon. The position object lives here, so the menu
+    // sees the same one on every render.
+    const [railMenu, setRailMenu] = useState<{ position: { x: number; y: number }; railId: string } | null>(null);
+    const closeRailMenu = useCallback(() => setRailMenu(null), []);
     const [activeRoomId, setActiveRoomId] = useState<string | null>(() => {
         const directRoomIds = getDirectRoomIds(client);
         const firstRoom = sortRoomsByActivity(
@@ -2641,6 +2647,24 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         doNotDisturb: presenceEnabled && presenceControl.selection.choice === "dnd",
     });
 
+    // Right-clicking "@" or a Space in the rail: everything in it is marked read.
+    const markRailItemRead = (railId: string): void => {
+        const space = railId === PEOPLE_SPACE_ID ? null : spaces.find((candidate) => candidate.roomId === railId);
+        const railRooms = railId === PEOPLE_SPACE_ID ? peopleChannels : space ? getSpaceChannels(space, roomById) : [];
+        void markRoomsRead(client, railRooms).then(({ failed }) => {
+            if (failed > 0) {
+                pushToast({
+                    type: "error",
+                    message: failed === 1 ? "One chat couldn't be marked as read." : `${failed} chats couldn't be marked as read.`,
+                });
+            }
+        });
+    };
+    const openRailMenu = (event: React.MouseEvent, railId: string): void => {
+        event.preventDefault();
+        setRailMenu({ position: { x: event.clientX, y: event.clientY }, railId });
+    };
+
     return (
         <div className={appShellClassName} style={appShellStyle}>
             <aside className="left-rail">
@@ -2649,6 +2673,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     type="button"
                     className={`rail-icon rail-people${selectedSpaceId === PEOPLE_SPACE_ID ? " is-active" : ""}`}
                     onClick={() => setSelectedSpaceId(PEOPLE_SPACE_ID)}
+                    onContextMenu={(event) => openRailMenu(event, PEOPLE_SPACE_ID)}
                     title="People"
                     aria-label={railLabel("People", railUnread.get(PEOPLE_SPACE_ID), true)}
                 >
@@ -2663,6 +2688,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                             key={space.roomId}
                             className={`rail-icon${selectedSpaceId === space.roomId ? " is-active" : ""}`}
                             onClick={() => setSelectedSpaceId(space.roomId)}
+                            onContextMenu={(event) => openRailMenu(event, space.roomId)}
                             title={getRoomName(space)}
                             aria-label={railLabel(getRoomName(space), railUnread.get(space.roomId), false)}
                         >
@@ -3252,6 +3278,13 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     onClose={() => setQuickSwitcherOpen(false)}
                 />
             ) : null}
+            <RailContextMenu
+                position={railMenu?.position ?? null}
+                onMarkAllRead={() => {
+                    if (railMenu) markRailItemRead(railMenu.railId);
+                }}
+                onClose={closeRailMenu}
+            />
             <Toast toast={toast} onClose={() => setToast(null)} />
         </div>
     );
