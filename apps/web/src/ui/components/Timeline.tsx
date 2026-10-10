@@ -24,6 +24,7 @@ import { formatDayDivider, formatFullTimestamp, formatMessageTime, localDayKey }
 import { locateNewMessages, mayBeMessage, newMessagesLabel, readUpToEventIds } from "../messages/newMessages";
 import { useCurrentDay } from "../messages/useCurrentDay";
 import { getServerUnreadCount, hasUnreadActivity } from "../notifications/roomUnread";
+import { latestMarkableEvent } from "../notifications/markRead";
 import { mxcThumbnailToHttp } from "../utils/mxc";
 import { Avatar } from "./Avatar";
 import { UserBadges } from "./badges/UserBadges";
@@ -2144,7 +2145,7 @@ export function Timeline({
     }, []);
 
     const markActiveRoomReadToLatest = useCallback(async (): Promise<void> => {
-        if (!room || events.length === 0) {
+        if (!room) {
             return;
         }
 
@@ -2153,14 +2154,12 @@ export function Timeline({
             return;
         }
 
-        const latestEvent = events[events.length - 1];
+        // The newest event of any kind, not the newest message shown: one Jorvik doesn't
+        // show (a sticker, a poll, a call) still makes the room unread, and marking only
+        // up to the last shown message left that dot there for good.
+        const latestEvent = latestMarkableEvent(room);
         const latestEventId = latestEvent?.getId();
         if (!latestEvent || !latestEventId) {
-            return;
-        }
-        // Right after a room switch, events still holds the previous room's
-        // timeline for a render, and Synapse rejects a marker from another room.
-        if (latestEvent.getRoomId() !== room.roomId) {
             return;
         }
 
@@ -2196,11 +2195,11 @@ export function Timeline({
         } finally {
             readMarkerInFlightByRoomRef.current.delete(room.roomId);
         }
-    }, [client, events, placeNewMessagesLine, room]);
+    }, [client, placeNewMessagesLine, room]);
 
     const markReadIfAtBottom = useCallback((): void => {
         const container = scrollContainerRef.current;
-        if (!container || !room || events.length === 0) {
+        if (!container || !room) {
             return;
         }
         // A message arriving while the user is away was not read. The receipt
