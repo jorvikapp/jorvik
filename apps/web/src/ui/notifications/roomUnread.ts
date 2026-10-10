@@ -1,4 +1,4 @@
-import { EventType, M_BEACON, NotificationCountType, type MatrixEvent, type Room } from "matrix-js-sdk/src/matrix";
+import { EventType, NotificationCountType, RelationType, type MatrixEvent, type Room } from "matrix-js-sdk/src/matrix";
 
 /** What the server counts as waiting for you in a room: notifying messages, or only mentions. */
 export function getServerUnreadCount(room: Room, type: NotificationCountType = NotificationCountType.Total): number {
@@ -17,24 +17,24 @@ export function getServerUnreadCount(room: Room, type: NotificationCountType = N
     }
 }
 
+// Only what Jorvik shows as a message lights a room up. Anything else (a reaction, an edit,
+// a call being answered or hung up) can't be seen, so a dot for it could never be read away.
+// A missed call still does: its ring is an ordinary message.
 function eventTriggersUnread(event: MatrixEvent, ownUserId: string): boolean {
-    if (event.getSender() === ownUserId) {
+    if (event.getSender() === ownUserId || event.isRedacted()) {
         return false;
     }
 
     switch (event.getType()) {
-        case EventType.RoomMember:
-        case EventType.RoomThirdPartyInvite:
-        case EventType.CallAnswer:
-        case EventType.CallHangup:
-        case EventType.RoomCanonicalAlias:
-        case EventType.RoomServerAcl:
-        case M_BEACON.name:
-        case M_BEACON.altName:
+        case EventType.RoomMessage:
+            return event.getRelation()?.rel_type !== RelationType.Replace;
+        case EventType.Sticker:
+        // Not decrypted yet, and most likely a message.
+        case EventType.RoomMessageEncrypted:
+            return true;
+        default:
             return false;
     }
-
-    return !event.isRedacted();
 }
 
 /** Whether someone else wrote since you last read the room, notifying or not. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { summarizeUnread } from "../../../../src/ui/notifications/roomUnread";
+import { hasUnreadActivity, summarizeUnread } from "../../../../src/ui/notifications/roomUnread";
 
 const ME = "@me:matrix.jorvik.app";
 
@@ -14,7 +14,7 @@ interface FakeOptions {
 
 function fakeRoom({ total = 0, highlight = 0, lastSender = null, read = false, muted = false }: FakeOptions) {
     const events = lastSender
-        ? [{ getId: () => "$last", getSender: () => lastSender, getType: () => "m.room.message", isRedacted: () => false }]
+        ? [{ getId: () => "$last", getSender: () => lastSender, getType: () => "m.room.message", getRelation: () => null, isRedacted: () => false }]
         : [];
     return {
         muted,
@@ -51,5 +51,35 @@ describe("summarizeUnread", () => {
     it("ignores new messages in muted rooms, but still counts their mentions", () => {
         expect(summary([fakeRoom({ lastSender: "@riff:matrix.jorvik.app", muted: true })])).toEqual({ unread: false, count: 0 });
         expect(summary([fakeRoom({ total: 1, highlight: 1, muted: true })])).toEqual({ unread: false, count: 1 });
+    });
+});
+
+describe("hasUnreadActivity", () => {
+    const LILITH = "@lilith:matrix.jorvik.app";
+
+    // Your own message, then one event from Lilith; read up to (and including) yours.
+    function roomEndingWith(type: string, relation: { rel_type: string } | null = null) {
+        const events = [
+            { getId: () => "$mine", getSender: () => ME, getType: () => "m.room.message", getRelation: () => null, isRedacted: () => false },
+            { getId: () => "$theirs", getSender: () => LILITH, getType: () => type, getRelation: () => relation, isRedacted: () => false },
+        ];
+        return {
+            getLiveTimeline: () => ({ getEvents: () => events }),
+            timeline: events,
+            hasUserReadEvent: (_userId: string, eventId: string) => eventId === "$mine",
+        } as never;
+    }
+
+    it("lights up for a new message, a sticker, or one still being decrypted", () => {
+        expect(hasUnreadActivity(roomEndingWith("m.room.message"), ME)).toBe(true);
+        expect(hasUnreadActivity(roomEndingWith("m.sticker"), ME)).toBe(true);
+        expect(hasUnreadActivity(roomEndingWith("m.room.encrypted"), ME)).toBe(true);
+    });
+
+    it("stays dark for what Jorvik doesn't show: a call answered or hung up, a reaction, an edit", () => {
+        expect(hasUnreadActivity(roomEndingWith("org.heorot.call.answer"), ME)).toBe(false);
+        expect(hasUnreadActivity(roomEndingWith("org.heorot.call.hangup"), ME)).toBe(false);
+        expect(hasUnreadActivity(roomEndingWith("m.reaction", { rel_type: "m.annotation" }), ME)).toBe(false);
+        expect(hasUnreadActivity(roomEndingWith("m.room.message", { rel_type: "m.replace" }), ME)).toBe(false);
     });
 });

@@ -9,6 +9,7 @@ function event(id: string, sender: string, type = "m.room.message", status: stri
         getId: () => id,
         getSender: () => sender,
         getType: () => type,
+        getRelation: () => null,
         isRedacted: () => false,
         status,
     };
