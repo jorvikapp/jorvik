@@ -71,6 +71,19 @@
   </branding>
 
   <releases>
+    <release version="1.0.22" date="2026-10-11">
+      <description>
+        <p>Easier channel making, and invites by @name.</p>
+        <ul>
+          <li>A + at the top of a space's channel list creates a channel, for people who can add one</li>
+          <li>A new channel shows in its space straight away, as does one someone else adds, with no need to reload channels</li>
+          <li>Create channel in Server settings keeps settings open, and picks the new channel in the list, ready to move</li>
+          <li>Invite people on your server as just @name, and a mistyped name is caught instead of looking invited</li>
+          <li>Messages such as "Channels reloaded" show over settings instead of behind them</li>
+          <li>The badges room is no longer offered as a place to invite someone</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.21" date="2026-10-10">
       <description>
         <p>Mark all as read, unread dots that clear, and encrypted spaces.</p>
