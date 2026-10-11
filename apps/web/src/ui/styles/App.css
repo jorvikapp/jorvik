@@ -5519,11 +5519,13 @@ img.voice-ctrl-icon {
     to   { opacity: 0; transform: translateY(8px) scale(0.97); }
 }
 
+/* Above settings, whose tabs push toasts too (Reload channels, say): under
+   settings those never showed. */
 .toast {
     position: fixed;
     right: 18px;
     bottom: 16px;
-    z-index: 1300;
+    z-index: 1800;
     border-radius: 10px;
     border: 1px solid rgba(185, 187, 190, 0.24);
     background: rgba(54, 57, 63, 0.98);
@@ -5824,6 +5826,7 @@ select,
 .verification-dialog-overlay,
 .emoji-upload-overlay,
 .incoming-call,
+.toast,
 /* The sign-in card stays a grip; its checkbox labels take clicks. */
 .login-checkbox {
     -webkit-app-region: no-drag;
