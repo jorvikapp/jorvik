@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import type { MatrixClient, Room } from "matrix-js-sdk/src/matrix";
 
 import { RoomList } from "../../../components/RoomList";
+import { CreateRoomDialog } from "../../../components/rooms/CreateRoomDialog";
 
 interface ChannelsTabProps {
     client: MatrixClient;
@@ -9,7 +10,6 @@ interface ChannelsTabProps {
     rooms: Room[];
     activeRoomId: string | null;
     onSelectRoom: (roomId: string) => void;
-    onCreateChannel: () => void;
     onRefreshChannels: () => Promise<void>;
 }
 
@@ -19,10 +19,12 @@ export function ChannelsTab({
     rooms,
     activeRoomId,
     onSelectRoom,
-    onCreateChannel,
     onRefreshChannels,
 }: ChannelsTabProps): React.ReactElement {
     const [refreshing, setRefreshing] = useState(false);
+    // The dialog opens over settings rather than closing them: the new channel then
+    // turns up in this list, picked, ready to be moved where it belongs.
+    const [createOpen, setCreateOpen] = useState(false);
 
     const handleRefresh = async (): Promise<void> => {
         if (refreshing) {
@@ -53,7 +55,7 @@ export function ChannelsTab({
                 >
                     {refreshing ? "Reloading..." : "Reload channels"}
                 </button>
-                <button type="button" className="settings-button settings-button-secondary" onClick={onCreateChannel}>
+                <button type="button" className="settings-button settings-button-secondary" onClick={() => setCreateOpen(true)}>
                     Create channel
                 </button>
             </div>
@@ -70,6 +72,14 @@ export function ChannelsTab({
                     onSelectRoom={onSelectRoom}
                 />
             </div>
+
+            <CreateRoomDialog
+                client={client}
+                open={createOpen}
+                spaceParentId={spaceId}
+                onClose={() => setCreateOpen(false)}
+                onCreated={onSelectRoom}
+            />
         </div>
     );
 }

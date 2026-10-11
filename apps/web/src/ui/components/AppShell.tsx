@@ -1388,12 +1388,35 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 .map((roomId) => roomById.get(roomId))
                 .filter((room): room is Room => Boolean(room && !room.isSpaceRoom() && isVisibleMembership(room)));
             if (hierarchyRooms.length > 0) {
-                return sortRoomsBySpaceOrder(selectedSpaceRoom, hierarchyRooms);
+                // The hierarchy is from when the space was opened. A channel added since,
+                // like one just created here, is in the space's own state already: list
+                // it now, not after the next fetch. A child without via was taken out.
+                const listed = new Set(hierarchyRooms.map((room) => room.roomId));
+                const childOrder = readSpaceChildOrder(selectedSpaceRoom);
+                const added = getSpaceChannels(selectedSpaceRoom, roomById).filter(
+                    (room) => !listed.has(room.roomId) && (childOrder.get(room.roomId)?.viaServers.length ?? 0) > 0,
+                );
+                return sortRoomsBySpaceOrder(selectedSpaceRoom, [...hierarchyRooms, ...added]);
             }
         }
 
         return getSpaceChannels(selectedSpaceRoom, roomById);
     }, [peopleChannels, roomById, selectedSpaceHierarchyJoinedRoomIds, selectedSpaceId, selectedSpaceRoom]);
+
+    // The channels the selected space's own state lists. The hierarchy is fetched
+    // again when they change: it is cached, and dropped from the cache when a
+    // m.space.child arrives, but nothing else asks for it again.
+    const selectedSpaceChildrenKey = useMemo(() => {
+        if (!selectedSpaceRoom?.isSpaceRoom()) {
+            return "";
+        }
+
+        return [...readSpaceChildOrder(selectedSpaceRoom).entries()]
+            .filter(([, metadata]) => metadata.viaServers.length > 0)
+            .map(([roomId]) => roomId)
+            .sort()
+            .join("\u0000");
+    }, [rooms, selectedSpaceRoom]);
 
     useEffect(() => {
         if (selectedSpaceId === PEOPLE_SPACE_ID || !selectedSpaceRoom?.isSpaceRoom()) {
@@ -1598,7 +1621,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             cancelled = true;
             abortController.abort();
         };
-    }, [client, selectedSpaceId, selectedSpaceRoom, visibleRoomIdsKey]);
+    }, [client, selectedSpaceId, selectedSpaceRoom, visibleRoomIdsKey, selectedSpaceChildrenKey]);
 
     useEffect(() => {
         setExpandedSubspaceIds([]);
@@ -3240,10 +3263,6 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 onOpenEmojiUpload={(target) => {
                     setEmojiUploadTarget(target);
                     setEmojiUploadOpen(true);
-                }}
-                onOpenCreateRoomInSpace={(spaceId) => {
-                    setSettingsState(null);
-                    openCreateRoomDialog(spaceId);
                 }}
                 onRefreshSpaceChannels={reloadSpaceChannelsFromServer}
                 onClose={() => setSettingsState(null)}

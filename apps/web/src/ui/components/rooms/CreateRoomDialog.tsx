@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { EventType, Preset, Visibility, type MatrixClient } from "matrix-js-sdk/src/matrix";
 
+import { waitForSpaceChild } from "../../../core/spaces/waitForSpaceChild";
+import { formatUserIdForDisplay } from "../../../core/users/formatUserId";
+import { resolveInviteTargets } from "../../adapters/inviteAdapter";
 import { RoomDialog } from "./RoomDialog";
 import {
     HEOROT_SPACE_CHILD_CHANNEL_TYPE_KEY,
@@ -15,10 +18,6 @@ interface CreateRoomDialogProps {
     spaceParentId?: string | null;
     onClose: () => void;
     onCreated?: (roomId: string) => void;
-}
-
-function parseUserIds(input: string): string[] {
-    return [...new Set(input.split(/[\s,]+/).map((value) => value.trim()).filter((value) => value.length > 0))];
 }
 
 function normalizeAliasLocalPart(input: string): string {
@@ -66,6 +65,13 @@ export function CreateRoomDialog({
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Adding a room to a space is sending the space's m.space.child for it. Without
+    // that right the room would be made and then left outside the space.
+    const myUserId = client.getUserId() ?? "";
+    const spaceRoom = spaceParentId ? client.getRoom(spaceParentId) : null;
+    const canAddToSpace =
+        !spaceParentId || Boolean(spaceRoom && myUserId && spaceRoom.currentState.maySendStateEvent(EventType.SpaceChild, myUserId));
+
     useEffect(() => {
         if (!open) {
             return;
@@ -83,13 +89,21 @@ export function CreateRoomDialog({
     }, [open]);
 
     const submit = async (): Promise<void> => {
-        const parsedInvites = parseUserIds(inviteInput);
         const normalizedAlias = normalizeAliasLocalPart(aliasLocalPart);
 
         setSaving(true);
         setError(null);
 
         try {
+            // Checked before anything is made: the server refuses the whole room over
+            // one ID it can't read, and takes an invite for someone it doesn't have.
+            const inviteTargets = await resolveInviteTargets(client, inviteInput);
+            const inviteFailure = inviteTargets.failed[0];
+            if (inviteFailure) {
+                setError(`${formatUserIdForDisplay(inviteFailure.userId, client.getDomain())}: ${inviteFailure.message}`);
+                return;
+            }
+
             const initialState: Array<{ type: string; state_key: string; content: Record<string, unknown> }> = [];
             // Voice channels too: a call is end-to-end encrypted when its room is.
             if (enableEncryption) {
@@ -125,7 +139,7 @@ export function CreateRoomDialog({
                 topic: topic.trim() || undefined,
                 visibility,
                 preset: visibility === Visibility.Public ? Preset.PublicChat : Preset.PrivateChat,
-                invite: parsedInvites.length > 0 ? parsedInvites : undefined,
+                invite: inviteTargets.userIds.length > 0 ? inviteTargets.userIds : undefined,
                 room_alias_name: visibility === Visibility.Public && normalizedAlias ? normalizedAlias : undefined,
                 initial_state: initialState.length > 0 ? initialState : undefined,
             };
@@ -164,6 +178,9 @@ export function CreateRoomDialog({
                     parentContent as any,
                     spaceParentId,
                 );
+
+                // Until the sync brings these back, the space doesn't list the channel here.
+                await waitForSpaceChild(client, spaceParentId, response.room_id);
             }
 
             onCreated?.(response.room_id);
@@ -186,7 +203,12 @@ export function CreateRoomDialog({
                     <button type="button" className="room-dialog-button room-dialog-button-secondary" onClick={onClose} disabled={saving}>
                         Cancel
                     </button>
-                    <button type="button" className="room-dialog-button room-dialog-button-primary" onClick={() => void submit()} disabled={saving}>
+                    <button
+                        type="button"
+                        className="room-dialog-button room-dialog-button-primary"
+                        onClick={() => void submit()}
+                        disabled={saving || !canAddToSpace}
+                    >
                         {saving ? "Creating..." : "Create"}
                     </button>
                 </>
@@ -250,7 +272,7 @@ export function CreateRoomDialog({
                     className="room-dialog-textarea"
                     value={inviteInput}
                     onChange={(event) => setInviteInput(event.target.value)}
-                    placeholder="@alice:example.org @bob:example.org"
+                    placeholder="@alice @bob:example.org"
                     disabled={saving}
                 />
             </label>
@@ -272,6 +294,9 @@ export function CreateRoomDialog({
                 />
                 Voice channel (chat suppressed)
             </label>
+            {!canAddToSpace ? (
+                <p className="room-dialog-warning">You don't have permission to add channels to this Space.</p>
+            ) : null}
             {error ? <p className="room-dialog-error">{error}</p> : null}
         </RoomDialog>
     );

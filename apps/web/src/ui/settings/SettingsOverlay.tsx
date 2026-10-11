@@ -103,7 +103,6 @@ interface SettingsOverlayProps {
     activeRoomId: string | null;
     onSelectRoom: (roomId: string) => void;
     onOpenEmojiUpload: (target: EmojiPackTarget) => void;
-    onOpenCreateRoomInSpace: (spaceId: string) => void;
     onRefreshSpaceChannels: (spaceId: string) => Promise<void>;
     onClose: () => void;
     onLeftSpace: (spaceId: string) => void;
@@ -129,7 +128,6 @@ export function SettingsOverlay({
     activeRoomId,
     onSelectRoom,
     onOpenEmojiUpload,
-    onOpenCreateRoomInSpace,
     onRefreshSpaceChannels,
     onClose,
     onLeftSpace,
@@ -237,7 +235,6 @@ export function SettingsOverlay({
                         rooms={spaceChannels}
                         activeRoomId={activeRoomId}
                         onSelectRoom={onSelectRoom}
-                        onCreateChannel={() => onOpenCreateRoomInSpace(spaceRoom.roomId)}
                         onRefreshChannels={() => onRefreshSpaceChannels(spaceRoom.roomId)}
                     />
                 );
