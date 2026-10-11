@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { MatrixClient, Room } from "matrix-js-sdk/src/matrix";
 
+import { isBadgesRoom } from "../../../core/badges/userBadges";
 import { plainUserDisplayName } from "../../../core/users/userDisplayName";
 import { getDirectRoomIds } from "../../adapters/dmAdapter";
 import { inviteUsersToRoom } from "../../adapters/inviteAdapter";
@@ -56,6 +57,8 @@ export function AddToRoomDialog({ client, userId, onClose, onInvited }: AddToRoo
 
         return joined
             .filter((room) => !directRoomIds.has(room.roomId))
+            // It only holds the badge list, and the app hides it everywhere else.
+            .filter((room) => !isBadgesRoom(room))
             .filter((room) => room.canInvite(myUserId))
             .filter((room) => {
                 const membership = room.getMember(userId)?.membership;

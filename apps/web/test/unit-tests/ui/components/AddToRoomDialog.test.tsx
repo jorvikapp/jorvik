@@ -18,10 +18,11 @@ const THEM = "@them:x";
 let container: HTMLDivElement;
 let root: Root;
 
-function room(roomId: string, name: string, opts: { space?: boolean; canInvite?: boolean; theirs?: string; children?: string[] } = {}) {
+function room(roomId: string, name: string, opts: { space?: boolean; canInvite?: boolean; theirs?: string; children?: string[]; type?: string } = {}) {
     return {
         roomId,
         name,
+        getType: () => opts.type,
         getCanonicalAlias: () => null,
         getMyMembership: () => "join",
         isSpaceRoom: () => opts.space === true,
@@ -39,6 +40,7 @@ const ROOMS = [
     room("!mods:x", "mods", { canInvite: false }),
     room("!lounge:x", "lounge", { theirs: "join" }),
     room("!dm:x", "them"),
+    room("!badges:x", "Jorvik badges", { type: "app.jorvik.badges" }),
 ];
 const client = { getUserId: () => "@me:x", getUser: () => ({ displayName: "Them" }), getRooms: () => ROOMS };
 
@@ -56,7 +58,7 @@ afterEach(() => {
 });
 
 describe("AddToRoomDialog", () => {
-    it("lists only places you can invite them to, spaces first", () => {
+    it("lists only places you can invite them to, spaces first, never the badges room", () => {
         act(() => root.render(<AddToRoomDialog client={client as never} userId={THEM} onClose={vi.fn()} onInvited={vi.fn()} />));
         const labels = [...document.querySelectorAll(".add-to-room-item")].map((item) => item.textContent);
         expect(labels).toEqual(["Test SpaceSpaceInvite", "# generalTest SpaceInvite"]);
