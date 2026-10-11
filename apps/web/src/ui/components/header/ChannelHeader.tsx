@@ -16,6 +16,8 @@ interface ChannelHeaderProps {
     onSearchQueryChange: (value: string) => void;
     onSelectSidebarMode: (mode: RightSidebarMode) => void;
     onOpenDirectChat: () => void;
+    /** "Create channel" in a space, where that's what it makes. */
+    createRoomLabel?: string;
     onOpenCreateRoom: () => void;
     onOpenJoinRoom: () => void;
     onOpenInviteUsers: () => void;
@@ -107,6 +109,7 @@ export function ChannelHeader({
     onSearchQueryChange,
     onSelectSidebarMode,
     onOpenDirectChat,
+    createRoomLabel = "Create room",
     onOpenCreateRoom,
     onOpenJoinRoom,
     onOpenInviteUsers,
@@ -273,7 +276,7 @@ export function ChannelHeader({
                                     setMenuOpen(false);
                                 }}
                             >
-                                Create room
+                                {createRoomLabel}
                             </button>
                             <button
                                 type="button"

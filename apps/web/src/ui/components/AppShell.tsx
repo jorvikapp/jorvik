@@ -1880,6 +1880,10 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const { panelMode, selectUser, clearSelectedUser } = useSelectedUser(activeRoom?.roomId ?? null);
     const ownUserId = client.getUserId() ?? "";
     const canInviteInActiveRoom = Boolean(activeRoom && ownUserId && activeRoom.canInvite(ownUserId));
+    // Adding a channel to a space is sending the space's m.space.child for it.
+    const canCreateChannelInSpace = Boolean(
+        selectedSpaceRoom && ownUserId && selectedSpaceRoom.currentState.maySendStateEvent(EventType.SpaceChild, ownUserId),
+    );
     // Read once and never updated, this showed the raw user ID whenever the
     // profile had not reached the store before the first render -- nothing
     // listened for it arriving, so it stayed wrong until some unrelated state
@@ -2750,6 +2754,17 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                                 New DM
                             </button>
                         ) : null}
+                        {selectedSpaceRoom && canCreateChannelInSpace ? (
+                            <button
+                                type="button"
+                                className="pane-top-action"
+                                onClick={() => openCreateRoomDialog(selectedSpaceRoom.roomId)}
+                                title="Create channel"
+                                aria-label="Create channel"
+                            >
+                                +
+                            </button>
+                        ) : null}
                         {selectedSpaceRoom ? (
                             <button
                                 type="button"
@@ -3002,6 +3017,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     onSearchQueryChange={setSidebarSearchQuery}
                     onSelectSidebarMode={selectSidebarMode}
                     onOpenDirectChat={() => setCreateDirectChatOpen(true)}
+                    createRoomLabel={selectedSpaceId === PEOPLE_SPACE_ID ? "Create room" : "Create channel"}
                     onOpenCreateRoom={() =>
                         openCreateRoomDialog(selectedSpaceId === PEOPLE_SPACE_ID ? null : selectedSpaceRoom?.roomId ?? null)
                     }
