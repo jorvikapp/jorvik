@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { type MatrixClient, type Room } from "matrix-js-sdk/src/matrix";
 
+import { formatUserIdForDisplay } from "../../../core/users/formatUserId";
 import { inviteUsersToRoom, type InviteUsersResult } from "../../adapters/inviteAdapter";
 import { RoomDialog } from "./RoomDialog";
 import { getRoomDisplayName } from "./roomAdminUtils";
@@ -58,7 +59,7 @@ export function InviteDialog({
             if (result.invited.length === 0) {
                 const firstFailure = result.failed[0];
                 if (firstFailure) {
-                    setError(`${firstFailure.userId}: ${firstFailure.message}`);
+                    setError(`${formatUserIdForDisplay(firstFailure.userId, client.getDomain())}: ${firstFailure.message}`);
                 } else {
                     setError("Failed to invite users.");
                 }
@@ -97,10 +98,12 @@ export function InviteDialog({
                     className="room-dialog-textarea"
                     value={userIdInput}
                     onChange={(event) => setUserIdInput(event.target.value)}
-                    placeholder="@alice:example.org, @bob:example.org"
+                    placeholder="@alice, @bob:example.org"
                     disabled={inviting}
                 />
-                <small className="room-dialog-muted">Use spaces, commas, or new lines to invite multiple users.</small>
+                <small className="room-dialog-muted">
+                    People on this server are just @name. Use spaces, commas, or new lines to invite several.
+                </small>
             </label>
             <label className="room-dialog-field">
                 <span>Reason (optional)</span>

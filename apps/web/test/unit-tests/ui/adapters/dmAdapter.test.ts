@@ -8,6 +8,7 @@ import {
     findExistingDirectRoomId,
     getDirectRoomIds,
     isValidMatrixUserId,
+    qualifyMatrixUserId,
 } from "../../../../src/ui/adapters/dmAdapter";
 
 interface MockClientOptions {
@@ -86,6 +87,15 @@ describe("dmAdapter", () => {
         expect(isValidMatrixUserId("  @alice:example.org ")).toBe(true);
         expect(isValidMatrixUserId("alice:example.org")).toBe(false);
         expect(isValidMatrixUserId("@alice")).toBe(false);
+    });
+
+    it("qualifyMatrixUserId puts a bare @name on our server, in lower case", () => {
+        expect(qualifyMatrixUserId("@alice", "example.org")).toBe("@alice:example.org");
+        // Synapse takes an invite for "@Alice:example.org" though no such user can exist.
+        expect(qualifyMatrixUserId(" @Alice ", "example.org")).toBe("@alice:example.org");
+        expect(qualifyMatrixUserId("@Bob:other.org", "example.org")).toBe("@Bob:other.org");
+        expect(qualifyMatrixUserId("alice", "example.org")).toBe("alice");
+        expect(qualifyMatrixUserId("@alice", null)).toBe("@alice");
     });
 
     it("getDirectRoomIds sanitizes m.direct content and deduplicates room IDs", () => {

@@ -365,8 +365,10 @@ export function isValidMatrixUserId(userId: string): boolean {
  * Expands a bare local reference into a full Matrix user ID.
  *
  * `@alice` becomes `@alice:example.org` for the supplied home server domain, so
- * users on your own server can be addressed without typing the domain. Input
- * that already carries a domain, or that does not start with "@", is returned
+ * users on your own server can be addressed without typing the domain. `@Alice`
+ * does too: Synapse refuses capitals in new user IDs, yet accepts an invite for
+ * `@Alice:example.org` and says nothing, so it would reach no one. Input that
+ * already carries a domain, or that does not start with "@", is returned
  * unchanged - a bare word must keep matching display names rather than being
  * silently turned into a user ID.
  */
@@ -381,7 +383,7 @@ export function qualifyMatrixUserId(userId: string, domain: string | null): stri
         return trimmed;
     }
 
-    return `${trimmed}:${domain}`;
+    return `@${localpart.toLowerCase()}:${domain}`;
 }
 
 export function getDirectRoomIds(client: MatrixClient): Set<string> {

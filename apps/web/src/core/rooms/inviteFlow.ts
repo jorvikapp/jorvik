@@ -1,6 +1,6 @@
 import { EventType, type MatrixClient, type Room } from "matrix-js-sdk/src/matrix";
 
-import { isValidMatrixUserId } from "../dm/directChats";
+import { isValidMatrixUserId, qualifyMatrixUserId } from "../dm/directChats";
 import {
     getMatrixErrorCode,
     getMatrixErrorMessage,
@@ -15,6 +15,11 @@ export interface InviteFailure {
 
 export interface InviteUsersResult {
     invited: string[];
+    failed: InviteFailure[];
+}
+
+export interface InviteTargets {
+    userIds: string[];
     failed: InviteFailure[];
 }
 
@@ -159,31 +164,67 @@ export function parseInviteUserIds(rawInput: string): string[] {
     return [...new Set(tokens)];
 }
 
+async function isUnknownUser(client: MatrixClient, userId: string): Promise<boolean> {
+    try {
+        await client.getProfileInfo(userId);
+        return false;
+    } catch (lookupError) {
+        // Only a definite "no such user"; anything else is left to the invite itself.
+        return getMatrixErrorStatus(lookupError) === 404 || getMatrixErrorCode(lookupError) === "M_NOT_FOUND";
+    }
+}
+
+/**
+ * The user IDs typed into an invite box. "@alice" means @alice on our own server,
+ * as it does when starting a chat. Someone on our server is looked up first:
+ * Synapse accepts an invite for a user it doesn't have and says nothing, so a
+ * mistyped name would look invited and never arrive.
+ */
+export async function resolveInviteTargets(client: MatrixClient, rawInput: string): Promise<InviteTargets> {
+    const domain = client.getDomain();
+    const candidates = [...new Set(parseInviteUserIds(rawInput).map((entry) => qualifyMatrixUserId(entry, domain)))];
+    const userIds: string[] = [];
+    const failed: InviteFailure[] = [];
+
+    for (const userId of candidates) {
+        if (!isValidMatrixUserId(userId)) {
+            failed.push({
+                userId,
+                message: "Not a user ID. Write @name, or @name:server for someone on another server.",
+            });
+            continue;
+        }
+
+        if (domain && userId.slice(userId.indexOf(":") + 1) === domain && (await isUnknownUser(client, userId))) {
+            failed.push({
+                userId,
+                message: "User was not found on the homeserver.",
+            });
+            continue;
+        }
+
+        userIds.push(userId);
+    }
+
+    return { userIds, failed };
+}
+
 export async function inviteUsersToRoom(
     client: MatrixClient,
     roomId: string,
     rawInput: string,
     reason = "",
 ): Promise<InviteUsersResult> {
-    const targetUserIds = parseInviteUserIds(rawInput);
-    if (targetUserIds.length === 0) {
-        throw new Error("Enter at least one Matrix user ID (example: @alice:example.org).");
+    if (parseInviteUserIds(rawInput).length === 0) {
+        throw new Error("Enter at least one user ID (example: @alice).");
     }
 
     const normalizedReason = normalizeReason(reason);
     const parentSpaceIds = getInvitableParentSpaceIds(client, roomId);
+    const { userIds: targetUserIds, failed } = await resolveInviteTargets(client, rawInput);
     const invited: string[] = [];
-    const failed: InviteFailure[] = [];
 
     for (const targetUserId of targetUserIds) {
-        if (!isValidMatrixUserId(targetUserId)) {
-            failed.push({
-                userId: targetUserId,
-                message: "Invalid Matrix user ID format.",
-            });
-            continue;
-        }
-
         try {
             await client.invite(roomId, targetUserId, normalizedReason);
             invited.push(targetUserId);
