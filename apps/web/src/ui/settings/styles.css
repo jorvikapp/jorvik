@@ -59,6 +59,12 @@
     background: rgba(255, 255, 255, 0.74);
 }
 
+/* The sign-in and security screens' buttons are green but take the page's text colour, which
+   in light mode is black on dark green. Light mode now reaches these screens from the start. */
+[data-theme="light"] .login-card button:not(.login-secondary-button):not(.login-link-button):not(.login-mode-button.is-active) {
+    color: #ffffff;
+}
+
 .app-shell.hide-timestamps .timeline-time {
     display: none;
 }
