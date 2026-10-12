@@ -23,6 +23,42 @@
     --badge-early-supporter: #b4325a;
 }
 
+/* The right panel's cards, buttons and hovers have fixed dark colours of their own. In light
+   mode they take the theme's, or the text on them (which does follow the theme) turns black
+   on dark. */
+[data-theme="light"] .rp-room-header,
+[data-theme="light"] .rp-icon-btn,
+[data-theme="light"] .rp-card,
+[data-theme="light"] .rp-row-button,
+[data-theme="light"] .rp-profile-hero {
+    border-color: var(--border);
+    background: var(--bg-card);
+}
+
+[data-theme="light"] .rs-row-action:hover,
+[data-theme="light"] .rp-member-row:hover,
+[data-theme="light"] .rp-icon-btn:hover:not(:disabled),
+[data-theme="light"] .rp-row-button:hover:not(:disabled) {
+    background: var(--bg-hover);
+}
+
+[data-theme="light"] .rp-room-title,
+[data-theme="light"] .rp-icon-btn,
+[data-theme="light"] .rp-card-title,
+[data-theme="light"] .rp-card-text,
+[data-theme="light"] .rp-member-row-name,
+[data-theme="light"] .rp-row-button,
+[data-theme="light"] .rp-danger-button,
+[data-theme="light"] .rp-row-label,
+[data-theme="light"] .rp-row-value,
+[data-theme="light"] .rp-profile-close {
+    color: var(--text-main);
+}
+
+[data-theme="light"] .rp-profile-close {
+    background: rgba(255, 255, 255, 0.74);
+}
+
 .app-shell.hide-timestamps .timeline-time {
     display: none;
 }
