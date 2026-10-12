@@ -27,6 +27,7 @@ export interface HeorotDesktopBridge {
     clearMediaAuthState?: () => Promise<void>;
     setCloseOnWindowCloseMinimize?: (enabled: boolean) => Promise<void>;
     setDevToolsEnabled?: (enabled: boolean) => Promise<void>;
+    setAppearanceTheme?: (theme: "light" | "dark") => Promise<void>;
     quitApp?: () => Promise<void>;
     getAppVersion?: () => Promise<string>;
     getSystemIdleSeconds?: () => Promise<number>;

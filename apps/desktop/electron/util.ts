@@ -64,6 +64,32 @@ export function writeWindowState(window: BrowserWindow): void {
     }
 }
 
+export type AppearanceTheme = "light" | "dark";
+
+const APPEARANCE_FILE_NAME = "appearance.json";
+
+function getAppearancePath(): string {
+    return path.join(app.getPath("userData"), APPEARANCE_FILE_NAME);
+}
+
+// The app's theme as the page last reported it, so the next window opens in its colours.
+export function readAppearanceTheme(): AppearanceTheme {
+    try {
+        const parsed = JSON.parse(fs.readFileSync(getAppearancePath(), "utf8")) as { theme?: unknown };
+        return parsed.theme === "light" ? "light" : "dark";
+    } catch {
+        return "dark";
+    }
+}
+
+export function writeAppearanceTheme(theme: AppearanceTheme): void {
+    try {
+        fs.writeFileSync(getAppearancePath(), JSON.stringify({ theme }, null, 2), "utf8");
+    } catch {
+        // Ignore persistence errors.
+    }
+}
+
 function isAllowedExternalScheme(url: URL): boolean {
     return ["http:", "https:", "mailto:", "matrix:"].includes(url.protocol);
 }

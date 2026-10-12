@@ -2033,6 +2033,20 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         void bridge.setDevToolsEnabled(userSettings.appearance.developerToolsEnabled);
     }, [userSettings.appearance.developerToolsEnabled]);
 
+    // The desktop window paints its own background and window-controls strip; keep them in the theme.
+    useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+
+        const bridge = window.heorotDesktop;
+        if (!bridge?.setAppearanceTheme) {
+            return;
+        }
+
+        void bridge.setAppearanceTheme(userSettings.appearance.theme);
+    }, [userSettings.appearance.theme]);
+
     useEffect(() => {
         if (isRoomVoiceChannel(activeRoom) && !voiceSessionRoomId && activeRoom) {
             setVoiceSessionRoomId(activeRoom.roomId);

@@ -16,7 +16,14 @@ import {
     Tray,
 } from "electron";
 
-import { openExternalSafely, readWindowState, writeWindowState } from "./util";
+import {
+    type AppearanceTheme,
+    openExternalSafely,
+    readAppearanceTheme,
+    readWindowState,
+    writeAppearanceTheme,
+    writeWindowState,
+} from "./util";
 import { TrayBadge } from "./tray-badge";
 
 const APP_TITLE = "Jorvik";
@@ -47,10 +54,15 @@ const APP_ENTRY_URL = `${APP_PROTOCOL}://${APP_PROTOCOL_HOST}/index.html`;
 const SYSTEM_AUDIO_CAPTURE_MODE_ENV = process.env.HEOROT_DESKTOP_SYSTEM_AUDIO_CAPTURE_MODE?.trim().toLowerCase();
 const SYSTEM_AUDIO_CAPTURE_MODE: "loopback" | "loopbackWithMute" =
     SYSTEM_AUDIO_CAPTURE_MODE_ENV === "loopbackwithmute" ? "loopbackWithMute" : "loopback";
-const WINDOW_BACKGROUND_COLOR = "#0e141b";
-const TITLEBAR_OVERLAY_COLOR = "#121a23";
-const TITLEBAR_OVERLAY_SYMBOL_COLOR = "#e6edf3";
+// The window's own colours: what shows wherever the page hasn't painted, and the strip
+// behind the window controls. They follow the app's theme, or light mode gets dark edges
+// and dark flashes whenever the window is redrawn.
+const WINDOW_COLORS: Record<AppearanceTheme, { background: string; overlay: string; symbol: string }> = {
+    dark: { background: "#0e141b", overlay: "#121a23", symbol: "#e6edf3" },
+    light: { background: "#ffffff", overlay: "#ffffff", symbol: "#060607" },
+};
 const TITLEBAR_OVERLAY_HEIGHT = 32;
+let appearanceTheme: AppearanceTheme = "dark";
 let mainWindow: BrowserWindow | null = null;
 let mediaAuthInterceptorConfigured = false;
 let appProtocolConfigured = false;
@@ -497,8 +509,24 @@ function devToolsAllowed(): boolean {
     return devToolsEnabled || !app.isPackaged || process.argv.includes("--devtools");
 }
 
+function applyWindowColors(window: BrowserWindow): void {
+    const colors = WINDOW_COLORS[appearanceTheme];
+    window.setBackgroundColor(colors.background);
+    if (process.platform === "darwin") {
+        return;
+    }
+
+    try {
+        window.setTitleBarOverlay({ color: colors.overlay, symbolColor: colors.symbol, height: TITLEBAR_OVERLAY_HEIGHT });
+    } catch (error) {
+        console.error(`[jorvik-window] setTitleBarOverlay failed: ${String(error)}`);
+    }
+}
+
 function createMainWindow(): BrowserWindow {
     const windowState = readWindowState();
+    appearanceTheme = readAppearanceTheme();
+    const colors = WINDOW_COLORS[appearanceTheme];
     const preloadPath = resolvePreloadPath();
     console.log(`[jorvik-preload] path=${preloadPath} exists=${fs.existsSync(preloadPath)}`);
 
@@ -510,13 +538,13 @@ function createMainWindow(): BrowserWindow {
         y: windowState.y,
         minWidth: 960,
         minHeight: 640,
-        backgroundColor: WINDOW_BACKGROUND_COLOR,
+        backgroundColor: colors.background,
         icon: resolveIconPath(),
         show: false,
         titleBarStyle: "hidden",
         titleBarOverlay: {
-            color: TITLEBAR_OVERLAY_COLOR,
-            symbolColor: TITLEBAR_OVERLAY_SYMBOL_COLOR,
+            color: colors.overlay,
+            symbolColor: colors.symbol,
             height: TITLEBAR_OVERLAY_HEIGHT,
         },
         webPreferences: {
@@ -625,6 +653,19 @@ function registerIpc(): void {
         devToolsEnabled = enabled === true;
         if (!devToolsAllowed()) {
             mainWindow?.webContents.closeDevTools();
+        }
+    });
+
+    ipcMain.handle("heorot:setAppearanceTheme", (_event, theme: unknown) => {
+        const next: AppearanceTheme = theme === "light" ? "light" : "dark";
+        if (next === appearanceTheme) {
+            return;
+        }
+
+        appearanceTheme = next;
+        writeAppearanceTheme(next);
+        if (mainWindow) {
+            applyWindowColors(mainWindow);
         }
     });
 
