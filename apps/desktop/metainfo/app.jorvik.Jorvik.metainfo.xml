@@ -71,6 +71,17 @@
   </branding>
 
   <releases>
+    <release version="1.0.23" date="2026-10-12">
+      <description>
+        <p>Light mode that stays light.</p>
+        <ul>
+          <li>In light mode the app opens light, with no dark screens before you're signed in</li>
+          <li>The window's edges and the strip behind the window controls follow the theme, so light mode no longer flashes dark when the window is redrawn</li>
+          <li>Profiles and room details in the side panel are readable in light mode</li>
+          <li>The buttons on the sign-in and security screens are readable in light mode</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.22" date="2026-10-11">
       <description>
         <p>Easier channel making, and invites by @name.</p>
