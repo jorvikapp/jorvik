@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import { useGifFavourites, type GifItem } from "./gifFavourites";
+import { isPhoneLayout } from "../../layout/phoneLayout";
 
 const GIF_API = "https://matrix.jorvik.app/gif";
 const TAB_STORAGE_KEY = "jorvik.gif_picker_tab";
@@ -87,7 +88,7 @@ export function GifPicker({ client, onSelect, onClose }: GifPickerProps): React.
 
     return <div className="composer-gif-picker" role="dialog" aria-label="GIF picker">
         <div className="composer-emoji-picker-header">
-            <input className="composer-emoji-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search KLIPY" autoFocus />
+            <input className="composer-emoji-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search KLIPY" autoFocus={!isPhoneLayout()} />
             <button type="button" className="composer-emoji-close" onClick={onClose} aria-label="Close GIF picker">x</button>
         </div>
         {!searching ? <div className="composer-gif-tabs" role="tablist" aria-label="GIFs">

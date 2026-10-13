@@ -26,6 +26,7 @@ import { EmojiPicker } from "./composer/EmojiPicker";
 import { GifPicker } from "./composer/GifPicker";
 import { Toast, type ToastState } from "./Toast";
 import { TypingIndicator } from "./typing/TypingIndicator";
+import { usePhoneLayout } from "../layout/phoneLayout";
 
 interface ComposerProps {
     client: MatrixClient;
@@ -784,6 +785,8 @@ export function Composer({
     replyToEvent,
     onCancelReply,
 }: ComposerProps): React.ReactElement {
+    // Phones send with a button, so Return can start a new line as phone keyboards expect.
+    const isPhone = usePhoneLayout();
     const ownUserId = client.getUserId() ?? "";
     const [text, setText] = useState("");
     const [sendingText, setSendingText] = useState(false);
@@ -1943,7 +1946,7 @@ export function Composer({
             return;
         }
 
-        if (event.key !== "Enter" || event.shiftKey) {
+        if (event.key !== "Enter" || event.shiftKey || isPhone) {
             return;
         }
 
@@ -1959,7 +1962,8 @@ export function Composer({
         setMentionSelectionIndex(0);
         setEmojiSelectionIndex(0);
 
-        if (nextFocusedElement && nextFocusedElement !== document.body) {
+        // On a phone, focus is the on-screen keyboard: tapping away has to put it away.
+        if (isPhone || (nextFocusedElement && nextFocusedElement !== document.body)) {
             return;
         }
 
@@ -1978,7 +1982,7 @@ export function Composer({
             const caret = textarea.value.length;
             textarea.setSelectionRange(caret, caret);
         });
-    }, [room?.roomId, stopLocalTyping]);
+    }, [isPhone, room?.roomId, stopLocalTyping]);
 
     return (
         <div className="composer-wrap">
@@ -2043,6 +2047,8 @@ export function Composer({
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onAttach={() => fileInputRef.current?.click()}
+                showSend={isPhone}
+                onSend={() => void sendMessage()}
                 onToggleEmoji={() => setEmojiPickerOpen((open) => !open)}
                 onToggleGif={() => { setGifPickerOpen((open) => !open); setEmojiPickerOpen(false); }}
                 emojiPicker={

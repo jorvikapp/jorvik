@@ -14,6 +14,8 @@ import "./styles/composer.css";
 import "./styles/channelHeader.css";
 import "./styles/rightPanel.css";
 import "./settings/styles.css";
+// Last, so the phone layout can rearrange what the others set up.
+import "./styles/phone.css";
 
 function LoadingView({ label }: { label: string }): React.ReactElement {
     return (

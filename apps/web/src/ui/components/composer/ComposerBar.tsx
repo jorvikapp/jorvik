@@ -17,6 +17,9 @@ interface ComposerBarProps {
     onDragLeave: (event: React.DragEvent<HTMLDivElement>) => void;
     onDrop: (event: React.DragEvent<HTMLDivElement>) => void;
     onAttach: () => void;
+    // Phones get a send button; elsewhere Enter sends.
+    showSend?: boolean;
+    onSend?: () => void;
     onToggleEmoji: () => void;
     onToggleGif: () => void;
     emojiPicker: React.ReactNode;
@@ -40,6 +43,8 @@ export function ComposerBar({
     onDragLeave,
     onDrop,
     onAttach,
+    showSend = false,
+    onSend,
     onToggleEmoji,
     onToggleGif,
     emojiPicker,
@@ -100,6 +105,22 @@ export function ComposerBar({
                     </div>
                 </div>
             </div>
+            {showSend && value.trim().length > 0 ? (
+                <button
+                    type="button"
+                    className="composer-send-button"
+                    onClick={onSend}
+                    // Keeps the message box focused, so the keyboard stays up for the next message.
+                    onMouseDown={(event) => event.preventDefault()}
+                    disabled={disabled}
+                    aria-label="Send message"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M5 12h13" />
+                        <path d="M13 6l6 6-6 6" />
+                    </svg>
+                </button>
+            ) : null}
         </div>
     );
 }

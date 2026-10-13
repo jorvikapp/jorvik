@@ -5,6 +5,7 @@ import { loadAvailableEmojis } from "../../emoji/EmojiResolver";
 import { loadUnicodeEmoji, type UnicodeEmojiGroup } from "../../emoji/unicodeEmoji";
 import { subscribeEmojiPackUpdated } from "../../emoji/emojiEvents";
 import { mxcThumbnailToHttp } from "../../utils/mxc";
+import { isPhoneLayout } from "../../layout/phoneLayout";
 
 interface EmojiPickerProps {
     client: MatrixClient;
@@ -162,7 +163,7 @@ export function EmojiPicker({
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Search emoji"
-                    autoFocus
+                    autoFocus={!isPhoneLayout()}
                 />
                 <button
                     type="button"

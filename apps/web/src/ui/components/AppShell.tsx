@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { mxidLocalpart } from "../mentions/mentionTokens";
 import {
     ClientEvent,
@@ -103,6 +104,13 @@ import { QuickSwitcher } from "../quickSwitcher/QuickSwitcher";
 import type { QuickSwitcherItem } from "../quickSwitcher/quickSwitcherSearch";
 import { commandShortcutLabel, usesCommandKey } from "../utils/keyboard";
 import { CHANNEL_ORDER_STATE_EVENT, readChannelOrder, writeChannelOrder } from "../stores/CategoryStore";
+import { usePhoneLayout } from "../layout/phoneLayout";
+import { usePhoneBackLayer } from "../layout/phoneBackStack";
+import { scrollsSidewaysWithin, startsInTextInput, swipeCompletes, useHorizontalSwipe } from "../layout/swipe";
+import { collectInvites, collectMentions, inboxBadgeCount, type InboxInvite, type InboxMention } from "../notifications/phoneInbox";
+import { PhoneNotificationsView } from "./phone/PhoneNotificationsView";
+import { PhoneTabBar, type PhoneTab } from "./phone/PhoneTabBar";
+import { PhoneYouView } from "./phone/PhoneYouView";
 
 interface AppShellProps {
     client: MatrixClient;
@@ -1017,6 +1025,37 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         setTimelineFocusBottomNonce((value) => value + 1);
     }, []);
 
+    // Phones show one panel at a time: the lists, with tabs under them, or a chat over the lists,
+    // with the member list in a drawer over the chat.
+    const isPhone = usePhoneLayout();
+    const [phoneChatOpen, setPhoneChatOpen] = useState(false);
+    const [phoneDrawerOpen, setPhoneDrawerOpen] = useState(false);
+    const [phoneTab, setPhoneTab] = useState<PhoneTab>("home");
+    // The room last opened by hand. Going to a space selects its first channel, but on a phone
+    // that doesn't open it, so it isn't the chat the list should mark as current.
+    const [phoneOpenedRoomId, setPhoneOpenedRoomId] = useState<string | null>(null);
+    // Opening a room because the user asked for it. On phones this is what brings the chat up.
+    const showRoom = useCallback(
+        (roomId: string): void => {
+            openRoomAtBottom(roomId);
+            setPhoneOpenedRoomId(roomId);
+            setPhoneDrawerOpen(false);
+            setPhoneChatOpen(true);
+        },
+        [openRoomAtBottom],
+    );
+    const closePhoneChat = useCallback((): void => {
+        setPhoneDrawerOpen(false);
+        setPhoneChatOpen(false);
+    }, []);
+    const closePhoneDrawer = useCallback((): void => setPhoneDrawerOpen(false), []);
+    usePhoneBackLayer(isPhone && phoneChatOpen, closePhoneChat);
+    usePhoneBackLayer(isPhone && phoneChatOpen && phoneDrawerOpen, closePhoneDrawer);
+    const mainPaneRef = useRef<HTMLElement | null>(null);
+    const channelsPaneRef = useRef<HTMLElement | null>(null);
+    const phoneDrawerRef = useRef<HTMLDivElement | null>(null);
+    const phoneDrawerScrimRef = useRef<HTMLDivElement | null>(null);
+
     useEffect(() => {
         const onNotificationClicked = window.heorotDesktop?.onNotificationClicked;
         if (!onNotificationClicked) {
@@ -1027,9 +1066,9 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             if (!roomId || !client.getRoom(roomId)) {
                 return;
             }
-            openRoomAtBottom(roomId);
+            showRoom(roomId);
         });
-    }, [client, openRoomAtBottom]);
+    }, [client, showRoom]);
 
     const handleLiveParticipantsChange = useCallback(
         ({
@@ -1829,7 +1868,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     useEffect(() => {
         if (pendingFocusRoomId) {
             if (channels.some((room) => room.roomId === pendingFocusRoomId)) {
-                openRoomAtBottom(pendingFocusRoomId);
+                showRoom(pendingFocusRoomId);
                 setPendingFocusRoomId(null);
             }
             return;
@@ -1854,7 +1893,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
 
             openRoomAtBottom(channels[0].roomId);
         }
-    }, [activeRoomId, channels, directRoomIds, openRoomAtBottom, pendingFocusRoomId, selectedSpaceId]);
+    }, [activeRoomId, channels, directRoomIds, openRoomAtBottom, pendingFocusRoomId, selectedSpaceId, showRoom]);
 
     useEffect(() => {
         setReplyToEvent(null);
@@ -2282,7 +2321,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const selectChannel = useCallback(
         (roomId: string): void => {
             setPendingFocusRoomId(null);
-            openRoomAtBottom(roomId);
+            showRoom(roomId);
             const room = roomById.get(roomId) ?? client.getRoom(roomId);
             if (!room || !isRoomVoiceChannel(room)) {
                 return;
@@ -2297,7 +2336,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             setVoiceSessionStatus("joining");
             setVoiceAutoJoinNonce((value) => value + 1);
         },
-        [client, isRoomVoiceChannel, openRoomAtBottom, roomById, voiceSessionRoomId, voiceSessionStatus],
+        [client, isRoomVoiceChannel, roomById, showRoom, voiceSessionRoomId, voiceSessionStatus],
     );
 
     const focusRoom = useCallback(
@@ -2327,10 +2366,10 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 }
             }
 
-            openRoomAtBottom(roomId);
+            showRoom(roomId);
             setPendingFocusRoomId(null);
         },
-        [client, directRoomIds, openRoomAtBottom, spaces],
+        [client, directRoomIds, showRoom, spaces],
     );
 
     // Going somewhere from the quick switcher does what clicking it in the
@@ -2404,7 +2443,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 }
             }
 
-            openRoomAtBottom(joinedRoom.roomId);
+            showRoom(joinedRoom.roomId);
             setPendingFocusRoomId(null);
 
             if (options?.preferredSpaceId && options.preferredSpaceId === selectedSpaceId) {
@@ -2418,7 +2457,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
 
             return joinedRoom.roomId;
         },
-        [client, directRoomIds, openRoomAtBottom, selectedSpaceId, spaces],
+        [client, directRoomIds, selectedSpaceId, showRoom, spaces],
     );
 
     const joinDiscoverableSpaceChannel = useCallback(
@@ -2537,9 +2576,9 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             }
         }
 
-        openRoomAtBottom(pendingFocusRoomId);
+        showRoom(pendingFocusRoomId);
         setPendingFocusRoomId(null);
-    }, [client, directRoomIds, openRoomAtBottom, pendingFocusRoomId, spaces]);
+    }, [client, directRoomIds, pendingFocusRoomId, showRoom, spaces]);
 
     const leaveActiveRoom = useCallback(async (): Promise<void> => {
         if (!activeRoom) {
@@ -2637,11 +2676,11 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         document.addEventListener("pointerup", onUp);
     }, [channelsPaneWidth]);
 
-    const appShellStyle = useMemo(() => ({
+    const appShellStyle = useMemo(() => (isPhone ? undefined : {
         gridTemplateColumns: shouldRenderRightPanel
             ? `72px ${channelsPaneWidth}px minmax(0, 1fr) 280px`
             : `72px ${channelsPaneWidth}px minmax(0, 1fr)`,
-    }), [channelsPaneWidth, shouldRenderRightPanel]);
+    }), [channelsPaneWidth, isPhone, shouldRenderRightPanel]);
 
     const appShellClassName = useMemo(() => {
         const classes = ["app-shell"];
@@ -2663,8 +2702,26 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 classes.push("is-desktop-win32");
             }
         }
+        if (isPhone) {
+            classes.push("is-phone", `phone-tab-${phoneTab}`);
+            if (phoneChatOpen) {
+                classes.push("phone-chat-open");
+            }
+            if (phoneDrawerOpen) {
+                classes.push("phone-drawer-open");
+            }
+        }
         return classes.join(" ");
-    }, [shouldRenderRightPanel, isResizingPane, userSettings.appearance.compactMode, userSettings.appearance.showTimestamps]);
+    }, [
+        isPhone,
+        isResizingPane,
+        phoneChatOpen,
+        phoneDrawerOpen,
+        phoneTab,
+        shouldRenderRightPanel,
+        userSettings.appearance.compactMode,
+        userSettings.appearance.showTimestamps,
+    ]);
 
     const hasOpenDialog = Boolean(
         emojiUploadOpen ||
@@ -2682,7 +2739,8 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
 
     useElementLikeNotifications({
         client,
-        activeRoomId,
+        // On a phone showing the lists, no chat is in view, so none of them is quiet.
+        activeRoomId: isPhone && !phoneChatOpen ? null : activeRoomId,
         hasOpenDialog,
         settings: userSettings.notifications,
         doNotDisturb: presenceEnabled && presenceControl.selection.choice === "dnd",
@@ -2706,9 +2764,252 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         setRailMenu({ position: { x: event.clientX, y: event.clientY }, railId });
     };
 
+    // The Notifications tab: invites waiting for an answer, and messages that mention you.
+    const phoneInvites = useMemo(
+        () => (isPhone ? collectInvites(visibleRooms, ownUserId, (room) => directRoomIds.has(room.roomId)) : []),
+        // `rooms` changes whenever a membership or timeline does.
+        [directRoomIds, isPhone, ownUserId, rooms, visibleRooms],
+    );
+    const phoneMentions = useMemo(
+        () => (isPhone && phoneTab === "notifications" ? collectMentions(client, visibleRooms, ownUserId) : []),
+        [client, isPhone, ownUserId, phoneTab, rooms, visibleRooms],
+    );
+    const phoneNotificationCount = useMemo(
+        () => (isPhone ? inboxBadgeCount(visibleRooms, phoneInvites.length) : 0),
+        [isPhone, phoneInvites, rooms, visibleRooms],
+    );
+    const phoneRoomName = useCallback(
+        (roomId: string): string => {
+            const room = client.getRoom(roomId);
+            if (!room) {
+                return roomId;
+            }
+            if (directRoomIds.has(roomId)) {
+                return getOneToOneDirectName(room, ownUserId, localDomain) ?? getRoomName(room);
+            }
+            return room.isSpaceRoom() ? getRoomName(room) : `#${getRoomName(room)}`;
+        },
+        [client, directRoomIds, localDomain, ownUserId],
+    );
+    const phoneRoomContext = useCallback(
+        (roomId: string): string | null => {
+            if (directRoomIds.has(roomId)) {
+                return "Direct message";
+            }
+            const spaceId = findParentSpaceIdForRoom(roomId, spaces);
+            const space = spaceId ? client.getRoom(spaceId) : null;
+            return space ? getRoomName(space) : null;
+        },
+        [client, directRoomIds, spaces],
+    );
+    const phoneUserName = useCallback(
+        (roomId: string, userId: string): string =>
+            client.getRoom(roomId)?.getMember(userId)?.name ||
+            plainUserDisplayName(client.getUser(userId)) ||
+            mxidLocalpart(userId) ||
+            userId,
+        [client],
+    );
+    const acceptPhoneInvite = useCallback(
+        async (invite: InboxInvite): Promise<void> => {
+            try {
+                const name = phoneRoomName(invite.roomId);
+                await requestJoinRoom(invite.roomId);
+                if (invite.kind === "space") {
+                    setPhoneTab("home");
+                }
+                pushToast({ type: "success", message: `Joined ${name}.` });
+            } catch (error) {
+                pushToast({ type: "error", message: describeJoinError(error) });
+            }
+        },
+        [phoneRoomName, pushToast, requestJoinRoom],
+    );
+    const declinePhoneInvite = useCallback(
+        async (invite: InboxInvite): Promise<void> => {
+            try {
+                await client.leave(invite.roomId);
+                setRooms([...client.getRooms()]);
+                pushToast({ type: "info", message: "Invite declined." });
+            } catch (error) {
+                const details = error instanceof Error ? error.message : String(error);
+                pushToast({ type: "error", message: `Couldn't decline the invite. (${details})` });
+            }
+        },
+        [client, pushToast],
+    );
+    const openPhoneMention = useCallback((mention: InboxMention): void => focusRoom(mention.roomId), [focusRoom]);
+    const markPhoneMentionsRead = useCallback((): void => {
+        const roomIds = new Set(phoneMentions.filter((mention) => mention.unread).map((mention) => mention.roomId));
+        const targets = [...roomIds].map((roomId) => client.getRoom(roomId)).filter((room): room is Room => Boolean(room));
+        void markRoomsRead(client, targets).then(({ failed }) => {
+            if (failed > 0) {
+                pushToast({
+                    type: "error",
+                    message: failed === 1 ? "One chat couldn't be marked as read." : `${failed} chats couldn't be marked as read.`,
+                });
+            }
+        });
+    }, [client, phoneMentions, pushToast]);
+
+    // A room that changes without being opened (left, deleted, or swapped for a space's first
+    // channel) takes a phone back to the lists rather than into a chat nobody picked.
+    useEffect(() => {
+        if (isPhone && phoneChatOpen && activeRoomId !== phoneOpenedRoomId) {
+            closePhoneChat();
+        }
+    }, [activeRoomId, closePhoneChat, isPhone, phoneChatOpen, phoneOpenedRoomId]);
+
+    // The header's section buttons toggle a panel beside the chat on wide screens. On phones the
+    // panel is a drawer over the chat, and closing it keeps the section for next time.
+    const phoneHeaderSidebarMode: RightSidebarMode = isPhone && !phoneDrawerOpen ? "closed" : rightSidebarMode;
+    const selectSidebarModeFromHeader = useCallback(
+        (mode: RightSidebarMode): void => {
+            if (!isPhone) {
+                selectSidebarMode(mode);
+                return;
+            }
+            if (mode === "closed") {
+                setPhoneDrawerOpen(false);
+                return;
+            }
+            selectSidebarMode(mode);
+            setPhoneDrawerOpen(true);
+        },
+        [isPhone, selectSidebarMode],
+    );
+    const openPhoneMembers = useCallback((): void => {
+        selectSidebarMode(rightSidebarMode === "closed" ? "members" : rightSidebarMode);
+        setPhoneDrawerOpen(true);
+    }, [rightSidebarMode, selectSidebarMode]);
+    const selectUserFromChat = useCallback(
+        (userId: string): void => {
+            selectUser(userId);
+            if (isPhone) {
+                setPhoneDrawerOpen(true);
+            }
+        },
+        [isPhone, selectUser],
+    );
+
+    // Swipes. Dragging a chat right goes back to the lists and dragging it left brings in the
+    // members; dragging the drawer right puts it away; dragging the lists left brings back the
+    // last chat. Panels follow the finger directly, outside React, then settle through their CSS.
+    const clearPhoneDragStyles = (): void => {
+        for (const element of [mainPaneRef.current, phoneDrawerRef.current, phoneDrawerScrimRef.current]) {
+            if (element) {
+                element.style.transform = "";
+                element.style.transition = "";
+                element.style.opacity = "";
+            }
+        }
+    };
+    const dragPhoneDrawer = (offset: number): void => {
+        const drawer = phoneDrawerRef.current;
+        const scrim = phoneDrawerScrimRef.current;
+        if (!drawer) {
+            return;
+        }
+        const width = drawer.offsetWidth || 1;
+        const shown = Math.min(width, Math.max(0, width - offset));
+        drawer.style.transition = "none";
+        drawer.style.transform = `translateX(${offset}px)`;
+        if (scrim) {
+            scrim.style.transition = "none";
+            scrim.style.opacity = String(shown / width);
+        }
+    };
+    const canActivePhoneRoomShowMembers = Boolean(activeRoom && !activeRoom.isSpaceRoom());
+    useHorizontalSwipe(mainPaneRef, isPhone && phoneChatOpen && !phoneDrawerOpen, {
+        canStart: (direction, target) => {
+            const pane = mainPaneRef.current;
+            if (!pane || startsInTextInput(target) || scrollsSidewaysWithin(target, pane, direction)) {
+                return false;
+            }
+            return direction === 1 || canActivePhoneRoomShowMembers;
+        },
+        onMove: (dx) => {
+            const pane = mainPaneRef.current;
+            if (!pane) {
+                return;
+            }
+            if (dx >= 0) {
+                pane.style.transition = "none";
+                pane.style.transform = `translateX(${dx}px)`;
+                return;
+            }
+            pane.style.transform = "";
+            const width = phoneDrawerRef.current?.offsetWidth ?? 0;
+            dragPhoneDrawer(Math.max(0, width + dx));
+        },
+        onEnd: (dx, velocity) => {
+            if (dx > 0 && swipeCompletes(dx, mainPaneRef.current?.offsetWidth ?? 0, velocity)) {
+                flushSync(closePhoneChat);
+            } else if (dx < 0 && swipeCompletes(-dx, phoneDrawerRef.current?.offsetWidth ?? 0, -velocity)) {
+                flushSync(openPhoneMembers);
+            }
+            clearPhoneDragStyles();
+        },
+    });
+    useHorizontalSwipe(phoneDrawerRef, isPhone && phoneChatOpen && phoneDrawerOpen, {
+        canStart: (direction, target) => {
+            const drawer = phoneDrawerRef.current;
+            return Boolean(drawer) && direction === 1 && !startsInTextInput(target) && !scrollsSidewaysWithin(target, drawer!, direction);
+        },
+        onMove: (dx) => dragPhoneDrawer(Math.max(0, dx)),
+        onEnd: (dx, velocity) => {
+            if (swipeCompletes(dx, phoneDrawerRef.current?.offsetWidth ?? 0, velocity)) {
+                flushSync(closePhoneDrawer);
+            }
+            clearPhoneDragStyles();
+        },
+    });
+    const canReopenPhoneChat = Boolean(phoneOpenedRoomId && phoneOpenedRoomId === activeRoomId && activeRoom);
+    useHorizontalSwipe(channelsPaneRef, isPhone && !phoneChatOpen && phoneTab === "home" && canReopenPhoneChat, {
+        canStart: (direction, target) => direction === -1 && !startsInTextInput(target),
+        onMove: (dx) => {
+            const pane = mainPaneRef.current;
+            if (pane) {
+                pane.style.transition = "none";
+                pane.style.transform = `translateX(${Math.max(0, pane.offsetWidth + dx)}px)`;
+            }
+        },
+        onEnd: (dx, velocity) => {
+            if (dx < 0 && swipeCompletes(-dx, mainPaneRef.current?.offsetWidth ?? 0, -velocity)) {
+                flushSync(() => setPhoneChatOpen(true));
+            }
+            clearPhoneDragStyles();
+        },
+    });
+    // While a chat covers them, the lists and tabs are out of reach of focus and screen readers,
+    // and the other way round.
+    const phoneHomeInert = isPhone && phoneChatOpen ? true : undefined;
+    const rightPanelElement = (
+        <RightPanel
+            client={client}
+            room={activeRoom}
+            activeSpaceRoom={selectedSpaceId === PEOPLE_SPACE_ID ? null : selectedSpaceRoom}
+            mode={panelMode}
+            roomMode={isPhone && rightSidebarMode === "closed" ? "members" : rightSidebarMode}
+            directPartnerId={activeDirectPartnerId}
+            searchQuery={sidebarSearchQuery}
+            onSearchQueryChange={setSidebarSearchQuery}
+            onSelectUser={selectUser}
+            onBackToRoom={clearSelectedUser}
+            onCloseRoomPanel={isPhone ? closePhoneDrawer : () => selectSidebarMode("closed")}
+            onOpenRoomSettings={() => openRoomSettingsFor(activeRoom?.roomId ?? null)}
+            onCopyRoomLink={copyActiveRoomLink}
+            onLeaveRoom={leaveActiveRoom}
+            onOpenRoom={focusRoom}
+            onToast={pushToast}
+            onStartCall={(userId) => void calls.startCall(userId)}
+            onAddToRoom={setAddToRoomUserId}
+        />
+    );
+
     return (
         <div className={appShellClassName} style={appShellStyle}>
-            <aside className="left-rail">
+            <aside className="left-rail" inert={phoneHomeInert}>
                 <img className="rail-logo" src="/branding/jorvik-logo-848bff6b.webp" width="46" height="46" alt="Jorvik" />
                 <button
                     type="button"
@@ -2753,7 +3054,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 </button>
             </aside>
 
-            <section className="channels-pane">
+            <section className="channels-pane" ref={channelsPaneRef} inert={phoneHomeInert}>
                 <div className="channels-pane-resize-handle" onPointerDown={handleResizePointerDown} />
                 <div className="pane-top pane-top-row">
                     <span>{selectedSpaceName}</span>
@@ -2850,7 +3151,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     discoverableRooms={selectedSpaceId === PEOPLE_SPACE_ID ? [] : discoverableSpaceChannels}
                     discoverableJoiningRoomId={joiningDiscoverableRoomId}
                     contentsPending={selectedSpaceId === PEOPLE_SPACE_ID ? false : spaceContentsPending}
-                    activeRoomId={activeRoomId}
+                    activeRoomId={isPhone ? (phoneOpenedRoomId === activeRoomId ? activeRoomId : null) : activeRoomId}
                     orderingMode={selectedSpaceId === PEOPLE_SPACE_ID ? "dynamic" : "manual"}
                     showOrderingControls={selectedSpaceId !== PEOPLE_SPACE_ID}
                     showHashPrefix={selectedSpaceId !== PEOPLE_SPACE_ID}
@@ -2897,7 +3198,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                             <button
                                 type="button"
                                 className="pane-voice-pill"
-                                onClick={() => openRoomAtBottom(voiceSessionRoomId)}
+                                onClick={() => showRoom(voiceSessionRoomId)}
                                 title="Open voice channel"
                             >
                                 <span className="pane-voice-pill-title">
@@ -3018,18 +3319,18 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 <div className="channels-pane-header-drag" aria-hidden="true" />
             </section>
 
-            <section className="main-pane">
+            <section className="main-pane" ref={mainPaneRef} inert={isPhone && !phoneChatOpen ? true : undefined}>
                 <ChannelHeader
                     room={activeRoom}
                     directName={activeDirectName}
                     isDirectMessage={isActiveRoomDirect}
                     isOneToOneDirect={activeDirectPartnerId !== null}
                     showHashPrefix={shouldPrefixRoomWithHash}
-                    sidebarMode={rightSidebarMode}
+                    sidebarMode={phoneHeaderSidebarMode}
                     searchQuery={sidebarSearchQuery}
                     canInviteInRoom={canInviteInActiveRoom}
                     onSearchQueryChange={setSidebarSearchQuery}
-                    onSelectSidebarMode={selectSidebarMode}
+                    onSelectSidebarMode={selectSidebarModeFromHeader}
                     onOpenDirectChat={() => setCreateDirectChatOpen(true)}
                     createRoomLabel={selectedSpaceId === PEOPLE_SPACE_ID ? "Create room" : "Create channel"}
                     onOpenCreateRoom={() =>
@@ -3041,6 +3342,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     onOpenModeration={() => setRoomModerationOpen(true)}
                     onCopyRoomLink={copyActiveRoomLink}
                     onLeaveRoom={leaveActiveRoom}
+                    onBack={isPhone ? closePhoneChat : undefined}
                 />
                 {calls.outgoingCall && !calls.outgoingCall.answered && activeRoom?.roomId === calls.outgoingCall.roomId ? (
                     <div className="call-status-bar" role="status">
@@ -3100,11 +3402,12 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                                 setReplyToEvent(event);
                             }}
                             onEdit={startEditing}
-                            onSelectUser={selectUser}
+                            onSelectUser={selectUserFromChat}
                             activeSpaceId={selectedSpaceId === PEOPLE_SPACE_ID ? null : selectedSpaceId}
                             customReactionImagesEnabled={renderReactionImages}
                             showReadReceipts={shouldShowReadReceipts}
-                            userAway={userAway}
+                            // On a phone showing the lists, the chat isn't on screen, so it isn't being read.
+                            userAway={userAway || (isPhone && !phoneChatOpen)}
                             linkPreviewsInEncrypted={userSettings.privacy.linkPreviewsInEncrypted}
                         />
                         <div className="main-chat-composer">
@@ -3124,27 +3427,66 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 <div className="main-pane-header-drag" aria-hidden="true" />
             </section>
 
-            {shouldRenderRightPanel ? (
-                <RightPanel
-                    client={client}
-                    room={activeRoom}
-                    activeSpaceRoom={selectedSpaceId === PEOPLE_SPACE_ID ? null : selectedSpaceRoom}
-                    mode={panelMode}
-                    roomMode={rightSidebarMode}
-                    directPartnerId={activeDirectPartnerId}
-                    searchQuery={sidebarSearchQuery}
-                    onSearchQueryChange={setSidebarSearchQuery}
-                    onSelectUser={selectUser}
-                    onBackToRoom={clearSelectedUser}
-                    onCloseRoomPanel={() => selectSidebarMode("closed")}
-                    onOpenRoomSettings={() => openRoomSettingsFor(activeRoom?.roomId ?? null)}
-                    onCopyRoomLink={copyActiveRoomLink}
-                    onLeaveRoom={leaveActiveRoom}
-                    onOpenRoom={focusRoom}
-                    onToast={pushToast}
-                    onStartCall={(userId) => void calls.startCall(userId)}
-                    onAddToRoom={setAddToRoomUserId}
-                />
+            {isPhone ? (
+                activeRoom && !activeRoom.isSpaceRoom() ? (
+                    <>
+                        <div ref={phoneDrawerScrimRef} className="phone-drawer-scrim" onClick={closePhoneDrawer} aria-hidden="true" />
+                        <div ref={phoneDrawerRef} className="phone-drawer" inert={phoneChatOpen && phoneDrawerOpen ? undefined : true}>
+                            {rightPanelElement}
+                        </div>
+                    </>
+                ) : null
+            ) : shouldRenderRightPanel ? (
+                rightPanelElement
+            ) : null}
+            {isPhone && phoneTab === "notifications" ? (
+                <div className="phone-tab-page" inert={phoneHomeInert}>
+                    <PhoneNotificationsView
+                        client={client}
+                        invites={phoneInvites}
+                        mentions={phoneMentions}
+                        roomName={phoneRoomName}
+                        roomContext={phoneRoomContext}
+                        isDirectRoom={(roomId) => directRoomIds.has(roomId)}
+                        userName={phoneUserName}
+                        onOpenMention={openPhoneMention}
+                        onAcceptInvite={acceptPhoneInvite}
+                        onDeclineInvite={declinePhoneInvite}
+                        onMarkAllRead={markPhoneMentionsRead}
+                    />
+                </div>
+            ) : null}
+            {isPhone && phoneTab === "you" ? (
+                <div className="phone-tab-page" inert={phoneHomeInert}>
+                    <PhoneYouView
+                        ownUserId={ownUserId}
+                        displayName={ownDisplayName}
+                        userIdLabel={formatUserIdForDisplay(ownUserId, localDomain) || ownUserId}
+                        avatarSources={ownAvatarSources}
+                        presenceEnabled={presenceEnabled}
+                        presence={presenceControl}
+                        onOpenSettings={openUserSettings}
+                    />
+                </div>
+            ) : null}
+            {isPhone ? (
+                <div className="phone-tabbar-wrap" inert={phoneHomeInert}>
+                    <PhoneTabBar
+                        tab={phoneTab}
+                        notificationCount={phoneNotificationCount}
+                        you={
+                            <Avatar
+                                className="phone-tab-avatar"
+                                name={ownDisplayName}
+                                src={ownAvatarSources[0] ?? null}
+                                sources={ownAvatarSources}
+                                seed={ownUserId || undefined}
+                                userId={ownUserId || undefined}
+                            />
+                        }
+                        onSelect={setPhoneTab}
+                    />
+                </div>
             ) : null}
             {emojiUploadOpen && emojiUploadTarget ? (
                 <EmojiUploadDialog

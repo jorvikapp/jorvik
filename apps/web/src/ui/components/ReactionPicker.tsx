@@ -20,7 +20,7 @@ interface ReactionPickerProps {
     onFinished: () => void;
 }
 
-const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "👀", "✅"];
+export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "👀", "✅"];
 
 export function ReactionPicker({
     client,

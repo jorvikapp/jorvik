@@ -1,0 +1,980 @@
+/* The phone layout: one panel at a time, as on the phone apps people know. The shell is
+   .app-shell.is-phone while the phone query matches (ui/layout/phoneLayout.ts), and what
+   renders outside the shell follows html.is-phone-layout. None of this applies on wider screens,
+   and the desktop app's window never gets narrow enough for it. */
+
+/* ---------- Shell ---------- */
+
+.app-shell.is-phone {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: var(--app-offset-top, 0px);
+    width: auto;
+    /* The visible height, which shrinks when the on-screen keyboard opens. */
+    height: var(--app-height, 100%);
+    grid-template-columns: 72px minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) auto;
+    background: var(--bg-rail);
+    overscroll-behavior: none;
+}
+
+.app-shell.is-phone > .left-rail {
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+    gap: 10px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 0 16px env(safe-area-inset-left, 0px);
+    border-right: 0;
+    touch-action: pan-y;
+}
+
+.app-shell.is-phone > .left-rail::-webkit-scrollbar {
+    display: none;
+}
+
+/* On a phone the strip starts with direct messages; the logo would only take room from spaces. */
+.app-shell.is-phone .rail-logo {
+    display: none;
+}
+
+.app-shell.is-phone .rail-icon,
+.app-shell.is-phone .rail-icon.rail-people {
+    flex: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+}
+
+.app-shell.is-phone .rail-icon.rail-people {
+    font-size: 21px;
+}
+
+.app-shell.is-phone > .channels-pane {
+    display: flex !important;
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    min-height: 0;
+    margin-top: env(safe-area-inset-top, 0px);
+    border: 1px solid var(--border);
+    border-right: 0;
+    border-bottom: 0;
+    border-radius: 18px 0 0 0;
+    touch-action: pan-y;
+}
+
+.app-shell.is-phone .channels-pane-resize-handle,
+.app-shell.is-phone .channels-pane-header-drag,
+.app-shell.is-phone .main-pane-header-drag,
+.app-shell.is-phone .right-panel-drag-strip,
+.app-shell.is-phone .pane-user-row,
+.app-shell.is-phone .pane-voice-indicators,
+.app-shell.is-phone .channels-pane-jump-key {
+    display: none !important;
+}
+
+.app-shell.is-phone .pane-top {
+    padding: 14px 14px 10px;
+    font-size: 17px;
+}
+
+.app-shell.is-phone .pane-top-action {
+    min-height: 32px;
+}
+
+.app-shell.is-phone .channels-pane-jump {
+    margin: 10px 10px 4px;
+    padding: 9px 12px;
+    font-size: 14px;
+}
+
+.app-shell.is-phone .room-item-select {
+    min-height: 40px;
+}
+
+/* A thumb can't hover: the handle to drag channels around and the menus that appear on hover
+   stay a desktop thing for now. */
+.app-shell.is-phone .room-item-handle,
+.app-shell.is-phone .room-category-menu-wrapper {
+    display: none;
+}
+
+.app-shell.is-phone .pane-bottom {
+    padding: 8px;
+}
+
+/* With the user card on the You tab, the bottom of the list only holds a call in progress. */
+.app-shell.is-phone .pane-bottom:not(:has(.pane-voice-dock)) {
+    display: none;
+}
+
+/* The voice dock becomes a compact bar above the tabs. */
+.app-shell.is-phone .pane-voice-dock {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 6px;
+}
+
+.app-shell.is-phone .pane-voice-pill {
+    flex: 1;
+    min-width: 0;
+    min-height: 40px;
+    justify-content: center;
+}
+
+.app-shell.is-phone .pane-voice-controls {
+    display: flex;
+    gap: 6px;
+}
+
+.app-shell.is-phone .pane-voice-control {
+    min-height: 40px;
+    padding: 6px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* Only leave and the microphone fit; the speaker switch is in the call itself. */
+.app-shell.is-phone .pane-voice-control:last-child:not(.pane-voice-control-leave):not(.pane-voice-control-join) {
+    display: none;
+}
+
+/* ---------- Tabs ---------- */
+
+.app-shell.is-phone > .phone-tabbar-wrap {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    z-index: 3;
+}
+
+.phone-tabbar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--border);
+    background: var(--bg-rail);
+}
+
+.phone-tab {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 4px 0 2px;
+    border: 0;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.phone-tab svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.phone-tab.is-active {
+    color: var(--text-main);
+}
+
+.phone-tab-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    font-size: 11px;
+}
+
+.phone-tab:not(.is-active) .phone-tab-avatar {
+    opacity: 0.8;
+}
+
+.phone-tab-badge {
+    position: absolute;
+    top: -2px;
+    left: calc(50% + 6px);
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--danger);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 0 0 3px var(--bg-rail);
+}
+
+/* ---------- Notifications and You ---------- */
+
+.app-shell.is-phone > .phone-tab-page {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    z-index: 2;
+    min-height: 0;
+    display: flex;
+    padding-top: env(safe-area-inset-top, 0px);
+    background: var(--bg-pane);
+}
+
+.phone-page {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.phone-page-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.phone-page-title {
+    flex: 1;
+    margin: 0;
+    font-size: 20px;
+}
+
+.phone-page-head-action {
+    border: 0;
+    background: none;
+    color: var(--accent-soft);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+[data-theme="light"] .phone-page-head-action {
+    color: var(--primary);
+}
+
+.phone-page-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 8px 10px 20px;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+}
+
+.phone-section-label {
+    margin: 14px 8px 6px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.phone-empty {
+    margin: 32px 16px;
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.5;
+    text-align: center;
+}
+
+.phone-notif {
+    position: relative;
+    width: 100%;
+    display: flex;
+    gap: 12px;
+    padding: 12px 28px 12px 8px;
+    border: 0;
+    border-radius: 12px;
+    background: none;
+    color: var(--text-main);
+    font: inherit;
+    text-align: left;
+}
+
+button.phone-notif {
+    cursor: pointer;
+}
+
+button.phone-notif:active {
+    background: var(--bg-hover);
+}
+
+.phone-notif.is-unread::after {
+    content: "";
+    position: absolute;
+    top: 18px;
+    right: 10px;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--danger);
+}
+
+.phone-notif-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    font-size: 16px;
+}
+
+.phone-notif-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 14px;
+    line-height: 1.35;
+}
+
+.phone-notif-quote {
+    overflow: hidden;
+    padding-left: 8px;
+    border-left: 2px solid var(--border);
+    color: var(--text-muted);
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.phone-notif-when {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.phone-notif-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.phone-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-card);
+    color: var(--text-main);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.phone-button:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.phone-button-primary {
+    border-color: transparent;
+    background: var(--primary);
+    color: #ffffff;
+}
+
+.phone-you-body {
+    padding: 0 0 24px;
+}
+
+.phone-you-banner {
+    height: 104px;
+    background: linear-gradient(135deg, var(--primary), var(--accent-soft));
+}
+
+.phone-you-profile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: -42px;
+    padding: 0 16px;
+}
+
+.phone-you-avatar-wrap {
+    position: relative;
+    display: inline-flex;
+    margin-bottom: 4px;
+    border-radius: 999px;
+    box-shadow: 0 0 0 6px var(--bg-pane);
+}
+
+.phone-you-avatar {
+    width: 84px;
+    height: 84px;
+    border-radius: 999px;
+    font-size: 32px;
+}
+
+.phone-you-presence.status-menu-dot {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 22px;
+    height: 22px;
+    border: 4px solid var(--bg-pane);
+    border-radius: 999px;
+}
+
+.phone-you-name {
+    margin: 0;
+    font-size: 22px;
+}
+
+.phone-you-id,
+.phone-you-status-message {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 14px;
+    overflow-wrap: anywhere;
+}
+
+.phone-you-status-message {
+    color: var(--text-main);
+}
+
+.phone-you-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.phone-you-body > .phone-section-label,
+.phone-you-body > .sheet-group {
+    margin-left: 12px;
+    margin-right: 12px;
+}
+
+.phone-you-version {
+    margin: 18px 16px 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+/* ---------- Chat ---------- */
+
+.app-shell.is-phone > .main-pane {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    transform: translateX(100%);
+    transition: transform 280ms cubic-bezier(0.22, 0.9, 0.28, 1);
+    touch-action: pan-y;
+}
+
+.app-shell.is-phone.phone-chat-open > .main-pane {
+    transform: none;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.22);
+}
+
+/* Sideways drags have to reach the swipe handlers, so every list that scrolls up and down
+   tells the browser it only pans vertically. */
+.app-shell.is-phone .timeline,
+.app-shell.is-phone .room-list-items,
+.app-shell.is-phone .voice-room-content,
+.app-shell.is-phone .right-panel-body,
+.app-shell.is-phone .rs-panel,
+.app-shell.is-phone .rs-pins-list,
+.app-shell.is-phone .rp-members-list {
+    touch-action: pan-y;
+}
+
+.app-shell.is-phone .channel-header {
+    gap: 4px;
+    min-height: 52px;
+    padding: 6px 6px 6px 4px;
+}
+
+.channel-header-back {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.channel-header-back:active {
+    background: var(--bg-hover);
+}
+
+.channel-header-back svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.app-shell.is-phone .channel-header-topic,
+.app-shell.is-phone .channel-header-search {
+    display: none;
+}
+
+/* The lock alone says it on a narrow header; the word stays for screen readers. */
+.app-shell.is-phone .channel-header-chip-encrypted {
+    padding: 2px 6px;
+    font-size: 0;
+}
+
+.app-shell.is-phone .channel-header-chip-encrypted > span {
+    font-size: 12px;
+}
+
+.app-shell.is-phone .channel-header-icon-btn {
+    width: 38px;
+    height: 38px;
+}
+
+/* Messages: holding one opens its actions, so the hover bar has nothing to add, and the
+   browser's own text-selection callout would get in the way of the hold. */
+.app-shell.is-phone .message-actions-bar {
+    display: none !important;
+}
+
+.app-shell.is-phone .timeline-event {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.app-shell.is-phone .composer-wrap {
+    position: relative;
+    padding: 8px;
+}
+
+.app-shell.is-phone .typing-indicator,
+.app-shell.is-phone .composer-mentions-popover,
+.app-shell.is-phone .composer-emojis-popover {
+    margin-left: 4px;
+}
+
+.app-shell.is-phone .composer-bar {
+    gap: 8px;
+}
+
+.app-shell.is-phone .composer-input-shell,
+.app-shell.is-phone .composer-emoji-anchor {
+    position: static;
+}
+
+/* The pickers span the width of the screen above the message box. */
+.app-shell.is-phone .composer-emoji-picker-popover {
+    left: 8px;
+    right: 8px;
+    bottom: calc(100% + 6px);
+    width: auto;
+    max-height: min(420px, 55vh);
+}
+
+.app-shell.is-phone .composer-gif-picker {
+    max-height: min(420px, 55vh);
+}
+
+.composer-send-button {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: var(--primary);
+    color: #ffffff;
+    cursor: pointer;
+}
+
+.composer-send-button svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Calls: the controls wrap instead of running off the sides. */
+.app-shell.is-phone .voice-controls-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
+}
+
+.app-shell.is-phone .voice-ctrl-btn {
+    min-width: 56px;
+    padding: 8px 6px;
+}
+
+.app-shell.is-phone .voice-room-participants-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* ---------- Members drawer ---------- */
+
+.app-shell.is-phone > .phone-drawer-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 25;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 220ms ease;
+}
+
+.app-shell.is-phone.phone-drawer-open > .phone-drawer-scrim {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.app-shell.is-phone > .phone-drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    width: min(86%, 380px);
+    display: flex;
+    overflow: hidden;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border-left: 1px solid var(--border);
+    border-radius: 18px 0 0 18px;
+    background: var(--bg-main);
+    transform: translateX(100%);
+    transition: transform 280ms cubic-bezier(0.22, 0.9, 0.28, 1);
+    touch-action: pan-y;
+}
+
+.app-shell.is-phone.phone-drawer-open > .phone-drawer {
+    transform: none;
+}
+
+.app-shell.is-phone > .phone-drawer > .right-panel {
+    flex: 1;
+    min-width: 0;
+    border-left: 0;
+}
+
+/* ---------- Sheets ---------- */
+
+.bottom-sheet-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 1700;
+}
+
+.bottom-sheet-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    animation: fade-in 200ms ease both;
+}
+
+.bottom-sheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 84%;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border-top: 1px solid var(--border);
+    border-radius: 22px 22px 0 0;
+    background: var(--bg-pane);
+    color: var(--text-main);
+    outline: none;
+    transition: transform 200ms ease;
+    animation: bottom-sheet-in 280ms cubic-bezier(0.22, 0.9, 0.28, 1) both;
+}
+
+@keyframes bottom-sheet-in {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: none;
+    }
+}
+
+.bottom-sheet-grip {
+    flex: none;
+    padding: 8px 0;
+    cursor: grab;
+    touch-action: none;
+}
+
+.bottom-sheet-grip span {
+    display: block;
+    width: 40px;
+    height: 5px;
+    margin: 0 auto;
+    border-radius: 3px;
+    background: var(--bg-active);
+}
+
+.bottom-sheet-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0 12px 16px;
+    overscroll-behavior: contain;
+}
+
+.sheet-group {
+    overflow: hidden;
+    border-radius: 14px;
+    background: var(--bg-card);
+}
+
+.sheet-group + .sheet-group {
+    margin-top: 10px;
+}
+
+.sheet-item {
+    width: 100%;
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    border: 0;
+    background: none;
+    color: var(--text-main);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+}
+
+.sheet-item + .sheet-item {
+    border-top: 1px solid var(--border);
+}
+
+.sheet-item:active {
+    background: var(--bg-active);
+}
+
+.sheet-item-nav::after {
+    content: "›";
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 20px;
+}
+
+.sheet-item-danger {
+    color: var(--danger);
+}
+
+.message-action-sheet-preview {
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+    padding: 2px 6px 12px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.message-action-sheet-sender {
+    flex: none;
+    color: var(--text-main);
+    font-weight: 700;
+}
+
+.message-action-sheet-body {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.message-action-sheet-reactions {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 0 2px 12px;
+}
+
+.message-action-sheet-reaction {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: var(--bg-card);
+    font-size: 22px;
+    cursor: pointer;
+}
+
+.message-action-sheet-reaction:active {
+    background: var(--bg-active);
+}
+
+.message-action-sheet-reaction-more {
+    color: var(--text-muted);
+    font-size: 24px;
+    font-weight: 300;
+}
+
+/* Pickers and menus made for a popover, laid flat inside a sheet. */
+.bottom-sheet .reaction-picker,
+.bottom-sheet .status-menu {
+    position: static;
+    width: auto;
+    max-width: none;
+    max-height: none;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+}
+
+/* ---------- Outside the shell ---------- */
+
+/* Phone browsers zoom in on any text box smaller than this, and stay zoomed. */
+.is-phone-layout input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.is-phone-layout textarea,
+.is-phone-layout select {
+    font-size: 16px;
+}
+
+.is-phone-layout .login-view {
+    justify-content: flex-start;
+    overflow-y: auto;
+    padding: calc(24px + env(safe-area-inset-top, 0px)) 0 calc(24px + env(safe-area-inset-bottom, 0px));
+}
+
+.is-phone-layout .login-view > * {
+    flex: none;
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+.is-phone-layout .room-dialog-overlay {
+    padding: 10px;
+    padding-top: calc(10px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+}
+
+.is-phone-layout .room-dialog {
+    width: 100%;
+    max-height: 100%;
+}
+
+.is-phone-layout .toast {
+    left: 12px;
+    right: 12px;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    max-width: none;
+}
+
+.is-phone-layout .incoming-call {
+    left: 12px;
+    right: 12px;
+    min-width: 0;
+    max-width: none;
+}
+
+.is-phone-layout .message-context-menu {
+    max-width: calc(100vw - 16px);
+}
+
+/* Settings: one column, the list of sections or the section picked from it. */
+.settings-overlay.is-phone {
+    padding: 0;
+    place-items: stretch;
+}
+
+.settings-overlay.is-phone .settings-shell {
+    width: 100%;
+    height: var(--app-height, 100%);
+    max-height: none;
+    grid-template-columns: minmax(0, 1fr);
+    border: 0;
+    border-radius: 0;
+}
+
+.settings-overlay.is-phone .settings-sidebar,
+.settings-overlay.is-phone .settings-main {
+    padding-top: env(safe-area-inset-top, 0px);
+}
+
+.settings-overlay.is-phone-list .settings-main,
+.settings-overlay.is-phone-section .settings-sidebar {
+    display: none;
+}
+
+.settings-overlay.is-phone .settings-sidebar {
+    width: auto;
+    min-width: 0;
+    overflow-y: auto;
+    border-right: 0;
+}
+
+/* The list's own header, outside the sidebar's padding like the section header beside it. */
+.settings-phone-list-header {
+    margin: -16px -12px 12px;
+}
+
+.settings-phone-back {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    margin-right: 4px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--text-muted);
+    font-size: 30px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.settings-overlay.is-phone .settings-header h1 {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 18px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.settings-overlay.is-phone .settings-content {
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+}

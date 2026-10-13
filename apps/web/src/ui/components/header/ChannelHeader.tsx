@@ -25,6 +25,8 @@ interface ChannelHeaderProps {
     onOpenModeration: () => void;
     onCopyRoomLink: () => Promise<void>;
     onLeaveRoom: () => Promise<void>;
+    /** Phones show one panel at a time; this takes the chat away again, back to the lists. */
+    onBack?: () => void;
 }
 
 type HeaderIconKind = "search" | "pins" | "members" | "profile" | "more";
@@ -117,6 +119,7 @@ export function ChannelHeader({
     onOpenModeration,
     onCopyRoomLink,
     onLeaveRoom,
+    onBack,
 }: ChannelHeaderProps): React.ReactElement {
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement | null>(null);
@@ -184,6 +187,13 @@ export function ChannelHeader({
 
     return (
         <header className="channel-header">
+            {onBack ? (
+                <button type="button" className="channel-header-back" onClick={onBack} aria-label="Back to the list">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M15 5l-7 7 7 7" />
+                    </svg>
+                </button>
+            ) : null}
             <div className="channel-header-main">
                 <div className="channel-header-title-row">
                     <h1 className="channel-header-title">{`${titlePrefix}${roomName}`}</h1>

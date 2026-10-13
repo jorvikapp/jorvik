@@ -26,6 +26,8 @@ import { SignOutTab } from "./user/tabs/SignOutTab";
 import type { UserLocalSettings } from "./user/settingsStore";
 import { VerificationDialog, type VerificationTarget } from "../components/verification/VerificationDialog";
 import type { EmojiPackTarget } from "../emoji/EmojiPackTypes";
+import { usePhoneLayout } from "../layout/phoneLayout";
+import { usePhoneBackLayer } from "../layout/phoneBackStack";
 
 export type SettingsMode = "server" | "user";
 
@@ -144,6 +146,10 @@ export function SettingsOverlay({
     const [verificationOpen, setVerificationOpen] = useState(false);
     const [verificationTarget, setVerificationTarget] = useState<VerificationTarget | null>(null);
     const [verificationNonce, setVerificationNonce] = useState(0);
+    // Phones show one column: the list of sections, or the section picked from it. Settings opens
+    // on the section that was asked for, with a way back to the list.
+    const isPhone = usePhoneLayout();
+    const [phonePane, setPhonePane] = useState<"list" | "section">("section");
 
     useEffect(() => {
         if (!open) {
@@ -153,7 +159,11 @@ export function SettingsOverlay({
         }
 
         setActiveTab(initialTab || getDefaultTab(mode));
+        setPhonePane("section");
     }, [initialTab, mode, open]);
+
+    usePhoneBackLayer(open && isPhone, onClose);
+    usePhoneBackLayer(open && isPhone && phonePane === "section", () => setPhonePane("list"));
 
     useEffect(() => {
         if (!open) {
@@ -200,6 +210,8 @@ export function SettingsOverlay({
         }
         return "User Settings";
     }, [mode, spaceRoom]);
+    const activeTabLabel =
+        navSections.flatMap((section) => section.items).find((item) => item.id === activeTab)?.label ?? title;
 
     if (!open) {
         return null;
@@ -377,14 +389,44 @@ export function SettingsOverlay({
     };
 
     return (
-        <div className="settings-overlay" role="dialog" aria-modal="true" aria-label={title}>
+        <div
+            className={`settings-overlay${isPhone ? ` is-phone is-phone-${phonePane}` : ""}`}
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+        >
             <div className="settings-shell">
                 <aside className="settings-sidebar">
-                    <SettingsNav sections={navSections} activeTab={activeTab} onChangeTab={setActiveTab} />
+                    {isPhone ? (
+                        <header className="settings-header settings-phone-list-header">
+                            <h1>{title}</h1>
+                            <button type="button" className="settings-close" onClick={onClose} aria-label="Close settings">
+                                x
+                            </button>
+                        </header>
+                    ) : null}
+                    <SettingsNav
+                        sections={navSections}
+                        activeTab={activeTab}
+                        onChangeTab={(tab) => {
+                            setActiveTab(tab);
+                            setPhonePane("section");
+                        }}
+                    />
                 </aside>
                 <section className="settings-main">
                     <header className="settings-header">
-                        <h1>{title}</h1>
+                        {isPhone ? (
+                            <button
+                                type="button"
+                                className="settings-phone-back"
+                                onClick={() => setPhonePane("list")}
+                                aria-label="All settings"
+                            >
+                                ‹
+                            </button>
+                        ) : null}
+                        <h1>{isPhone ? activeTabLabel : title}</h1>
                         <button type="button" className="settings-close" onClick={onClose} aria-label="Close settings">
                             x
                         </button>

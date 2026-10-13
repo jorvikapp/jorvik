@@ -4,10 +4,13 @@ import type { MatrixClient, MatrixEvent, Room } from "matrix-js-sdk/src/matrix";
 
 import type { ToastState } from "../Toast";
 import { ReactionPicker } from "../ReactionPicker";
+import { BottomSheet } from "../phone/BottomSheet";
+import { MessageActionSheet } from "./MessageActionSheet";
 import { MessageContextMenu } from "./MessageContextMenu";
 import { useMessageActions } from "../../hooks/useMessageActions";
 import { reportMessage } from "../../../core/moderation/reports";
 import { ReportDialog } from "../moderation/ReportDialog";
+import { usePhoneLayout } from "../../layout/phoneLayout";
 
 interface Position {
     x: number;
@@ -50,7 +53,9 @@ export function MessageActionsBar({
         react,
     } = useMessageActions({ client, room, event });
 
+    const isPhone = usePhoneLayout();
     const [barReactionPickerOpen, setBarReactionPickerOpen] = useState(false);
+    const [sheetReactionPickerOpen, setSheetReactionPickerOpen] = useState(false);
     const [reportOpen, setReportOpen] = useState(false);
     const canReport = Boolean(event.getId()) && event.getSender() !== client.getUserId();
     const [menuReactionPickerPosition, setMenuReactionPickerPosition] = useState<Position | null>(null);
@@ -290,8 +295,52 @@ export function MessageActionsBar({
                 ) : null}
             </div>
 
+            {isPhone ? (
+                <MessageActionSheet
+                    open={isContextMenuOpen}
+                    senderName={room.getMember(event.getSender() ?? "")?.name ?? event.getSender() ?? ""}
+                    preview={plainTextBody?.trim() || "Attachment"}
+                    canEdit={canEdit}
+                    canDelete={canDelete}
+                    canCopyText={Boolean(plainTextBody && plainTextBody.trim().length > 0)}
+                    canReport={canReport}
+                    onClose={onCloseContextMenu}
+                    onQuickReact={(key) => {
+                        void handleReactSelection({ key });
+                    }}
+                    onMoreReactions={() => setSheetReactionPickerOpen(true)}
+                    onReply={() => onReply(event)}
+                    onEdit={() => onEdit(event)}
+                    onDelete={() => {
+                        void handleDelete();
+                    }}
+                    onReport={() => setReportOpen(true)}
+                    onCopyLink={() => {
+                        void withToast(() => copyLink(), "Copied link.", "Failed to copy link.");
+                    }}
+                    onCopyText={() => {
+                        void withToast(() => copyText(), "Copied text.", "Failed to copy text.");
+                    }}
+                />
+            ) : null}
+            {isPhone ? (
+                <BottomSheet
+                    open={sheetReactionPickerOpen}
+                    label="Add a reaction"
+                    onClose={() => setSheetReactionPickerOpen(false)}
+                    className="reaction-picker-sheet"
+                >
+                    <ReactionPicker
+                        client={client}
+                        room={room}
+                        activeSpaceId={activeSpaceId}
+                        onSelect={handleReactSelection}
+                        onFinished={() => setSheetReactionPickerOpen(false)}
+                    />
+                </BottomSheet>
+            ) : null}
             <MessageContextMenu
-                open={isContextMenuOpen}
+                open={isContextMenuOpen && !isPhone}
                 position={contextMenuPosition}
                 canEdit={canEdit}
                 canDelete={canDelete}
