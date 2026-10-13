@@ -33,6 +33,7 @@ import { MessageRenderer } from "./MessageRenderer";
 import { MessageActionsBar } from "./messages/MessageActionsBar";
 import { Toast, type ToastState } from "./Toast";
 import { ReactionsRow } from "./reactions/ReactionsRow";
+import { useLongPress } from "../layout/longPress";
 
 interface TimelineProps {
     client: MatrixClient;
@@ -1341,6 +1342,14 @@ export function Timeline({
     const [paginating, setPaginating] = useState(false);
     const [lightbox, setLightbox] = useState<LightboxState | null>(null);
     const [contextMenuState, setContextMenuState] = useState<{ eventKey: string; x: number; y: number } | null>(null);
+    // Holding a message with a finger opens what a right click does: the menu, or on phones the sheet.
+    const messageLongPress = useLongPress(".timeline-event[data-event-key]", (target, point) => {
+        const element = target as HTMLElement;
+        const eventKey = element.dataset.eventId ?? element.dataset.eventKey;
+        if (eventKey) {
+            setContextMenuState({ eventKey, x: point.x, y: point.y });
+        }
+    });
     const [toast, setToast] = useState<ToastState | null>(null);
     const [replyJumpTargetEventId, setReplyJumpTargetEventId] = useState<string | null>(null);
     const [, setLinkPreviewRerenderTick] = useState(0);
@@ -2460,7 +2469,12 @@ export function Timeline({
 
     return (
         <>
-            <div className="timeline" ref={scrollContainerRef} onScroll={(event) => void handleScroll(event)}>
+            <div
+                className="timeline"
+                ref={scrollContainerRef}
+                onScroll={(event) => void handleScroll(event)}
+                onPointerDown={messageLongPress.onPointerDown}
+            >
                 <div className="timeline-new-messages-bar-anchor">
                     {newMessagesBarLabel !== null ? (
                         <div className="timeline-new-messages-bar">
