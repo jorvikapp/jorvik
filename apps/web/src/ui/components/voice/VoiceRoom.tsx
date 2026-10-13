@@ -586,6 +586,10 @@ function getMicProcessingSignature(settings: AudioSettings): string {
     ].join("|");
 }
 
+function screenShareSupported(): boolean {
+    return typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getDisplayMedia === "function";
+}
+
 export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(function VoiceRoom(
     {
         client,
@@ -2594,25 +2598,27 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                         <span className="voice-ctrl-label">{localCameraEnabled ? "Stop video" : "Start video"}</span>
                     </button>
 
-                    {/* Screen share */}
-                    <button
-                        type="button"
-                        className={`voice-ctrl-btn${localScreenSharing ? " is-active" : ""}`}
-                        onClick={() => void toggleScreenShare()}
-                        title={localScreenSharing ? "Stop screen share" : "Share screen"}
-                        aria-pressed={localScreenSharing}
-                    >
-                        <svg className="voice-ctrl-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                            {localScreenSharing ? (
-                                <path fill="currentColor"
-                                    d="M4 5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H4Zm0 2h16v9H4V7Zm4 11v2H6a1 1 0 1 0 0 2h12a1 1 0 1 0 0-2h-2v-2H8Z" />
-                            ) : (
-                                <path fill="currentColor"
-                                    d="M4 5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h6v2H8a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2h-2v-2h6a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H4Zm0 2h16v9H4V7Zm8.7 2.3a1 1 0 0 0-1.4 1.4l.6.6H8a1 1 0 1 0 0 2h3.9l-.6.6a1 1 0 1 0 1.4 1.4l2.3-2.3a1 1 0 0 0 0-1.4l-2.3-2.3Z" />
-                            )}
-                        </svg>
-                        <span className="voice-ctrl-label">{localScreenSharing ? "Stop" : "Share"}</span>
-                    </button>
+                    {/* Screen share: phone browsers can't capture the screen, so they don't get the button. */}
+                    {screenShareSupported() || localScreenSharing ? (
+                        <button
+                            type="button"
+                            className={`voice-ctrl-btn${localScreenSharing ? " is-active" : ""}`}
+                            onClick={() => void toggleScreenShare()}
+                            title={localScreenSharing ? "Stop screen share" : "Share screen"}
+                            aria-pressed={localScreenSharing}
+                        >
+                            <svg className="voice-ctrl-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                {localScreenSharing ? (
+                                    <path fill="currentColor"
+                                        d="M4 5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H4Zm0 2h16v9H4V7Zm4 11v2H6a1 1 0 1 0 0 2h12a1 1 0 1 0 0-2h-2v-2H8Z" />
+                                ) : (
+                                    <path fill="currentColor"
+                                        d="M4 5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h6v2H8a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2h-2v-2h6a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H4Zm0 2h16v9H4V7Zm8.7 2.3a1 1 0 0 0-1.4 1.4l.6.6H8a1 1 0 1 0 0 2h3.9l-.6.6a1 1 0 1 0 1.4 1.4l2.3-2.3a1 1 0 0 0 0-1.4l-2.3-2.3Z" />
+                                )}
+                            </svg>
+                            <span className="voice-ctrl-label">{localScreenSharing ? "Stop" : "Share"}</span>
+                        </button>
+                    ) : null}
 
                     {/* Deafen */}
                     <button
