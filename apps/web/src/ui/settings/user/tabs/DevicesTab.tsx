@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     DeviceVerification,
     type IMyDevice,
@@ -120,6 +120,7 @@ export function DevicesTab({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [signOutState, setSignOutState] = useState<SignOutState | null>(null);
+    const signOutBoxRef = useRef<HTMLFormElement | null>(null);
 
     const loadDevices = useCallback(async (): Promise<void> => {
         setLoading(true);
@@ -254,6 +255,69 @@ export function DevicesTab({
         }
     }, [client, currentUserId, loadDevices, signOutState]);
 
+    // The box opens under the session that was clicked, which can be far down a long list,
+    // so bring it into view, and again once it grows a password field.
+    const signOutDeviceId = signOutState?.device.device_id ?? null;
+    const signOutNeedsPassword = signOutState?.needsPassword ?? false;
+    useEffect(() => {
+        if (signOutDeviceId) {
+            signOutBoxRef.current?.scrollIntoView({ block: "nearest" });
+        }
+    }, [signOutDeviceId, signOutNeedsPassword]);
+
+    const renderSignOutBox = (state: SignOutState): React.ReactElement => (
+        <form
+            ref={signOutBoxRef}
+            className="settings-section-card settings-devices-signout"
+            onSubmit={(event) => {
+                event.preventDefault();
+                void submitSignOut();
+            }}
+        >
+            <h3>Sign out device</h3>
+            <p className="settings-inline-note">
+                {state.device.display_name || "Unnamed device"} ({state.device.device_id})
+            </p>
+            {state.needsPassword ? (
+                <label className="settings-field">
+                    Account password
+                    <input
+                        type="password"
+                        value={state.password}
+                        onChange={(event) =>
+                            setSignOutState((previous) =>
+                                previous
+                                    ? {
+                                          ...previous,
+                                          password: event.target.value,
+                                      }
+                                    : previous,
+                            )
+                        }
+                        autoComplete="current-password"
+                        autoFocus
+                    />
+                </label>
+            ) : (
+                <p className="settings-inline-note">This removes the selected session from your account on the homeserver.</p>
+            )}
+            {state.error ? <p className="settings-inline-error">{state.error}</p> : null}
+            <div className="settings-actions-row">
+                <button type="submit" className="settings-button settings-button-danger" disabled={state.pending}>
+                    {state.pending ? "Processing..." : "Confirm sign out"}
+                </button>
+                <button
+                    type="button"
+                    className="settings-button settings-button-secondary"
+                    onClick={() => setSignOutState(null)}
+                    disabled={state.pending}
+                >
+                    Cancel
+                </button>
+            </div>
+        </form>
+    );
+
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Devices</h2>
@@ -272,103 +336,54 @@ export function DevicesTab({
             {loading ? <p className="settings-inline-note">Loading devices...</p> : null}
             {error ? <p className="settings-inline-error">{error}</p> : null}
 
-            {signOutState ? (
-                <div className="settings-section-card settings-devices-signout">
-                    <h3>Sign out device</h3>
-                    <p className="settings-inline-note">
-                        {signOutState.device.display_name || "Unnamed device"} ({signOutState.device.device_id})
-                    </p>
-                    {signOutState.needsPassword ? (
-                        <label className="settings-field">
-                            Account password
-                            <input
-                                type="password"
-                                value={signOutState.password}
-                                onChange={(event) =>
-                                    setSignOutState((previous) =>
-                                        previous
-                                            ? {
-                                                  ...previous,
-                                                  password: event.target.value,
-                                              }
-                                            : previous,
-                                    )
-                                }
-                                autoComplete="current-password"
-                            />
-                        </label>
-                    ) : (
-                        <p className="settings-inline-note">
-                            This removes the selected session from your account on the homeserver.
-                        </p>
-                    )}
-                    {signOutState.error ? <p className="settings-inline-error">{signOutState.error}</p> : null}
-                    <div className="settings-actions-row">
-                        <button
-                            type="button"
-                            className="settings-button settings-button-danger"
-                            onClick={() => void submitSignOut()}
-                            disabled={signOutState.pending}
-                        >
-                            {signOutState.pending ? "Processing..." : "Confirm sign out"}
-                        </button>
-                        <button
-                            type="button"
-                            className="settings-button settings-button-secondary"
-                            onClick={() => setSignOutState(null)}
-                            disabled={signOutState.pending}
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            ) : null}
-
             <div className="settings-devices-list">
                 {hasDevices ? (
                     devices.map((device) => {
                         const isCurrent = device.device_id === currentDeviceId;
                         const disableActions = signOutState?.pending ?? false;
                         return (
-                            <div className="settings-devices-item" key={device.device_id}>
-                                <div className="settings-devices-main">
-                                    <span className="settings-devices-title">
-                                        {device.display_name || "Unnamed device"} {isCurrent ? "(This device)" : ""}
-                                    </span>
-                                    <span className="settings-devices-meta">Device ID: {device.device_id}</span>
-                                    <span className="settings-devices-meta">Last seen: {formatLastSeen(device.last_seen_ts)}</span>
-                                    {device.last_seen_ip ? <span className="settings-devices-meta">IP: {device.last_seen_ip}</span> : null}
+                            <React.Fragment key={device.device_id}>
+                                <div className="settings-devices-item">
+                                    <div className="settings-devices-main">
+                                        <span className="settings-devices-title">
+                                            {device.display_name || "Unnamed device"} {isCurrent ? "(This device)" : ""}
+                                        </span>
+                                        <span className="settings-devices-meta">Device ID: {device.device_id}</span>
+                                        <span className="settings-devices-meta">Last seen: {formatLastSeen(device.last_seen_ts)}</span>
+                                        {device.last_seen_ip ? <span className="settings-devices-meta">IP: {device.last_seen_ip}</span> : null}
+                                    </div>
+                                    <div className="settings-devices-actions">
+                                        <span className={`settings-role-badge settings-role-${device.trustedState}`}>
+                                            {trustedStateLabel(device.trustedState)}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className="settings-button settings-button-secondary"
+                                            disabled={disableActions || !currentUserId}
+                                            onClick={() =>
+                                                isCurrent
+                                                    ? onOpenOwnVerification()
+                                                    : onOpenDeviceVerification({
+                                                          userId: currentUserId,
+                                                          deviceId: device.device_id,
+                                                      })
+                                            }
+                                        >
+                                            {isCurrent ? "Verify current" : "Verify"}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="settings-button settings-button-danger"
+                                            disabled={disableActions || isCurrent}
+                                            title={isCurrent ? "Use global sign out for current device." : undefined}
+                                            onClick={() => openSignOut(device)}
+                                        >
+                                            Sign out
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="settings-devices-actions">
-                                    <span className={`settings-role-badge settings-role-${device.trustedState}`}>
-                                        {trustedStateLabel(device.trustedState)}
-                                    </span>
-                                    <button
-                                        type="button"
-                                        className="settings-button settings-button-secondary"
-                                        disabled={disableActions || !currentUserId}
-                                        onClick={() =>
-                                            isCurrent
-                                                ? onOpenOwnVerification()
-                                                : onOpenDeviceVerification({
-                                                      userId: currentUserId,
-                                                      deviceId: device.device_id,
-                                                  })
-                                        }
-                                    >
-                                        {isCurrent ? "Verify current" : "Verify"}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="settings-button settings-button-danger"
-                                        disabled={disableActions || isCurrent}
-                                        title={isCurrent ? "Use global sign out for current device." : undefined}
-                                        onClick={() => openSignOut(device)}
-                                    >
-                                        Sign out
-                                    </button>
-                                </div>
-                            </div>
+                                {signOutState?.device.device_id === device.device_id ? renderSignOutBox(signOutState) : null}
+                            </React.Fragment>
                         );
                     })
                 ) : (

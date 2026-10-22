@@ -23,7 +23,7 @@ const ConfirmContext = createContext<ConfirmFn | null>(null);
 
 /**
  * Jorvik's own "are you sure?". The browser's confirm() can be blocked or never shown, and then
- * it answers "no" without asking: on an iPhone that made Sign out do nothing at all.
+ * it answers "no" without asking, so the action silently does nothing.
  * Phones get a sheet from the bottom, everything else a small dialog.
  */
 export function ConfirmProvider({ children }: { children: React.ReactNode }): React.ReactElement {

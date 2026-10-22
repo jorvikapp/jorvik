@@ -38,7 +38,7 @@ async function renderTab(onSignOut: () => Promise<void>): Promise<void> {
 }
 
 describe("SignOutTab", () => {
-    // Firefox on an iPhone never showed confirm(), so it answered "no" and Sign out did nothing.
+    // A browser that blocks confirm() answers "no" without asking, so Sign out did nothing.
     it("signs out where the browser's own confirm box never appears", async () => {
         vi.spyOn(window, "confirm").mockReturnValue(false);
         const onSignOut = vi.fn().mockResolvedValue(undefined);
