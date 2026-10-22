@@ -18,6 +18,7 @@ import { mediaFromMxc, thumbnailFromMxc } from "../adapters/media";
 import type { NotificationsSettings } from "../settings/user/settingsStore";
 import { messagePreviewText } from "../formatting/messagePreviewText";
 import { playNotificationSound } from "./sound";
+import { isPushEnabledHere } from "../../core/push/webPush";
 
 interface UseElementLikeNotificationsOptions {
     client: MatrixClient;
@@ -274,6 +275,11 @@ export function useElementLikeNotifications({
             }
 
             if (typeof Notification === "undefined" || Notification.permission !== "granted") {
+                return;
+            }
+
+            // With push on in this browser, the service worker shows the notification instead.
+            if (isPushEnabledHere()) {
                 return;
             }
 

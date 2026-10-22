@@ -33,6 +33,7 @@ import {
     waitForCrossSigningKeys,
 } from "../adapters/securityRecoveryAdapter";
 import { subscribeAccessTokenRotated } from "../../core/lifecycle/tokenEvents";
+import { disablePush, getWebPushConfig, isPushEnabledHere } from "../../core/push/webPush";
 import { syncMediaServiceWorkerAuthState } from "../serviceWorker/registerMediaServiceWorker";
 
 export type MatrixSessionStatus =
@@ -1070,6 +1071,13 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
         dispatch({ type: "set_status", status: "starting", error: null });
 
         try {
+            if (isPushEnabledHere()) {
+                // Bounded, so a slow homeserver can't hold up signing out.
+                await Promise.race([
+                    disablePush(state.client, getWebPushConfig(state.config)),
+                    new Promise((resolve) => window.setTimeout(resolve, 3000)),
+                ]);
+            }
             await state.core.session.logout(true);
             clearPendingSetupKey();
             verificationSkippedRef.current = false;
@@ -1083,7 +1091,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
                 error: error instanceof Error ? error.message : String(error),
             });
         }
-    }, [clearPendingSetupKey, state.core]);
+    }, [clearPendingSetupKey, state.client, state.config, state.core]);
 
     const value = useMemo<MatrixContextValue>(
         () => ({

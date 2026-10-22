@@ -59,6 +59,7 @@ import {
 import { RoomList, type DiscoverableSpaceChannel, type SubspaceGroupView } from "./RoomList";
 import { Timeline } from "./Timeline";
 import { Toast, type ToastState } from "./Toast";
+import { getWebPushConfig, isPushEnabledHere, refreshPushRegistration } from "../../core/push/webPush";
 import { useConfirm } from "./confirm/ConfirmProvider";
 import { RailContextMenu } from "./RailContextMenu";
 import { Avatar } from "./Avatar";
@@ -1228,11 +1229,31 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const presenceControl = usePresenceSelection(client, presenceEnabled, userAway);
     useEffect(() => {
         const desktopBadge = window.heorotDesktop?.setBadgeCount;
-        if (!desktopBadge) {
+        if (desktopBadge) {
+            void desktopBadge(unreadNotificationTotal).catch(() => undefined);
             return;
         }
-        void desktopBadge(unreadNotificationTotal).catch(() => undefined);
+        // The icon of Jorvik added to a Home Screen; pushes update it while Jorvik is closed.
+        const appBadge = navigator as Navigator & {
+            setAppBadge?: (count?: number) => Promise<void>;
+            clearAppBadge?: () => Promise<void>;
+        };
+        if (typeof appBadge.setAppBadge !== "function") {
+            return;
+        }
+        const update = unreadNotificationTotal > 0 ? appBadge.setAppBadge(unreadNotificationTotal) : appBadge.clearAppBadge?.();
+        void update?.catch(() => undefined);
     }, [unreadNotificationTotal]);
+    const webPushConfig = useMemo(() => getWebPushConfig(coreConfig), [coreConfig]);
+    const hidePushBody = !userSettings.notifications.notificationBodyEnabled;
+    useEffect(() => {
+        if (!webPushConfig || !isPushEnabledHere()) {
+            return;
+        }
+        refreshPushRegistration(client, webPushConfig, { hideBody: hidePushBody }).catch((error: unknown) => {
+            console.warn("[jorvik-push] could not refresh this browser's push registration", error);
+        });
+    }, [client, hidePushBody, webPushConfig]);
     const directRoomIds = useMemo(
         () => getDirectRoomIds(client),
         [client, rooms],
@@ -2373,6 +2394,55 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         },
         [client, directRoomIds, showRoom, spaces],
     );
+
+    // Before showing a push, the service worker asks whether that chat is on screen right now.
+    const roomOnScreenRef = useRef<string | null>(null);
+    useEffect(() => {
+        roomOnScreenRef.current = isPhone && !phoneChatOpen ? null : activeRoomId;
+    }, [activeRoomId, isPhone, phoneChatOpen]);
+
+    useEffect(() => {
+        const serviceWorker = typeof navigator === "undefined" ? undefined : navigator.serviceWorker;
+        if (!serviceWorker) {
+            return;
+        }
+        const onMessage = (event: MessageEvent): void => {
+            const data = event.data as { type?: unknown; roomId?: unknown } | null;
+            if (!data || typeof data.roomId !== "string") {
+                return;
+            }
+            if (data.type === "jorvik:open_room") {
+                if (client.getRoom(data.roomId)) {
+                    focusRoom(data.roomId);
+                }
+            } else if (data.type === "jorvik:is_room_open") {
+                const onScreen =
+                    document.visibilityState === "visible" && document.hasFocus() && roomOnScreenRef.current === data.roomId;
+                event.ports[0]?.postMessage(onScreen);
+            }
+        };
+        serviceWorker.addEventListener("message", onMessage);
+        return () => serviceWorker.removeEventListener("message", onMessage);
+    }, [client, focusRoom]);
+
+    // A notification tapped while no Jorvik window was open starts one at /?room=…
+    const openedRoomFromUrlRef = useRef(false);
+    useEffect(() => {
+        if (openedRoomFromUrlRef.current) {
+            return;
+        }
+        openedRoomFromUrlRef.current = true;
+        const url = new URL(window.location.href);
+        const roomId = url.searchParams.get("room");
+        if (!roomId) {
+            return;
+        }
+        url.searchParams.delete("room");
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+        if (client.getRoom(roomId)) {
+            focusRoom(roomId);
+        }
+    }, [client, focusRoom]);
 
     // Going somewhere from the quick switcher does what clicking it in the
     // rail or the list does: a voice channel is joined, as it is from the list.

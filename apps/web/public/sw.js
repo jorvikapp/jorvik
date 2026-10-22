@@ -1,3 +1,6 @@
+// Push notifications live in their own file.
+importScripts("/sw-push.js");
+
 const ACCESS_TOKEN_STORAGE_KEY = "mx_access_token";
 const ACCESS_TOKEN_IV = "access_token";
 const ACCOUNT_STORE_NAME = "account";

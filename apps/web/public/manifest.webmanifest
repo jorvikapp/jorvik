@@ -1,0 +1,17 @@
+{
+    "name": "Jorvik",
+    "short_name": "Jorvik",
+    "description": "Chat, voice and Spaces on Jorvik.",
+    "id": "/",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#0e0e10",
+    "theme_color": "#0e0e10",
+    "icons": [
+        { "src": "/branding/jorvik-app-192-7b87c503.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "/branding/jorvik-app-512-44fcce27.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "/branding/jorvik-app-maskable-192-ed125f55.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+        { "src": "/branding/jorvik-app-maskable-512-0e95a2d6.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    ]
+}

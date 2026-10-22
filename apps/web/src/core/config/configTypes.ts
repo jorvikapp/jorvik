@@ -14,5 +14,11 @@ export interface CoreConfig {
     voice_enabled?: boolean;
     voice_service_url?: string;
     livekit_ws_url?: string;
+    // The push gateway for notifications (see core/push/webPush.ts).
+    web_push?: {
+        gateway_url?: string;
+        app_id?: string;
+        vapid_public_key?: string;
+    };
     [key: string]: unknown;
 }

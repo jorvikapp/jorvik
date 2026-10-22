@@ -1,11 +1,84 @@
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 
+import {
+    disablePush,
+    enablePush,
+    getPushAvailability,
+    getWebPushConfig,
+    isPushEnabledHere,
+} from "../../../../core/push/webPush";
 import type { NotificationsSettings } from "../settingsStore";
 import { playNotificationSound } from "../../../notifications/sound";
+import { useMatrix } from "../../../providers/MatrixProvider";
 
 interface NotificationsTabProps {
     settings: NotificationsSettings;
     onChange: (settings: NotificationsSettings) => void;
+}
+
+// Push reaches this device while Jorvik is closed. It is set up per browser, so it isn't a synced setting.
+function PushNotificationsCard({ hideBody }: { hideBody: boolean }): React.ReactElement | null {
+    const { client, config } = useMatrix();
+    const pushConfig = useMemo(() => getWebPushConfig(config), [config]);
+    const availability = useMemo(() => getPushAvailability(), []);
+    const [enabled, setEnabled] = useState(isPushEnabledHere);
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // The desktop app has no push service; it shows its own notifications while it runs.
+    if (!pushConfig || !client || window.heorotDesktop) {
+        return null;
+    }
+
+    const toggle = async (on: boolean): Promise<void> => {
+        setError(null);
+        setPending(true);
+        try {
+            if (on) {
+                await enablePush(client, pushConfig, { hideBody });
+            } else {
+                await disablePush(client, pushConfig);
+            }
+            setEnabled(on);
+        } catch (pushError) {
+            setEnabled(isPushEnabledHere());
+            setError(pushError instanceof Error ? pushError.message : "Push notifications could not be set up.");
+        } finally {
+            setPending(false);
+        }
+    };
+
+    return (
+        <div className="settings-section-card">
+            <h3>Push notifications</h3>
+            {availability === "needs_home_screen" ? (
+                <p className="settings-inline-note">
+                    On iPhone and iPad, notifications only reach Jorvik on your Home Screen. In Safari, tap Share,
+                    then Add to Home Screen, and open Jorvik from there.
+                </p>
+            ) : availability === "unsupported" ? (
+                <p className="settings-inline-note">This browser can't receive push notifications.</p>
+            ) : (
+                <>
+                    <p className="settings-inline-note">
+                        Get notified about new messages on this device, even when Jorvik is closed.
+                    </p>
+                    <label className="settings-toggle">
+                        <input
+                            type="checkbox"
+                            checked={enabled}
+                            disabled={pending}
+                            onChange={(event) => {
+                                void toggle(event.target.checked);
+                            }}
+                        />
+                        Push notifications on this device
+                    </label>
+                </>
+            )}
+            {error ? <p className="settings-inline-error">{error}</p> : null}
+        </div>
+    );
 }
 
 export function NotificationsTab({ settings, onChange }: NotificationsTabProps): React.ReactElement {
@@ -101,6 +174,8 @@ export function NotificationsTab({ settings, onChange }: NotificationsTabProps):
                 Matrix-native local notification handling using Matrix push-actions.
             </p>
 
+            <PushNotificationsCard hideBody={!settings.notificationBodyEnabled} />
+
             <label className="settings-toggle">
                 <input
                     type="checkbox"
@@ -128,7 +203,7 @@ export function NotificationsTab({ settings, onChange }: NotificationsTabProps):
                     checked={settings.notificationBodyEnabled}
                     onChange={(event) => onChange({ ...settings, notificationBodyEnabled: event.target.checked })}
                 />
-                Show message body in desktop notifications
+                Show message text in notifications
             </label>
 
             <label className="settings-toggle">
