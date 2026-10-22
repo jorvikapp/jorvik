@@ -3,7 +3,7 @@
   Jorvik
 </h1>
 
-A self-hosted Matrix client built to feel like Discord. Spaces are servers. Rooms are channels. End-to-end encryption is on by default.
+A self-hosted Matrix client built to feel like Discord. Spaces are servers. Rooms are channels. Voice and video calls come with screen sharing, and end-to-end encryption is on by default.
 
 Runs as a web app or a native desktop client (Windows · macOS · Linux).
 
@@ -92,9 +92,12 @@ Personal open-source experiment — alpha stage. Core features work, rough edges
 - Inline image viewer (lightbox)
 - Pinned messages
 
-**Voice** *(requires heorot-voice-relay)*
-- Voice channels alongside text channels
-- Mic mute / audio mute
+**Voice and video** *(requires heorot-voice-relay)*
+- Voice channels alongside text channels, and calls from someone's profile
+- Video: turn your camera on in a voice channel or a call
+- Screen sharing at up to 1440p and 60 fps, in the desktop app and desktop browsers
+- End-to-end encrypted calls in encrypted rooms
+- Mic mute / audio mute, and a volume for each person
 - Live participant list
 - Auto-discovery via `/.well-known/matrix/client`
 
@@ -120,7 +123,7 @@ Personal open-source experiment — alpha stage. Core features work, rough edges
 
 **Desktop extras** *(Electron)*
 - Native window with titlebar overlay
-- Screen sharing and system audio capture (Windows)
+- System audio in screen shares (Windows)
 - Window state persistence across restarts
 - Authenticated media (no token-in-URL)
 
@@ -132,8 +135,8 @@ Personal open-source experiment — alpha stage. Core features work, rough edges
 |---|---|
 | UI | React 19, TypeScript, Vite |
 | Matrix | matrix-js-sdk 40.x, Rust Crypto WASM |
-| Voice | LiveKit client |
-| Desktop | Electron 34, electron-builder |
+| Voice and video | LiveKit client |
+| Desktop | Electron 44, electron-builder |
 | Package manager | pnpm 10 |
 
 ---
