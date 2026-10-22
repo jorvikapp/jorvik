@@ -299,17 +299,6 @@ export function LoginView({
     return (
         <div className="login-view">
             <div className="login-card login-card-wide">
-                {!disableHomeserverInput ? (
-                    <button
-                        type="button"
-                        className="login-link-button login-settings-button"
-                        onClick={() => setServerSettingsOpen(true)}
-                        aria-label="Server settings"
-                        title="Server settings"
-                    >
-                        ⚙
-                    </button>
-                ) : null}
                 <div className="login-title">
                     <img src="/branding/jorvik-logo-848bff6b.webp" width="36" height="36" alt="" />
                     <h1>Jorvik</h1>
@@ -489,6 +478,19 @@ export function LoginView({
                         )}
                     </div>
                 </div>
+                {/* Last in the card: the desktop app applies window-drag areas in page order, later ones
+                    winning, so a gear placed before the full-width title row lost its clicks to a drag. */}
+                {!disableHomeserverInput ? (
+                    <button
+                        type="button"
+                        className="login-link-button login-settings-button"
+                        onClick={() => setServerSettingsOpen(true)}
+                        aria-label="Server settings"
+                        title="Server settings"
+                    >
+                        ⚙
+                    </button>
+                ) : null}
             </div>
             <ServerSettingsDialog
                 open={serverSettingsOpen}
