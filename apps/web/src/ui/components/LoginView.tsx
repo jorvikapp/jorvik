@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AuthType, MatrixError, type MatrixClient } from "matrix-js-sdk/src/matrix";
 
+import { clearLoginServer, readLoginServer, saveLoginServer, type LoginServer } from "../../core/config/loginServer";
 import type { MatrixCredentials } from "../../core/types/credentials";
 import { normalizeHomeserverUrl } from "../adapters/loginAdapter";
 import {
@@ -15,6 +16,7 @@ import {
 } from "../adapters/registrationAdapter";
 import { PasswordResetView } from "./auth/PasswordResetView";
 import { RegistrationInteractiveAuth } from "./auth/RegistrationInteractiveAuth";
+import { ServerSettingsDialog } from "./auth/ServerSettingsDialog";
 
 type AuthMode = "sign_in" | "register" | "reset";
 type RegistrationStep = "form" | "uia";
@@ -39,7 +41,14 @@ export function LoginView({
     onLoginWithCredentials,
 }: LoginViewProps): React.ReactElement {
     const [mode, setMode] = useState<AuthMode>("sign_in");
-    const [homeserver, setHomeserver] = useState(defaultHomeserver);
+    // A server picked in Server settings replaces config.json's until it is changed back.
+    const [loginServer, setLoginServer] = useState<LoginServer | null>(() =>
+        disableHomeserverInput ? null : readLoginServer(),
+    );
+    const [serverSettingsOpen, setServerSettingsOpen] = useState(false);
+    // An error from signing in to the server just replaced says nothing about the new one.
+    const [staleError, setStaleError] = useState<string | null>(null);
+    const [homeserver, setHomeserver] = useState(() => loginServer?.baseUrl ?? defaultHomeserver);
 
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
@@ -58,6 +67,22 @@ export function LoginView({
     const [registerError, setRegisterError] = useState<string | null>(null);
     const [registerSsoUrl, setRegisterSsoUrl] = useState<string | null>(null);
     const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+
+    const chooseServer = useCallback(
+        (server: LoginServer | null): void => {
+            if (server) {
+                saveLoginServer(server);
+            } else {
+                clearLoginServer();
+            }
+            setLoginServer(server);
+            setHomeserver(server?.baseUrl ?? defaultHomeserver);
+            setServerSettingsOpen(false);
+            setRegisterError(null);
+            setStaleError(error);
+        },
+        [defaultHomeserver, error],
+    );
 
     const switchMode = useCallback((nextMode: AuthMode): void => {
         setMode(nextMode);
@@ -105,6 +130,7 @@ export function LoginView({
             return;
         }
 
+        setStaleError(null);
         await onLogin(homeserver.trim(), username.trim(), password);
     };
 
@@ -216,7 +242,7 @@ export function LoginView({
         }
     };
 
-    const providerError = error;
+    const providerError = error && error !== staleError ? error : null;
     const displayError =
         mode === "register" ? registerError ?? providerError : mode === "sign_in" ? providerError : null;
     const flowContentRef = useRef<HTMLDivElement | null>(null);
@@ -273,6 +299,17 @@ export function LoginView({
     return (
         <div className="login-view">
             <div className="login-card login-card-wide">
+                {!disableHomeserverInput ? (
+                    <button
+                        type="button"
+                        className="login-link-button login-settings-button"
+                        onClick={() => setServerSettingsOpen(true)}
+                        aria-label="Server settings"
+                        title="Server settings"
+                    >
+                        ⚙
+                    </button>
+                ) : null}
                 <div className="login-title">
                     <img src="/branding/jorvik-logo-848bff6b.webp" width="36" height="36" alt="" />
                     <h1>Jorvik</h1>
@@ -293,24 +330,16 @@ export function LoginView({
                         Register
                     </button>
                 </div>
+                {loginServer ? (
+                    <p className="login-server-hint">
+                        Server: <strong>{loginServer.serverName}</strong>
+                    </p>
+                ) : null}
                 <div className="login-flow-shell" style={flowHeight === null ? undefined : { height: `${flowHeight}px` }}>
                     <div className="login-flow-content" ref={flowContentRef}>
                         {mode === "sign_in" ? (
                     <form onSubmit={handleSignInSubmit}>
                         <p className="login-subtitle">Sign in to continue</p>
-
-                        {!disableHomeserverInput && (
-                            <label>
-                                Homeserver
-                                <input
-                                    type="url"
-                                    value={homeserver}
-                                    onChange={(event) => setHomeserver(event.target.value)}
-                                    placeholder="https://matrix.org"
-                                    autoComplete="url"
-                                />
-                            </label>
-                        )}
 
                         <label>
                             Username or email
@@ -358,27 +387,14 @@ export function LoginView({
                 ) : mode === "reset" ? (
                     <PasswordResetView
                         homeserver={homeserver}
-                        disableHomeserverInput={disableHomeserverInput}
+                        // The server is picked in Server settings.
+                        disableHomeserverInput
                         onHomeserverChange={setHomeserver}
                         onBack={() => switchMode("sign_in")}
                     />
                 ) : registerStep === "form" ? (
                     <form onSubmit={handleRegisterSubmit}>
                         <p className="login-subtitle">Join Jorvik. Create your account and start connecting</p>
-                        {!disableHomeserverInput && (
-                            <label>
-                                Homeserver
-                                <input
-                                    type="url"
-                                    value={homeserver}
-                                    onChange={(event) => setHomeserver(event.target.value)}
-                                    placeholder="https://matrix.org"
-                                    autoComplete="url"
-                                    disabled={registerBusy}
-                                />
-                            </label>
-                        )}
-
                         <label>
                             Username
                             <span className="login-inline-note">Lowercase letters, numbers, dots, underscores, and hyphens only.</span>
@@ -474,6 +490,13 @@ export function LoginView({
                     </div>
                 </div>
             </div>
+            <ServerSettingsDialog
+                open={serverSettingsOpen}
+                defaultHomeserver={defaultHomeserver}
+                current={loginServer}
+                onClose={() => setServerSettingsOpen(false)}
+                onSaved={chooseServer}
+            />
         </div>
     );
 }

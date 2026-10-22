@@ -39,7 +39,7 @@ if (fs.existsSync(sourceConfigPath)) {
             default_server_config: { "m.homeserver": { base_url: "https://matrix.jorvik.app", server_name: "matrix.jorvik.app" } },
             brand: "Jorvik",
             disable_guests: true,
-            disable_custom_urls: true,
+            disable_custom_urls: false,
             force_verification: false,
             voice_enabled: true,
             voice_service_url: "https://matrix.jorvik.app",

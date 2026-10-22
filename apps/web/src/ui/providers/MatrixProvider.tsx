@@ -159,6 +159,15 @@ function toErrorMessage(error: unknown): string {
 function formatLoginError(error: unknown): string {
     const fallbackMessage = toErrorMessage(error);
 
+    // Browsers word a request that never got an answer their own way ("Failed to fetch", Safari's
+    // "Load failed"); the SDK wraps it in a ConnectionError.
+    if (
+        (error instanceof Error && error.name === "ConnectionError") ||
+        /failed to fetch|fetch failed|load failed|networkerror/i.test(fallbackMessage)
+    ) {
+        return "Couldn't reach the server. Check your connection and try again.";
+    }
+
     if (!error || typeof error !== "object") {
         return fallbackMessage;
     }
