@@ -71,6 +71,20 @@
   </branding>
 
   <releases>
+    <release version="1.0.24" date="2026-10-22">
+      <description>
+        <p>Sign in to any Matrix server, and chat.jorvik.app on phones.</p>
+        <ul>
+          <li>The gear on the sign-in screen opens Server settings, where you can sign in to or create an account on another Matrix server. Jorvik keeps it until you change it. Voice channels, calls and GIFs still need a server that runs Jorvik's voice service</li>
+          <li>Sign out, deleting a message, leaving and the other questions use Jorvik's own confirmation, which works in every browser</li>
+          <li>When the server can't be reached, sign-in says so plainly</li>
+          <li>On a phone, chat.jorvik.app has a layout of its own: your spaces and chats, a chat full screen, and swipes to go back or to see who's there</li>
+          <li>Push notifications for chat.jorvik.app on phones and in browsers: turn them on in Settings, Notifications. On an iPhone, add Jorvik to the Home Screen first</li>
+          <li>Hold a message on a touch screen to open its menu</li>
+          <li>Dark mode add-ons no longer recolour Jorvik's own dark theme</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.23" date="2026-10-12">
       <description>
         <p>Light mode that stays light.</p>
