@@ -798,6 +798,29 @@ button.phone-notif:active {
     color: var(--danger);
 }
 
+.confirm-sheet-text {
+    padding: 4px 8px 14px;
+    text-align: center;
+}
+
+.confirm-sheet-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.confirm-sheet-message {
+    margin: 6px 0 0;
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.confirm-sheet-action {
+    justify-content: center;
+    font-weight: 600;
+}
+
 .message-action-sheet-preview {
     display: flex;
     gap: 8px;

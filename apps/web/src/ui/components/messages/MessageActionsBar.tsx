@@ -5,6 +5,7 @@ import type { MatrixClient, MatrixEvent, Room } from "matrix-js-sdk/src/matrix";
 import type { ToastState } from "../Toast";
 import { ReactionPicker } from "../ReactionPicker";
 import { BottomSheet } from "../phone/BottomSheet";
+import { useConfirm } from "../confirm/ConfirmProvider";
 import { MessageActionSheet } from "./MessageActionSheet";
 import { MessageContextMenu } from "./MessageContextMenu";
 import { useMessageActions } from "../../hooks/useMessageActions";
@@ -54,6 +55,7 @@ export function MessageActionsBar({
     } = useMessageActions({ client, room, event });
 
     const isPhone = usePhoneLayout();
+    const confirmAction = useConfirm();
     const [barReactionPickerOpen, setBarReactionPickerOpen] = useState(false);
     const [sheetReactionPickerOpen, setSheetReactionPickerOpen] = useState(false);
     const [reportOpen, setReportOpen] = useState(false);
@@ -166,7 +168,12 @@ export function MessageActionsBar({
     };
 
     const handleDelete = async (): Promise<void> => {
-        const confirmed = window.confirm("Delete message?");
+        const confirmed = await confirmAction({
+            title: "Delete this message?",
+            message: "It is removed for everyone in the chat.",
+            confirmLabel: "Delete",
+            danger: true,
+        });
         if (!confirmed) {
             return;
         }

@@ -4006,6 +4006,25 @@ textarea {
     background: var(--bg-active);
 }
 
+/* Jorvik's own "are you sure?". Above Settings (1400), below toasts (1800). */
+.confirm-dialog-overlay {
+    z-index: 1700;
+}
+
+.confirm-dialog-overlay .room-dialog {
+    width: min(440px, 96vw);
+}
+
+.confirm-dialog-overlay .room-dialog-body:empty {
+    display: none;
+}
+
+.confirm-dialog-message {
+    margin: 0;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
 /* Asking before a link whose text hides where it goes. */
 .link-guard-intro {
     margin: 0;

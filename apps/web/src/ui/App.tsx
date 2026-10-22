@@ -3,6 +3,7 @@ import React from "react";
 import { getDefaultHomeserver, getDefaultIdentityServer, isCustomHomeserverDisabled } from "../core/config/serverDefaults";
 import { formatUserIdForDisplay } from "../core/users/formatUserId";
 import { AppShell } from "./components/AppShell";
+import { ConfirmProvider } from "./components/confirm/ConfirmProvider";
 import { DeviceVerificationView } from "./components/DeviceVerificationView";
 import { LoginView } from "./components/LoginView";
 import { SecurityRecoveryView } from "./components/SecurityRecoveryView";
@@ -91,8 +92,10 @@ function AppRouter(): React.ReactElement {
     if (matrix.status === "ready" && matrix.client) {
         return (
             <LinkGuardProvider>
-                <AppShell client={matrix.client} onLogout={matrix.logout} />
-                <IncomingVerificationDialog client={matrix.client} onCompleted={() => void matrix.collectKeysAfterVerification()} />
+                <ConfirmProvider>
+                    <AppShell client={matrix.client} onLogout={matrix.logout} />
+                    <IncomingVerificationDialog client={matrix.client} onCompleted={() => void matrix.collectKeysAfterVerification()} />
+                </ConfirmProvider>
             </LinkGuardProvider>
         );
     }

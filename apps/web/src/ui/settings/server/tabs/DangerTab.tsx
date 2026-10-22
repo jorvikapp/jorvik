@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { EventType, type MatrixClient, type Room } from "matrix-js-sdk/src/matrix";
 
 import type { ToastState } from "../../../components/Toast";
+import { useConfirm } from "../../../components/confirm/ConfirmProvider";
 import { DeleteSpaceDialog } from "./DeleteSpaceDialog";
 
 interface DangerTabProps {
@@ -14,6 +15,7 @@ interface DangerTabProps {
 export function DangerTab({ client, spaceRoom, onLeftSpace, onToast }: DangerTabProps): React.ReactElement {
     const [leaving, setLeaving] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const confirmAction = useConfirm();
     const spaceName = spaceRoom.name || spaceRoom.getCanonicalAlias() || spaceRoom.roomId;
     const myUserId = client.getUserId() ?? "";
     const myLevel = spaceRoom.getMember(myUserId)?.powerLevel ?? 0;
@@ -22,7 +24,7 @@ export function DangerTab({ client, spaceRoom, onLeftSpace, onToast }: DangerTab
         spaceRoom.currentState.hasSufficientPowerLevelFor("kick", myLevel);
 
     const leaveSpace = async (): Promise<void> => {
-        const confirmed = window.confirm(`Leave "${spaceName}"?`);
+        const confirmed = await confirmAction({ title: `Leave "${spaceName}"?`, confirmLabel: "Leave", danger: true });
         if (!confirmed) {
             return;
         }

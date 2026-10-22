@@ -10,6 +10,7 @@ import {
     saveSpacePack,
 } from "../../../emoji/EmojiPackStore";
 import type { ToastState } from "../../../components/Toast";
+import { useConfirm } from "../../../components/confirm/ConfirmProvider";
 import { useSpacePermissions } from "../../useSpacePermissions";
 
 interface EmojiTabProps {
@@ -39,6 +40,7 @@ function clonePack(pack: EmojiPackContent | null): EmojiPackContent {
 
 export function EmojiTab({ client, spaceRoom, onOpenUploadDialog, onToast }: EmojiTabProps): React.ReactElement {
     const permissions = useSpacePermissions(client, spaceRoom);
+    const confirmAction = useConfirm();
     const [pack, setPack] = useState<EmojiPackContent>(buildEmptyPack);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -100,7 +102,11 @@ export function EmojiTab({ client, spaceRoom, onOpenUploadDialog, onToast }: Emo
             return;
         }
 
-        const confirmed = window.confirm(`Remove ${shortcode} from this space pack?`);
+        const confirmed = await confirmAction({
+            title: `Remove ${shortcode} from this space pack?`,
+            confirmLabel: "Remove",
+            danger: true,
+        });
         if (!confirmed) {
             return;
         }

@@ -3,6 +3,7 @@ import { ClientEvent, type MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import { mediaFromMxc, thumbnailFromMxc } from "../../../adapters/media";
 import type { ToastState } from "../../../components/Toast";
+import { useConfirm } from "../../../components/confirm/ConfirmProvider";
 import {
     getPersonalPack,
     normalizeEmojiShortcode,
@@ -37,6 +38,7 @@ function clonePack(pack: EmojiPackContent | null): EmojiPackContent {
 
 export function PersonalEmojiTab({ client, onOpenUploadDialog, onToast }: PersonalEmojiTabProps): React.ReactElement {
     const canEdit = !client.isGuest();
+    const confirmAction = useConfirm();
     const [pack, setPack] = useState<EmojiPackContent>(buildEmptyPack);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -96,7 +98,11 @@ export function PersonalEmojiTab({ client, onOpenUploadDialog, onToast }: Person
             return;
         }
 
-        const confirmed = window.confirm(`Remove ${shortcode} from your personal emoji pack?`);
+        const confirmed = await confirmAction({
+            title: `Remove ${shortcode} from your personal emoji pack?`,
+            confirmLabel: "Remove",
+            danger: true,
+        });
         if (!confirmed) {
             return;
         }

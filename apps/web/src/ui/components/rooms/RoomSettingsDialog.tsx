@@ -11,6 +11,7 @@ import { getDirectRoomIds } from "../../adapters/dmAdapter";
 import { getRoomNotificationMode, RoomNotificationMode, setRoomNotificationMode } from "../../adapters/roomNotificationAdapter";
 import { describeRoomNotificationMode, RoomNotificationModePicker } from "../../notifications/RoomNotificationModePicker";
 import { getOneToOneDirectLabel, getOneToOneDirectName } from "../rightPanel/directPartner";
+import { useConfirm } from "../confirm/ConfirmProvider";
 import { RoomDialog } from "./RoomDialog";
 import { getExplicitRoomName, getRoomDisplayName } from "./roomAdminUtils";
 
@@ -57,6 +58,7 @@ function isRoomEncrypted(room: Room): boolean {
 }
 
 export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: RoomSettingsDialogProps): React.ReactElement | null {
+    const confirmAction = useConfirm();
     const [name, setName] = useState("");
     const [topic, setTopic] = useState("");
     const [joinRule, setJoinRule] = useState<JoinRule>(JoinRule.Invite);
@@ -188,10 +190,22 @@ export function RoomSettingsDialog({ client, room, open, onClose, onDeleted }: R
 
     const deleteChannel = async (): Promise<void> => {
         if (!room || !canDeleteChannel || deleting) return;
-        const question = isDirect
-            ? `Delete your chat with “${roomLabel}”? You will leave it and it disappears from your list.`
-            : `Delete “${roomLabel}”? You will leave this channel and lose access to its history.`;
-        if (!window.confirm(question)) return;
+        const confirmed = await confirmAction(
+            isDirect
+                ? {
+                      title: `Delete your chat with “${roomLabel}”?`,
+                      message: "You will leave it and it disappears from your list.",
+                      confirmLabel: "Delete chat",
+                      danger: true,
+                  }
+                : {
+                      title: `Delete “${roomLabel}”?`,
+                      message: "You will leave this channel and lose access to its history.",
+                      confirmLabel: "Delete channel",
+                      danger: true,
+                  },
+        );
+        if (!confirmed) return;
         setDeleting(true);
         setError(null);
         try {

@@ -59,6 +59,7 @@ import {
 import { RoomList, type DiscoverableSpaceChannel, type SubspaceGroupView } from "./RoomList";
 import { Timeline } from "./Timeline";
 import { Toast, type ToastState } from "./Toast";
+import { useConfirm } from "./confirm/ConfirmProvider";
 import { RailContextMenu } from "./RailContextMenu";
 import { Avatar } from "./Avatar";
 import { CreateRoomDialog } from "./rooms/CreateRoomDialog";
@@ -1028,6 +1029,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     // Phones show one panel at a time: the lists, with tabs under them, or a chat over the lists,
     // with the member list in a drawer over the chat.
     const isPhone = usePhoneLayout();
+    const confirmAction = useConfirm();
     const [phoneChatOpen, setPhoneChatOpen] = useState(false);
     const [phoneDrawerOpen, setPhoneDrawerOpen] = useState(false);
     const [phoneTab, setPhoneTab] = useState<PhoneTab>("home");
@@ -2586,7 +2588,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         }
 
         const roomLabel = activeDirectName ?? getRoomName(activeRoom);
-        if (!window.confirm(`Leave "${roomLabel}"?`)) {
+        if (!(await confirmAction({ title: `Leave "${roomLabel}"?`, confirmLabel: "Leave", danger: true }))) {
             return;
         }
 
@@ -2602,7 +2604,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             const message = leaveError instanceof Error ? leaveError.message : "Failed to leave room.";
             pushToast({ type: "error", message });
         }
-    }, [activeDirectName, activeRoom, client, pushToast]);
+    }, [activeDirectName, activeRoom, client, confirmAction, pushToast]);
 
     const openRoomSettingsFor = useCallback(
         (roomId: string | null): void => {

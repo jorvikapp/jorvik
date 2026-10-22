@@ -1,15 +1,18 @@
 import React, { useState } from "react";
 
+import { useConfirm } from "../../../components/confirm/ConfirmProvider";
+
 interface SignOutTabProps {
     onSignOut: () => Promise<void>;
 }
 
 export function SignOutTab({ onSignOut }: SignOutTabProps): React.ReactElement {
     const [pending, setPending] = useState(false);
+    const confirmAction = useConfirm();
     const isDesktopRuntime = typeof window !== "undefined" && Boolean(window.heorotDesktop?.quitApp);
 
     const runSignOut = async (): Promise<void> => {
-        const confirmed = window.confirm("Sign out of this session?");
+        const confirmed = await confirmAction({ title: "Sign out of this session?", confirmLabel: "Sign out", danger: true });
         if (!confirmed) {
             return;
         }

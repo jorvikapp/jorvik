@@ -6,9 +6,10 @@ interface RoomDialogProps {
     onClose: () => void;
     children: React.ReactNode;
     footer?: React.ReactNode;
+    className?: string;
 }
 
-export function RoomDialog({ open, title, onClose, children, footer }: RoomDialogProps): React.ReactElement | null {
+export function RoomDialog({ open, title, onClose, children, footer, className }: RoomDialogProps): React.ReactElement | null {
     useEffect(() => {
         if (!open) {
             return undefined;
@@ -32,7 +33,7 @@ export function RoomDialog({ open, title, onClose, children, footer }: RoomDialo
 
     return (
         <div
-            className="room-dialog-overlay"
+            className={`room-dialog-overlay${className ? ` ${className}` : ""}`}
             role="dialog"
             aria-modal="true"
             aria-label={title}

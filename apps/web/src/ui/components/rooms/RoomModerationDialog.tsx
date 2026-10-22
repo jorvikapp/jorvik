@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { EventType, KnownMembership, type MatrixClient, type Room } from "matrix-js-sdk/src/matrix";
 
 import { formatUserIdForDisplay } from "../../../core/users/formatUserId";
+import { useConfirm, type ConfirmOptions } from "../confirm/ConfirmProvider";
 import { RoomDialog } from "./RoomDialog";
 import {
     getActionPowerLevel,
@@ -28,6 +29,7 @@ export function RoomModerationDialog({
     open,
     onClose,
 }: RoomModerationDialogProps): React.ReactElement | null {
+    const confirmAction = useConfirm();
     const [reason, setReason] = useState("");
     const [powerInputByUserId, setPowerInputByUserId] = useState<Record<string, string>>({});
     const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -102,9 +104,9 @@ export function RoomModerationDialog({
     const runModerationAction = async (
         actionKey: string,
         action: () => Promise<unknown>,
-        confirmMessage: string,
+        confirmOptions: ConfirmOptions,
     ): Promise<void> => {
-        if (!window.confirm(confirmMessage)) {
+        if (!(await confirmAction(confirmOptions))) {
             return;
         }
 
@@ -220,7 +222,11 @@ export function RoomModerationDialog({
                                         void runModerationAction(
                                             `kick:${member.userId}`,
                                             () => client.kick(room.roomId, member.userId, actionReason),
-                                            `${isInvited ? "Remove invite for" : "Kick"} ${displayName}?`,
+                                            {
+                                                title: `${isInvited ? "Remove invite for" : "Kick"} ${displayName}?`,
+                                                confirmLabel: isInvited ? "Remove invite" : "Kick",
+                                                danger: true,
+                                            },
                                         );
                                     }}
                                     disabled={!room || !canKickTarget || pendingAction !== null}
@@ -238,7 +244,7 @@ export function RoomModerationDialog({
                                         void runModerationAction(
                                             `ban:${member.userId}`,
                                             () => client.ban(room.roomId, member.userId, actionReason),
-                                            `Ban ${displayName}?`,
+                                            { title: `Ban ${displayName}?`, confirmLabel: "Ban", danger: true },
                                         );
                                     }}
                                     disabled={!room || !canBanTarget || pendingAction !== null}
@@ -275,7 +281,7 @@ export function RoomModerationDialog({
                                         void runModerationAction(
                                             `unban:${member.userId}`,
                                             () => client.unban(room.roomId, member.userId),
-                                            `Unban ${displayName}?`,
+                                            { title: `Unban ${displayName}?`, confirmLabel: "Unban" },
                                         );
                                     }}
                                     disabled={!room || !canUnbanTarget || pendingAction !== null}
