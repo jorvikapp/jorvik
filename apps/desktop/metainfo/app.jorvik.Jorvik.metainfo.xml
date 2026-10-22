@@ -71,6 +71,15 @@
   </branding>
 
   <releases>
+    <release version="1.0.25" date="2026-10-23">
+      <description>
+        <p>Removing old sessions works in long lists, and the Linux packages bring their sound library along.</p>
+        <ul>
+          <li>Sign out next to a session in Settings, Devices opens its confirmation right under that session. In a long list it used to open out of sight at the top, so the button seemed to do nothing. Enter now confirms the password</li>
+          <li>The .deb and .rpm packages depend on ALSA, so Jorvik also starts on minimal systems that don't have it yet</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.24" date="2026-10-22">
       <description>
         <p>Sign in to any Matrix server, and chat.jorvik.app on phones.</p>
