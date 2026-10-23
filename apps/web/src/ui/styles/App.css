@@ -2820,7 +2820,11 @@ textarea {
     pointer-events: auto;
 }
 
+/* Every message has these, invisible until hovered, so they're kept out of copied text. On the buttons
+   rather than the bar, which also holds the reaction picker's search field: a parent with user-select: none
+   can stop typing in a field on iOS. */
 .message-actions-button {
+    user-select: none;
     width: 28px;
     height: 28px;
     border: 0;
@@ -3344,6 +3348,8 @@ textarea {
     margin-left: 50px;
     margin-top: 6px;
     position: relative;
+    /* Reactions aren't part of the message, so copied text leaves them out. */
+    user-select: none;
 }
 
 .reactions-row {

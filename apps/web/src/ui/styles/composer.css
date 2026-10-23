@@ -97,6 +97,14 @@
     flex-shrink: 0;
 }
 
+/* A selection that runs past the last message leaves the box's buttons and placeholder out of the copied
+   text. Not on the text field or a parent of it, or of the pickers' search fields: on iOS that can stop typing. */
+.composer-plus-button,
+.composer-action-button,
+.composer-textarea::placeholder {
+    user-select: none;
+}
+
 .composer-action-button {
     width: 32px;
     height: 32px;
