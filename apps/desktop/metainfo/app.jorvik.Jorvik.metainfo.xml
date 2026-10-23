@@ -81,6 +81,7 @@
         <ul>
           <li>New in Settings, Privacy &amp; Safety: "Show the game I'm playing". It's off until you turn it on. While it's on, your status shows the game you're playing, from Steam or a list of popular games, and only its name is shared. The Flatpak and Snap versions can't see other programs, so it isn't available there</li>
           <li>The status people set for themselves now shows in the member list and on their profile</li>
+          <li>Copying messages copies just the messages. Before, the emoji of the buttons and reactions under them came along</li>
         </ul>
       </description>
     </release>
