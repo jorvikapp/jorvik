@@ -689,6 +689,11 @@ function registerIpc(): void {
         setNativeBadge(typeof count === "number" ? count : 0);
     });
 
+    // A click on one of the page's notifications, which may come while the window is in the tray.
+    ipcMain.handle("heorot:focusWindow", () => {
+        focusMainWindow();
+    });
+
     ipcMain.handle("heorot:showNotification", (_event, payload: unknown) => {
         showNativeNotification(payload);
     });

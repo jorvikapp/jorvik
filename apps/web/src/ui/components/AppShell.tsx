@@ -2810,6 +2810,14 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             settingsState,
     );
 
+    const openRoomFromNotification = useCallback(
+        (roomId: string): void => {
+            if (client.getRoom(roomId)) {
+                focusRoom(roomId);
+            }
+        },
+        [client, focusRoom],
+    );
     useElementLikeNotifications({
         client,
         // On a phone showing the lists, no chat is in view, so none of them is quiet.
@@ -2817,6 +2825,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         hasOpenDialog,
         settings: userSettings.notifications,
         doNotDisturb: presenceEnabled && presenceControl.selection.choice === "dnd",
+        onOpenRoom: openRoomFromNotification,
     });
 
     // Right-clicking "@" or a Space in the rail: everything in it is marked read.

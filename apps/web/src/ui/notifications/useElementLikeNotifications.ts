@@ -27,6 +27,8 @@ interface UseElementLikeNotificationsOptions {
     settings: NotificationsSettings;
     /** The user's status is Do Not Disturb. */
     doNotDisturb: boolean;
+    /** Opens the chat a clicked notification is about. */
+    onOpenRoom?: (roomId: string) => void;
 }
 
 const MAX_PENDING_ENCRYPTED = 20;
@@ -139,10 +141,13 @@ export function useElementLikeNotifications({
     hasOpenDialog,
     settings,
     doNotDisturb,
+    onOpenRoom,
 }: UseElementLikeNotificationsOptions): void {
     const settingsRef = useRef(settings);
     const doNotDisturbRef = useRef(doNotDisturb);
     doNotDisturbRef.current = doNotDisturb;
+    const onOpenRoomRef = useRef(onOpenRoom);
+    onOpenRoomRef.current = onOpenRoom;
     const activeRoomIdRef = useRef(activeRoomId);
     const hasOpenDialogRef = useRef(hasOpenDialog);
     const pendingEncryptedEventIdsRef = useRef<string[]>([]);
@@ -294,8 +299,11 @@ export function useElementLikeNotifications({
                 tag: `${room.roomId}:${event.getId() ?? Date.now()}`,
             });
 
+            // Clicking brings Jorvik forward, out of the tray in the desktop app, and opens the chat.
             notification.onclick = () => {
                 window.focus();
+                void window.heorotDesktop?.focusWindow?.().catch(() => undefined);
+                onOpenRoomRef.current?.(room.roomId);
                 notification.close();
             };
 

@@ -34,6 +34,7 @@ export interface HeorotDesktopBridge {
     setPreferredDisplayMediaSource: (sourceId: string) => Promise<void>;
     setBadgeCount: (count: number) => Promise<void>;
     showNotification: (notification: HeorotDesktopNotification) => Promise<void>;
+    focusWindow: () => Promise<void>;
     onNotificationClicked: (listener: (target: HeorotDesktopNotificationTarget) => void) => () => void;
     platform: NodeJS.Platform;
     versions: {
@@ -82,6 +83,9 @@ const bridge: HeorotDesktopBridge = {
     },
     showNotification: async (notification: HeorotDesktopNotification): Promise<void> => {
         await ipcRenderer.invoke("heorot:showNotification", notification);
+    },
+    focusWindow: async (): Promise<void> => {
+        await ipcRenderer.invoke("heorot:focusWindow");
     },
     onNotificationClicked: (listener: (target: HeorotDesktopNotificationTarget) => void): (() => void) => {
         const handler = (_event: IpcRendererEvent, target: HeorotDesktopNotificationTarget): void => {

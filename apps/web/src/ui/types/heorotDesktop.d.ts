@@ -35,6 +35,8 @@ export interface HeorotDesktopBridge {
     setPreferredDisplayMediaSource?: (sourceId: string) => Promise<void>;
     setBadgeCount?: (count: number) => Promise<void>;
     showNotification?: (notification: HeorotDesktopNotification) => Promise<void>;
+    /** Shows the window, from the tray or minimized, and focuses it. */
+    focusWindow?: () => Promise<void>;
     onNotificationClicked?: (listener: (target: HeorotDesktopNotificationTarget) => void) => () => void;
     platform?: string;
     versions?: {
