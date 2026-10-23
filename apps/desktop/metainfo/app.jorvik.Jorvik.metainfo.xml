@@ -75,6 +75,15 @@
   </branding>
 
   <releases>
+    <release version="1.0.27" date="2026-10-23">
+      <description>
+        <p>Show the game you're playing, and see the status people set.</p>
+        <ul>
+          <li>New in Settings, Privacy &amp; Safety: "Show the game I'm playing". It's off until you turn it on. While it's on, your status shows the game you're playing, from Steam or a list of popular games, and only its name is shared. The Flatpak and Snap versions can't see other programs, so it isn't available there</li>
+          <li>The status people set for themselves now shows in the member list and on their profile</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.26" date="2026-10-23">
       <description>
         <p>Notifications open their chat, and stickers show up.</p>
