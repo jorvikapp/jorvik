@@ -37,6 +37,11 @@ export interface HeorotDesktopBridge {
     showNotification?: (notification: HeorotDesktopNotification) => Promise<void>;
     /** Shows the window, from the tray or minimized, and focuses it. */
     focusWindow?: () => Promise<void>;
+    /** Starts or stops looking for a running game; resolves to the game running now, if any. */
+    setGameActivityEnabled?: (enabled: boolean) => Promise<string | null>;
+    /** False in the Flatpak and Snap builds, which can't see other programs. */
+    gameActivitySupported?: () => Promise<boolean>;
+    onGameActivity?: (listener: (game: string | null) => void) => () => void;
     onNotificationClicked?: (listener: (target: HeorotDesktopNotificationTarget) => void) => () => void;
     platform?: string;
     versions?: {

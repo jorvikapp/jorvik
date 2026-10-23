@@ -23,6 +23,7 @@ import { plainUserDisplayName } from "../../core/users/userDisplayName";
 import { isPresenceEnabledForClient } from "../presence/presenceConfig";
 import { useAutoIdle } from "../presence/useAutoIdle";
 import { usePresenceSelection } from "../presence/usePresenceSelection";
+import { useGameActivity } from "../presence/useGameActivity";
 import { StatusMenu } from "./presence/StatusMenu";
 import { ensureDirectRoomMapping, getDirectRoomIds } from "../adapters/dmAdapter";
 import { describeJoinError, joinRoomWithRetry } from "../adapters/joinAdapter";
@@ -1227,7 +1228,8 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         [client, coreConfig],
     );
     const userAway = useAutoIdle(presenceEnabled ? userSettings.privacy.autoIdleMinutes * 60_000 : 0);
-    const presenceControl = usePresenceSelection(client, presenceEnabled, userAway);
+    const playing = useGameActivity(presenceEnabled && userSettings.privacy.shareGameActivity);
+    const presenceControl = usePresenceSelection(client, presenceEnabled, userAway, playing);
     useEffect(() => {
         const desktopBadge = window.heorotDesktop?.setBadgeCount;
         if (desktopBadge) {
@@ -3370,7 +3372,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                             <span className="pane-user-meta">
                                 <span className="pane-user-name">{ownDisplayName}</span>
                                 <span className="pane-user-id">
-                                    {presenceControl.selection.statusMessage ||
+                                    {presenceControl.effectiveStatusMessage ||
                                         formatUserIdForDisplay(ownUserId, localDomain) ||
                                         "Unknown user"}
                                 </span>

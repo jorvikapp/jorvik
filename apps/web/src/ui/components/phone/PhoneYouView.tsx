@@ -65,8 +65,8 @@ export function PhoneYouView({
                     </span>
                     <h2 className="phone-you-name">{displayName}</h2>
                     <p className="phone-you-id">{userIdLabel}</p>
-                    {presence.selection.statusMessage ? (
-                        <p className="phone-you-status-message">{presence.selection.statusMessage}</p>
+                    {presence.effectiveStatusMessage ? (
+                        <p className="phone-you-status-message">{presence.effectiveStatusMessage}</p>
                     ) : null}
                     <div className="phone-you-actions">
                         {presenceEnabled ? (

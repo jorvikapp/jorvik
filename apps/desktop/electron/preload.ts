@@ -35,6 +35,10 @@ export interface HeorotDesktopBridge {
     setBadgeCount: (count: number) => Promise<void>;
     showNotification: (notification: HeorotDesktopNotification) => Promise<void>;
     focusWindow: () => Promise<void>;
+    /** Starts or stops looking for a running game; resolves to the game running now, if any. */
+    setGameActivityEnabled: (enabled: boolean) => Promise<string | null>;
+    gameActivitySupported: () => Promise<boolean>;
+    onGameActivity: (listener: (game: string | null) => void) => () => void;
     onNotificationClicked: (listener: (target: HeorotDesktopNotificationTarget) => void) => () => void;
     platform: NodeJS.Platform;
     versions: {
@@ -86,6 +90,20 @@ const bridge: HeorotDesktopBridge = {
     },
     focusWindow: async (): Promise<void> => {
         await ipcRenderer.invoke("heorot:focusWindow");
+    },
+    setGameActivityEnabled: async (enabled: boolean): Promise<string | null> => {
+        const game = (await ipcRenderer.invoke("heorot:setGameActivityEnabled", enabled)) as unknown;
+        return typeof game === "string" ? game : null;
+    },
+    gameActivitySupported: async (): Promise<boolean> => {
+        return (await ipcRenderer.invoke("heorot:gameActivitySupported")) === true;
+    },
+    onGameActivity: (listener: (game: string | null) => void): (() => void) => {
+        const handler = (_event: IpcRendererEvent, game: unknown): void => {
+            listener(typeof game === "string" ? game : null);
+        };
+        ipcRenderer.on("heorot:gameActivity", handler);
+        return () => ipcRenderer.removeListener("heorot:gameActivity", handler);
     },
     onNotificationClicked: (listener: (target: HeorotDesktopNotificationTarget) => void): (() => void) => {
         const handler = (_event: IpcRendererEvent, target: HeorotDesktopNotificationTarget): void => {

@@ -5,6 +5,7 @@ import {
     applyPresenceSelection,
     resetPresencePublishState,
     loadPresenceSelection,
+    playingStatusMessage,
     sanitizeStatusMessage,
     savePresenceSelection,
     type PresenceChoice,
@@ -15,6 +16,8 @@ export interface PresenceSelectionController {
     selection: PresenceSelection;
     /** What is published: the selection, or Idle while auto-idle applies. */
     effectiveChoice: PresenceChoice;
+    /** The status message others see: the user's own, or "Playing ..." while a game runs. */
+    effectiveStatusMessage: string;
     autoIdle: boolean;
     setChoice: (choice: PresenceChoice) => void;
     setStatusMessage: (statusMessage: string) => void;
@@ -30,21 +33,27 @@ export interface PresenceSelectionController {
  *
  * While `away` is true an Online selection is published as Idle, without
  * changing or saving the selection itself; the other choices are left alone.
+ *
+ * While `playing` names a game, it is published as "Playing ..." unless the user set a status
+ * message of their own, which wins; nothing is shared while invisible.
  */
 export function usePresenceSelection(
     client: MatrixClient | null,
     enabled: boolean,
     away = false,
+    playing: string | null = null,
 ): PresenceSelectionController {
     const [selection, setSelection] = useState<PresenceSelection>(() => loadPresenceSelection());
     const [error, setError] = useState<string | null>(null);
     const selectionRef = useRef(selection);
     selectionRef.current = selection;
     const autoIdle = away && selection.choice === "online";
-    const effective = useMemo<PresenceSelection>(
-        () => (autoIdle ? { ...selection, choice: "idle" } : selection),
-        [autoIdle, selection],
-    );
+    const effective = useMemo<PresenceSelection>(() => {
+        const choice = autoIdle ? "idle" : selection.choice;
+        const statusMessage =
+            selection.statusMessage || (playing && choice !== "invisible" ? playingStatusMessage(playing) : "");
+        return { choice, statusMessage };
+    }, [autoIdle, playing, selection]);
     const effectiveRef = useRef(effective);
     effectiveRef.current = effective;
 
@@ -124,5 +133,13 @@ export function usePresenceSelection(
         [],
     );
 
-    return { selection, effectiveChoice: effective.choice, autoIdle, setChoice, setStatusMessage, error };
+    return {
+        selection,
+        effectiveChoice: effective.choice,
+        effectiveStatusMessage: effective.statusMessage,
+        autoIdle,
+        setChoice,
+        setStatusMessage,
+        error,
+    };
 }

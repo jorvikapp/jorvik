@@ -25,6 +25,7 @@ import {
     writeWindowState,
 } from "./util";
 import { TrayBadge } from "./tray-badge";
+import { GameActivityWatcher, gameActivitySupported } from "./game-activity";
 
 const APP_TITLE = "Jorvik";
 // Keep the Linux window identity aligned with the generated desktop entry so
@@ -233,6 +234,13 @@ function showNativeNotification(rawPayload: unknown): void {
 }
 
 const mediaAuthState: DesktopMediaAuthState = {};
+
+// "Playing ..." under the user's name; it only looks for games while the user has it turned on.
+const gameActivity = new GameActivityWatcher((game) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("heorot:gameActivity", game);
+    }
+});
 
 function clearMediaAuthState(): void {
     mediaAuthState.accessToken = undefined;
@@ -688,6 +696,13 @@ function registerIpc(): void {
     ipcMain.handle("heorot:setBadgeCount", (_event, count: unknown) => {
         setNativeBadge(typeof count === "number" ? count : 0);
     });
+
+    ipcMain.handle("heorot:setGameActivityEnabled", (_event, enabled: unknown) => {
+        gameActivity.setEnabled(enabled === true && gameActivitySupported());
+        return gameActivity.game;
+    });
+
+    ipcMain.handle("heorot:gameActivitySupported", () => gameActivitySupported());
 
     // A click on one of the page's notifications, which may come while the window is in the tray.
     ipcMain.handle("heorot:focusWindow", () => {

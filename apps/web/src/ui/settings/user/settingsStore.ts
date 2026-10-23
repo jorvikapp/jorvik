@@ -25,6 +25,8 @@ export interface PrivacySettings {
     autoIdleMinutes: number;
     /** The server fetches previewed links, so it sees links from encrypted chats too. */
     linkPreviewsInEncrypted: boolean;
+    /** The desktop app shows "Playing ..." in the user's status while a game runs. Off unless turned on. */
+    shareGameActivity: boolean;
 }
 
 export const AUTO_IDLE_MINUTE_CHOICES = [0, 5, 10, 15, 30, 60] as const;
@@ -73,6 +75,7 @@ const DEFAULT_SETTINGS: UserLocalSettings = {
         allowDmsFromServerMembers: true,
         autoIdleMinutes: DEFAULT_AUTO_IDLE_MINUTES,
         linkPreviewsInEncrypted: true,
+        shareGameActivity: false,
     },
     audio: {
         preferredAudioInputId: "default",
@@ -146,6 +149,7 @@ function normalizeSettings(raw: unknown): UserLocalSettings {
                 ? (privacy.autoIdleMinutes as number)
                 : DEFAULT_AUTO_IDLE_MINUTES,
             linkPreviewsInEncrypted: privacy.linkPreviewsInEncrypted !== false,
+            shareGameActivity: privacy.shareGameActivity === true,
         },
         audio: {
             preferredAudioInputId:

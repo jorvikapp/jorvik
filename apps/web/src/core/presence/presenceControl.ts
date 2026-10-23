@@ -62,6 +62,11 @@ export function sanitizeStatusMessage(raw: string): string {
     return raw.replace(/\s+/g, " ").trim().slice(0, MAX_STATUS_MESSAGE_LENGTH);
 }
 
+/** The status message while a game runs, for people who share their game activity. */
+export function playingStatusMessage(game: string): string {
+    return sanitizeStatusMessage(`Playing ${game}`);
+}
+
 export function loadPresenceSelection(): PresenceSelection {
     if (typeof window === "undefined") {
         return DEFAULT_SELECTION;

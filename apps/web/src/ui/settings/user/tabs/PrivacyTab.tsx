@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import { formatUserIdForDisplay } from "../../../../core/users/formatUserId";
@@ -14,8 +14,31 @@ interface PrivacyTabProps {
     onChange: (settings: PrivacySettings) => void;
 }
 
+type GameActivitySupport = "desktop" | "sandboxed" | "browser";
+
+const GAME_ACTIVITY_NOTES: Record<GameActivitySupport, string> = {
+    desktop:
+        "While a game runs, your status shows \"Playing\" and its name, unless you've set a status yourself. " +
+        "Steam games are recognized, and popular games from other launchers. Only the game's name is shared.",
+    sandboxed: "The Flatpak and Snap versions can't see other programs, so they can't tell which game you're playing.",
+    browser: "Only the desktop app can see which game you're playing.",
+};
+
 export function PrivacyTab({ client, onToast, settings, onChange }: PrivacyTabProps): React.ReactElement {
     const ignoredUsers = useIgnoredUsers(client);
+    const [gameSupport, setGameSupport] = useState<GameActivitySupport>(() =>
+        window.heorotDesktop?.setGameActivityEnabled ? "desktop" : "browser",
+    );
+    useEffect(() => {
+        const check = window.heorotDesktop?.gameActivitySupported;
+        if (!check) {
+            return;
+        }
+        void check().then(
+            (supported) => setGameSupport(supported ? "desktop" : "sandboxed"),
+            () => undefined,
+        );
+    }, []);
 
     return (
         <div className="settings-tab">
@@ -79,6 +102,16 @@ export function PrivacyTab({ client, onToast, settings, onChange }: PrivacyTabPr
                     active again. The desktop app also counts activity in other apps where your system reports
                     it; the web app only counts activity in Jorvik.
                 </p>
+                <label className="settings-toggle">
+                    <input
+                        type="checkbox"
+                        checked={settings.shareGameActivity}
+                        disabled={gameSupport !== "desktop"}
+                        onChange={(event) => onChange({ ...settings, shareGameActivity: event.target.checked })}
+                    />
+                    Show the game I'm playing
+                </label>
+                <p className="settings-inline-note">{GAME_ACTIVITY_NOTES[gameSupport]}</p>
             </div>
 
             <div className="settings-section-card">
