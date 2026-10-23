@@ -1,4 +1,4 @@
-import { createClient, decodeBase64, type MatrixClient, type TokenRefreshFunction } from "matrix-js-sdk/src/matrix";
+import { createClient, decodeBase64, HttpApiEvent, type MatrixClient, type TokenRefreshFunction } from "matrix-js-sdk/src/matrix";
 import { logger } from "matrix-js-sdk/src/logger";
 
 import { MatrixClientManager } from "../client/MatrixClientManager";
@@ -69,6 +69,11 @@ export interface SessionLifecycleOptions {
 export class SessionLifecycle {
     public readonly platform: WebPlatform;
     public readonly clientManager: MatrixClientManager;
+    /**
+     * Called when the homeserver has ended this session, e.g. it was signed out from another
+     * device. The SDK says so on every request it can no longer make, so this repeats.
+     */
+    public onSessionLoggedOut: (() => void) | null = null;
 
     public constructor(options: SessionLifecycleOptions = {}) {
         this.platform = options.platform ?? new WebPlatform();
@@ -133,6 +138,7 @@ export class SessionLifecycle {
 
         const tokenRefreshFunction = this.createTokenRefreshFunction(resolvedCredentials, persistSession);
         this.clientManager.replaceUsingCreds(resolvedCredentials, tokenRefreshFunction);
+        this.clientManager.safeGet().on(HttpApiEvent.SessionLoggedOut, () => this.onSessionLoggedOut?.());
 
         if (persistSession) {
             await persistCredentials(resolvedCredentials);
@@ -228,10 +234,11 @@ export class SessionLifecycle {
         };
     }
 
-    public async logout(clearStorage = true): Promise<void> {
+    /** With `notifyServer` false, only forgets the session here: for one the homeserver already ended. */
+    public async logout(clearStorage = true, notifyServer = true): Promise<void> {
         const client = this.clientManager.get();
 
-        if (client && !client.isGuest()) {
+        if (notifyServer && client && !client.isGuest()) {
             try {
                 await withTimeout(
                     client.logout(true),

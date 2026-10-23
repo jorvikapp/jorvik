@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { GeneratedSecretStorageKey } from "matrix-js-sdk/src/crypto-api";
 import { MatrixClient as MatrixClientSdk, MatrixError, type MatrixClient } from "matrix-js-sdk/src/matrix";
 
@@ -33,11 +33,14 @@ import {
     waitForCrossSigningKeys,
 } from "../adapters/securityRecoveryAdapter";
 import { subscribeAccessTokenRotated } from "../../core/lifecycle/tokenEvents";
+import { consumeHandedOver, getSessionLock, markHandedOver } from "../../core/lifecycle/sessionLock";
 import { disablePush, getWebPushConfig, isPushEnabledHere } from "../../core/push/webPush";
 import { syncMediaServiceWorkerAuthState } from "../serviceWorker/registerMediaServiceWorker";
 
 export type MatrixSessionStatus =
     | "booting"
+    /** Jorvik is running in another tab or window (see core/lifecycle/sessionLock.ts). */
+    | "elsewhere"
     | "login_required"
     | "starting"
     | "security_verification"
@@ -132,6 +135,8 @@ function reducer(state: MatrixState, action: MatrixAction): MatrixState {
 }
 
 interface MatrixContextValue extends MatrixState {
+    /** Takes Jorvik over from the tab or window it's running in, and starts it in this one. */
+    openHere: () => Promise<void>;
     login: (homeserverUrl: string, username: string, password: string) => Promise<void>;
     loginWithCredentials: (credentials: MatrixCredentials) => Promise<void>;
     logout: () => Promise<void>;
@@ -151,6 +156,8 @@ interface MatrixContextValue extends MatrixState {
 }
 
 const MatrixContext = createContext<MatrixContextValue | null>(null);
+
+const SESSION_ENDED_MESSAGE = "This session was signed out, maybe from another device. Sign in again to continue.";
 
 function toErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
@@ -491,6 +498,69 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
         };
     }, [clearPendingSetupKey]);
 
+    // Starts the session saved in this browser, if there is one.
+    const restoreStoredSession = useCallback(
+        async (core: CoreContext, config: CoreConfig, isCancelled: () => boolean): Promise<void> => {
+            let restoredSession = false;
+            let restoreError: string | null = null;
+
+            try {
+                restoredSession = await core.session.restoreSession();
+            } catch (error) {
+                if (!shouldRetryWithCleanStorage(error)) {
+                    throw error;
+                }
+
+                core.clientManager.stop(true);
+                await core.session.clearStorage();
+                restoreError = "Stored encrypted session could not be restored. Please sign in again.";
+                restoredSession = false;
+            }
+
+            if (!restoredSession) {
+                dispatch({ type: "set_client", client: null });
+                dispatch({ type: "set_local_device_verified", verified: false });
+                dispatch({ type: "set_status", status: "login_required", error: restoreError });
+                return;
+            }
+
+            const client = core.clientManager.get();
+            if (!client) {
+                dispatch({ type: "set_status", status: "login_required", error: null });
+                return;
+            }
+
+            dispatch({ type: "set_status", status: "starting", error: null });
+            try {
+                await waitForClientReady(client);
+            } catch {
+                core.clientManager.stop(true);
+                await core.session.clearStorage();
+                dispatch({ type: "set_client", client: null });
+                dispatch({ type: "set_local_device_verified", verified: false });
+                dispatch({
+                    type: "set_status",
+                    status: "login_required",
+                    error: "Stored session could not finish startup. Please sign in again.",
+                });
+                return;
+            }
+
+            if (isCancelled()) {
+                return;
+            }
+
+            dispatch({ type: "set_client", client });
+            const postLoginState = await resolvePostLoginState(client, config, securityOptions());
+            if (isCancelled()) {
+                return;
+            }
+
+            applyPostLoginState(postLoginState);
+        },
+        [applyPostLoginState, securityOptions],
+    );
+
     useEffect(() => {
         let isCancelled = false;
 
@@ -505,62 +575,15 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
 
                 dispatch({ type: "set_core", core: result.core, config: result.config });
 
-                let restoredSession = false;
-                let restoreError: string | null = null;
-
-                try {
-                    restoredSession = await result.core.session.restoreSession();
-                } catch (error) {
-                    if (!shouldRetryWithCleanStorage(error)) {
-                        throw error;
+                // One tab at a time. A tab that has just handed Jorvik over doesn't ask for it back.
+                if (consumeHandedOver() || !(await getSessionLock().acquire())) {
+                    if (!isCancelled) {
+                        dispatch({ type: "set_status", status: "elsewhere", error: null });
                     }
-
-                    result.core.clientManager.stop(true);
-                    await result.core.session.clearStorage();
-                    restoreError = "Stored encrypted session could not be restored. Please sign in again.";
-                    restoredSession = false;
-                }
-
-                if (!restoredSession) {
-                    dispatch({ type: "set_client", client: null });
-                    dispatch({ type: "set_local_device_verified", verified: false });
-                    dispatch({ type: "set_status", status: "login_required", error: restoreError });
                     return;
                 }
 
-                const client = result.core.clientManager.get();
-                if (!client) {
-                    dispatch({ type: "set_status", status: "login_required", error: null });
-                    return;
-                }
-
-                dispatch({ type: "set_status", status: "starting", error: null });
-                try {
-                    await waitForClientReady(client);
-                } catch {
-                    result.core.clientManager.stop(true);
-                    await result.core.session.clearStorage();
-                    dispatch({ type: "set_client", client: null });
-                    dispatch({ type: "set_local_device_verified", verified: false });
-                    dispatch({
-                        type: "set_status",
-                        status: "login_required",
-                        error: "Stored session could not finish startup. Please sign in again.",
-                    });
-                    return;
-                }
-
-                if (isCancelled) {
-                    return;
-                }
-
-                dispatch({ type: "set_client", client });
-                const postLoginState = await resolvePostLoginState(client, result.config, securityOptions());
-                if (isCancelled) {
-                    return;
-                }
-
-                applyPostLoginState(postLoginState);
+                await restoreStoredSession(result.core, result.config, () => isCancelled);
             } catch (error) {
                 if (isCancelled) {
                     return;
@@ -579,7 +602,69 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
         return () => {
             isCancelled = true;
         };
-    }, [applyPostLoginState, securityOptions]);
+    }, [restoreStoredSession]);
+
+    const openHere = useCallback(async (): Promise<void> => {
+        if (!state.core || !state.config) {
+            return;
+        }
+
+        try {
+            await getSessionLock().takeOver();
+            dispatch({ type: "set_status", status: "booting", error: null });
+            await restoreStoredSession(state.core, state.config, () => false);
+        } catch (error) {
+            dispatch({ type: "set_status", status: "error", error: toErrorMessage(error) });
+        }
+    }, [restoreStoredSession, state.config, state.core]);
+
+    // Another tab took Jorvik over. Stop here at once, before the lock passes to it, then reload
+    // into the "open in another tab" screen, which opens none of the stores that tab now uses.
+    useEffect(() => {
+        const core = state.core;
+        return getSessionLock().onLost(() => {
+            core?.clientManager.get()?.stopClient();
+            markHandedOver();
+            window.location.reload();
+        });
+    }, [state.core]);
+
+    // The homeserver ended this session, e.g. it was signed out from another device. The SDK would
+    // keep retrying with the dead tokens, so forget the session and go to sign-in, once whatever
+    // was starting up has settled.
+    const [sessionEnded, setSessionEnded] = useState(false);
+    useEffect(() => {
+        const core = state.core;
+        if (!core) {
+            return;
+        }
+
+        core.session.onSessionLoggedOut = () => setSessionEnded(true);
+        return () => {
+            core.session.onSessionLoggedOut = null;
+        };
+    }, [state.core]);
+
+    useEffect(() => {
+        const core = state.core;
+        if (!sessionEnded || !core || state.status === "booting" || state.status === "starting") {
+            return;
+        }
+
+        setSessionEnded(false);
+        void (async () => {
+            try {
+                await core.session.logout(true, false);
+            } catch {
+                // What's left here is cleared on the next sign-in.
+            }
+            clearPendingSetupKey();
+            verificationSkippedRef.current = false;
+            dispatch({ type: "set_client", client: null });
+            dispatch({ type: "set_local_device_verified", verified: false });
+            dispatch({ type: "set_status", status: "login_required", error: SESSION_ENDED_MESSAGE });
+        })();
+    }, [clearPendingSetupKey, sessionEnded, state.core, state.status]);
 
     useEffect(() => {
         const client = state.client;
@@ -1105,6 +1190,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
     const value = useMemo<MatrixContextValue>(
         () => ({
             ...state,
+            openHere,
             login,
             loginWithCredentials,
             logout,
@@ -1122,6 +1208,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
         }),
         [
             state,
+            openHere,
             login,
             loginWithCredentials,
             logout,

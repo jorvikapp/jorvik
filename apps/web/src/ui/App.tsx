@@ -5,6 +5,7 @@ import { formatUserIdForDisplay } from "../core/users/formatUserId";
 import { AppShell } from "./components/AppShell";
 import { ConfirmProvider } from "./components/confirm/ConfirmProvider";
 import { DeviceVerificationView } from "./components/DeviceVerificationView";
+import { ElsewhereView } from "./components/ElsewhereView";
 import { LoginView } from "./components/LoginView";
 import { SecurityRecoveryView } from "./components/SecurityRecoveryView";
 import { IncomingVerificationDialog } from "./components/verification/IncomingVerificationDialog";
@@ -38,6 +39,10 @@ function AppRouter(): React.ReactElement {
 
     if (matrix.status === "starting") {
         return <LoadingView label="Starting Jorvik session..." />;
+    }
+
+    if (matrix.status === "elsewhere") {
+        return <ElsewhereView onOpenHere={matrix.openHere} />;
     }
 
     if (matrix.status === "login_required") {
