@@ -71,6 +71,16 @@
   </branding>
 
   <releases>
+    <release version="1.0.26" date="2026-10-23">
+      <description>
+        <p>Notifications open their chat, and stickers show up.</p>
+        <ul>
+          <li>Clicking a notification opens the chat it's about, in whichever Space it's in, and brings Jorvik back from the tray</li>
+          <li>Stickers sent from other Matrix apps show in the chat. Before, they only marked it unread</li>
+          <li>If this session is signed out from another device, Jorvik goes to the sign-in screen and says why, instead of showing old chats</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.25" date="2026-10-23">
       <description>
         <p>Removing old sessions works in long lists, and the Linux packages bring their sound library along.</p>
