@@ -6,6 +6,8 @@ export interface PresenceVm {
     secondaryLabel: string | null;
     isCurrentlyActive: boolean;
     lastActiveAgo: number | null;
+    /** What they set as their status, or "Playing ..." while their game runs; null when offline. */
+    statusMessage: string | null;
 }
 
 export interface PresenceSource {
@@ -14,6 +16,7 @@ export interface PresenceSource {
     lastActiveAgo?: number | null;
     /** When the presence update arrived, in ms since the epoch (the SDK's User.lastPresenceTs). */
     receivedAt?: number | null;
+    statusMessage?: string | null;
 }
 
 const BUSY_PRESENCE_NAMES = new Set(["busy", "org.matrix.msc3026.busy"]);
@@ -140,12 +143,19 @@ export function buildPresenceVm(source: PresenceSource | null | undefined, now: 
         }
     }
 
+    // Hidden once they're offline: a game they were playing when they quit would stay up for good.
+    const statusMessage =
+        state === "online" || state === "idle" || state === "dnd"
+            ? (source?.statusMessage ?? "").replace(/\s+/g, " ").trim() || null
+            : null;
+
     return {
         state,
         primaryLabel: getPrimaryLabel(state),
         secondaryLabel,
         isCurrentlyActive,
         lastActiveAgo,
+        statusMessage,
     };
 }
 

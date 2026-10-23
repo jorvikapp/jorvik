@@ -83,6 +83,7 @@ export function usePresenceMap(
                         currentlyActive: user?.currentlyActive,
                         lastActiveAgo: user?.lastActiveAgo,
                         receivedAt: user?.lastPresenceTs,
+                        statusMessage: user?.presenceStatusMsg,
                     },
                     now ?? Date.now(),
                 ),

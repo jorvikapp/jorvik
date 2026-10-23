@@ -153,9 +153,16 @@ export function MembersPanel({
                                     <span className="rs-member-name">{displayName}</span>
                                     <UserBadges userId={member.userId} />
                                 </span>
-                                <span className="rs-member-id">
-                                    {formatUserIdForDisplay(member.userId, localDomain)}
-                                </span>
+                                {/* Their status, or "Playing ..." while their game runs; otherwise who they are. */}
+                                {presence?.statusMessage ? (
+                                    <span className="rs-member-id rs-member-status" title={presence.statusMessage}>
+                                        {presence.statusMessage}
+                                    </span>
+                                ) : (
+                                    <span className="rs-member-id">
+                                        {formatUserIdForDisplay(member.userId, localDomain)}
+                                    </span>
+                                )}
                             </span>
                             <span className="rs-member-badge">{roleLabel}</span>
                         </button>

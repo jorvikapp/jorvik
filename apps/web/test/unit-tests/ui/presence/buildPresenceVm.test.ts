@@ -81,3 +81,20 @@ describe("presence helpers", () => {
         expect(toAvatarPresenceState(null)).toBeNull();
     });
 });
+
+describe("buildPresenceVm status message", () => {
+    it("shows what someone set as their status, or the game they're playing, while they're around", () => {
+        expect(buildPresenceVm({ presence: "online", statusMessage: "Playing  Stardew Valley " }).statusMessage).toBe(
+            "Playing Stardew Valley",
+        );
+        expect(buildPresenceVm({ presence: "unavailable", statusMessage: "back at 8" }).statusMessage).toBe("back at 8");
+        expect(buildPresenceVm({ presence: "busy", statusMessage: "focusing" }).statusMessage).toBe("focusing");
+        expect(buildPresenceVm({ presence: "online", statusMessage: "   " }).statusMessage).toBeNull();
+    });
+
+    // A game they were playing when the app closed would otherwise stay up for good.
+    it("hides it once they're offline", () => {
+        expect(buildPresenceVm({ presence: "offline", statusMessage: "Playing Stardew Valley" }).statusMessage).toBeNull();
+        expect(buildPresenceVm({ presence: null, statusMessage: "Playing Stardew Valley" }).statusMessage).toBeNull();
+    });
+});

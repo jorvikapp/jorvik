@@ -129,6 +129,7 @@ export function ProfileHeader({
                 <div className="rp-profile-mxid">{formatUserIdForDisplay(userId, localDomain)}</div>
                 <UserBadges userId={userId} variant="chips" className="rp-profile-badges" />
                 {presence ? <PresenceText presence={presence} className="rp-profile-presence" /> : null}
+                {presence?.statusMessage ? <p className="rp-profile-status">{presence.statusMessage}</p> : null}
             </div>
             <div className="rp-profile-actions">
                 {onMessage ? (

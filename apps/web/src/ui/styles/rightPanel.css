@@ -755,6 +755,17 @@
     margin-top: 6px;
 }
 
+.rp-profile-status {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--text-main);
+    overflow-wrap: anywhere;
+}
+
+.rs-member-status {
+    color: var(--text-main);
+}
+
 .presence-text {
     display: flex;
     flex-direction: column;
