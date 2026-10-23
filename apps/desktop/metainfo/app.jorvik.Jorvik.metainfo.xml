@@ -40,12 +40,16 @@
 
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/jorvikapp/jorvik/3c16605e0342d4e97e924bb9815cb46acd6a9d9d/docs/ui.png</image>
-      <caption>Direct messages and conversation</caption>
+      <image>https://raw.githubusercontent.com/jorvikapp/jorvik/d881fb8207250bcadb348ece28bfca6825420830/docs/ui.png</image>
+      <caption>A Space with its channels and a conversation</caption>
     </screenshot>
     <screenshot>
       <image>https://raw.githubusercontent.com/jorvikapp/jorvik/3c16605e0342d4e97e924bb9815cb46acd6a9d9d/docs/voice.png</image>
       <caption>Voice calls</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/jorvikapp/jorvik/d881fb8207250bcadb348ece28bfca6825420830/docs/emoji.png</image>
+      <caption>Custom emoji for a Space</caption>
     </screenshot>
   </screenshots>
 
