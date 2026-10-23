@@ -61,6 +61,12 @@ function highlights(client: MatrixClient, event: MatrixEvent): boolean {
     return actions?.tweaks?.highlight === true;
 }
 
+export interface CollectMentionsOptions {
+    /** Mentions sent at or before this time were cleared from the list. */
+    clearedUpTo?: number;
+    limit?: number;
+}
+
 /**
  * Messages that mention you in what each room has loaded, newest first. The server can't see
  * inside encrypted messages, so it can't list these itself; the push rules are run here instead.
@@ -69,7 +75,7 @@ export function collectMentions(
     client: MatrixClient,
     rooms: readonly Room[],
     ownUserId: string,
-    limit = 50,
+    { clearedUpTo = 0, limit = 50 }: CollectMentionsOptions = {},
 ): InboxMention[] {
     const mentions: InboxMention[] = [];
     for (const room of rooms) {
@@ -78,7 +84,7 @@ export function collectMentions(
         }
         for (const event of room.getLiveTimeline().getEvents()) {
             const eventId = event.getId();
-            if (!eventId || !isMentionCandidate(event, ownUserId) || !highlights(client, event)) {
+            if (!eventId || event.getTs() <= clearedUpTo || !isMentionCandidate(event, ownUserId) || !highlights(client, event)) {
                 continue;
             }
             mentions.push({

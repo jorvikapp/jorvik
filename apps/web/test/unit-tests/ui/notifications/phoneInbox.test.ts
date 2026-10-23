@@ -138,9 +138,25 @@ describe("collectMentions", () => {
         const events = [1, 2, 3, 4].map((ts) => fakeEvent({ id: `$${ts}`, ts }));
         const room = fakeRoom({ roomId: "!room", events });
 
-        const mentions = collectMentions(clientHighlighting(["$1", "$2", "$3", "$4"]), [room], ME, 2);
+        const mentions = collectMentions(clientHighlighting(["$1", "$2", "$3", "$4"]), [room], ME, { limit: 2 });
 
         expect(mentions.map((mention) => mention.eventId)).toEqual(["$4", "$3"]);
+    });
+
+    it("leaves out what was cleared, read or not, and keeps what came after", () => {
+        const room = fakeRoom({
+            roomId: "!room",
+            events: [
+                fakeEvent({ id: "$read", ts: 10 }),
+                fakeEvent({ id: "$unread", ts: 20 }),
+                fakeEvent({ id: "$after", ts: 21 }),
+            ],
+            read: ["$read"],
+        });
+
+        const mentions = collectMentions(clientHighlighting(["$read", "$unread", "$after"]), [room], ME, { clearedUpTo: 20 });
+
+        expect(mentions.map((mention) => mention.eventId)).toEqual(["$after"]);
     });
 });
 

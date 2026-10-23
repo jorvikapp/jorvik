@@ -110,6 +110,7 @@ import { usePhoneLayout } from "../layout/phoneLayout";
 import { usePhoneBackLayer } from "../layout/phoneBackStack";
 import { scrollsSidewaysWithin, startsInTextInput, swipeCompletes, useHorizontalSwipe } from "../layout/swipe";
 import { collectInvites, collectMentions, inboxBadgeCount, type InboxInvite, type InboxMention } from "../notifications/phoneInbox";
+import { useClearedMentions } from "../notifications/clearedMentions";
 import { PhoneNotificationsView } from "./phone/PhoneNotificationsView";
 import { PhoneTabBar, type PhoneTab } from "./phone/PhoneTabBar";
 import { PhoneYouView } from "./phone/PhoneYouView";
@@ -2842,9 +2843,13 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         // `rooms` changes whenever a membership or timeline does.
         [directRoomIds, isPhone, ownUserId, rooms, visibleRooms],
     );
+    const { clearedUpTo: mentionsClearedUpTo, clearUpTo: clearMentionsUpTo } = useClearedMentions(client);
     const phoneMentions = useMemo(
-        () => (isPhone && phoneTab === "notifications" ? collectMentions(client, visibleRooms, ownUserId) : []),
-        [client, isPhone, ownUserId, phoneTab, rooms, visibleRooms],
+        () =>
+            isPhone && phoneTab === "notifications"
+                ? collectMentions(client, visibleRooms, ownUserId, { clearedUpTo: mentionsClearedUpTo })
+                : [],
+        [client, isPhone, mentionsClearedUpTo, ownUserId, phoneTab, rooms, visibleRooms],
     );
     const phoneNotificationCount = useMemo(
         () => (isPhone ? inboxBadgeCount(visibleRooms, phoneInvites.length) : 0),
@@ -2911,7 +2916,11 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         [client, pushToast],
     );
     const openPhoneMention = useCallback((mention: InboxMention): void => focusRoom(mention.roomId), [focusRoom]);
-    const markPhoneMentionsRead = useCallback((): void => {
+    // Clearing marks the cleared mentions read too, so the tab's badge doesn't count what's gone from the list.
+    const clearPhoneMentions = useCallback((): void => {
+        if (phoneMentions.length === 0) {
+            return;
+        }
         const roomIds = new Set(phoneMentions.filter((mention) => mention.unread).map((mention) => mention.roomId));
         const targets = [...roomIds].map((roomId) => client.getRoom(roomId)).filter((room): room is Room => Boolean(room));
         void markRoomsRead(client, targets).then(({ failed }) => {
@@ -2922,7 +2931,10 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 });
             }
         });
-    }, [client, phoneMentions, pushToast]);
+        clearMentionsUpTo(Math.max(...phoneMentions.map((mention) => mention.ts))).catch(() => {
+            pushToast({ type: "error", message: "Couldn't clear your mentions. Try again." });
+        });
+    }, [clearMentionsUpTo, client, phoneMentions, pushToast]);
 
     // A room that changes without being opened (left, deleted, or swapped for a space's first
     // channel) takes a phone back to the lists rather than into a chat nobody picked.
@@ -3524,7 +3536,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                         onOpenMention={openPhoneMention}
                         onAcceptInvite={acceptPhoneInvite}
                         onDeclineInvite={declinePhoneInvite}
-                        onMarkAllRead={markPhoneMentionsRead}
+                        onClearMentions={clearPhoneMentions}
                     />
                 </div>
             ) : null}

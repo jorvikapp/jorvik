@@ -16,7 +16,8 @@ interface PhoneNotificationsViewProps {
     onOpenMention: (mention: InboxMention) => void;
     onAcceptInvite: (invite: InboxInvite) => Promise<void>;
     onDeclineInvite: (invite: InboxInvite) => Promise<void>;
-    onMarkAllRead: () => void;
+    /** Marks the listed mentions read and takes them off the list. */
+    onClearMentions: () => void;
 }
 
 // Today shows the time, this week the weekday, anything older the date.
@@ -56,7 +57,7 @@ export function PhoneNotificationsView({
     onOpenMention,
     onAcceptInvite,
     onDeclineInvite,
-    onMarkAllRead,
+    onClearMentions,
 }: PhoneNotificationsViewProps): React.ReactElement {
     const [busyRoomId, setBusyRoomId] = useState<string | null>(null);
 
@@ -73,9 +74,9 @@ export function PhoneNotificationsView({
         <section className="phone-page phone-notifications" aria-label="Notifications">
             <header className="phone-page-head">
                 <h2 className="phone-page-title">Notifications</h2>
-                {mentions.some((mention) => mention.unread) ? (
-                    <button type="button" className="phone-page-head-action" onClick={onMarkAllRead}>
-                        Mark all read
+                {mentions.length > 0 ? (
+                    <button type="button" className="phone-page-head-action" onClick={onClearMentions}>
+                        Clear mentions
                     </button>
                 ) : null}
             </header>
