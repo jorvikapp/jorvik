@@ -3580,6 +3580,15 @@ textarea {
     object-fit: contain;
 }
 
+/* A sticker shows at sticker size, without the frame a photo gets. */
+.timeline-image.timeline-sticker {
+    max-width: 180px;
+    max-height: 180px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
 .timeline-image-button {
     border: 0;
     padding: 0;

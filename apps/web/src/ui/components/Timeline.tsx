@@ -392,7 +392,9 @@ async function fetchEncryptedArrayBufferWithRetry(
 }
 
 function getMessageContent(event: MatrixEvent): MessageContent {
-    return event.getContent() as MessageContent;
+    const content = event.getContent() as MessageContent;
+    // A sticker is an image without a msgtype, so it shows like one.
+    return event.getType() === EventType.Sticker ? { ...content, msgtype: MsgType.Image } : content;
 }
 
 function getTextBody(content: MessageContent): string | null {
@@ -440,8 +442,11 @@ function normalizeSnippet(text: string): string {
     return singleLine.length > 96 ? `${singleLine.slice(0, 93)}...` : singleLine;
 }
 
-function toReplyPreviewBody(content: MessageContent): string {
+export function toReplyPreviewBody(content: MessageContent, isSticker = false): string {
     const body = messagePreviewText(content);
+    if (isSticker) {
+        return body.trim() ? normalizeSnippet(`[Sticker] ${body}`) : "[Sticker]";
+    }
     if (isMediaMessageType(content.msgtype)) {
         const label = mediaTypeLabel(content.msgtype);
         return body.trim() ? normalizeSnippet(`[${label}] ${body}`) : `[${label}]`;
@@ -643,8 +648,9 @@ function collectLatestEditEventsByTarget(room: Room | null): Map<string, MatrixE
     return latestEditEventsByTarget;
 }
 
-function isRenderableMessage(event: MatrixEvent): boolean {
-    if (event.getType() !== EventType.RoomMessage || event.isRedacted()) {
+export function isRenderableMessage(event: MatrixEvent): boolean {
+    const type = event.getType();
+    if ((type !== EventType.RoomMessage && type !== EventType.Sticker) || event.isRedacted()) {
         return false;
     }
 
@@ -881,7 +887,7 @@ function getReplySummary(
         senderName: sender.name,
         senderAvatarUrl: sender.avatarUrl,
         senderAvatarSources: sender.avatarSources,
-        body: toReplyPreviewBody(content),
+        body: toReplyPreviewBody(content, replyEvent.getType() === EventType.Sticker),
     };
 }
 
@@ -2500,6 +2506,7 @@ export function Timeline({
                     const eventId = event.getId();
                     const senderId = event.getSender();
                     const mediaMsgType = isMediaMessageType(content.msgtype) ? content.msgtype : null;
+                    const isSticker = event.getType() === EventType.Sticker;
                     const encryptedMediaFile = getEncryptedMediaFile(content);
                     const decryptQueueItem =
                         encryptedMediaFile !== null ? toDecryptQueueItem(event, content, encryptedMediaFile) : null;
@@ -2647,11 +2654,11 @@ export function Timeline({
                                         type="button"
                                         className="timeline-image-button"
                                         onClick={() => setLightbox({ src: mediaUrl, alt: imageAlt, zoomed: false })}
-                                        title="Open image"
-                                        aria-label="Open image"
+                                        title={isSticker ? "Open sticker" : "Open image"}
+                                        aria-label={isSticker ? "Open sticker" : "Open image"}
                                     >
                                         <img
-                                            className="timeline-image"
+                                            className={`timeline-image${isSticker ? " timeline-sticker" : ""}`}
                                             src={mediaUrl}
                                             alt={imageAlt}
                                             title={imageAlt}

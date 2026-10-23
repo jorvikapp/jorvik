@@ -78,7 +78,7 @@ async function createLocalNotificationSettingsIfNeeded(
     });
 }
 
-function notificationMessageForEvent(event: MatrixEvent): string | null {
+export function notificationMessageForEvent(event: MatrixEvent): string | null {
     const content = event.getContent() as {
         body?: unknown;
         format?: unknown;
@@ -90,6 +90,9 @@ function notificationMessageForEvent(event: MatrixEvent): string | null {
     const body = messagePreviewText(content);
     const msgType = typeof content.msgtype === "string" ? content.msgtype : null;
 
+    if (event.getType() === EventType.Sticker) {
+        return body ? `[Sticker] ${body}` : "[Sticker]";
+    }
     if (msgType === MsgType.Image) {
         return body ? `[Image] ${body}` : "[Image]";
     }
