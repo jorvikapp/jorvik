@@ -1228,6 +1228,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         [client, coreConfig],
     );
     const userAway = useAutoIdle(presenceEnabled ? userSettings.privacy.autoIdleMinutes * 60_000 : 0);
+    const autoIdleOn = userSettings.privacy.autoIdleMinutes > 0;
     const playing = useGameActivity(presenceEnabled && userSettings.privacy.shareGameActivity);
     const presenceControl = usePresenceSelection(client, presenceEnabled, userAway, playing);
     useEffect(() => {
@@ -3402,6 +3403,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                                         choice={presenceControl.selection.choice}
                                         statusMessage={presenceControl.selection.statusMessage}
                                         error={presenceControl.error}
+                                        autoIdleOn={autoIdleOn}
                                         onChoose={presenceControl.setChoice}
                                         onStatusMessage={presenceControl.setStatusMessage}
                                         onClose={() => setStatusMenuOpen(false)}
@@ -3560,6 +3562,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                         avatarSources={ownAvatarSources}
                         presenceEnabled={presenceEnabled}
                         presence={presenceControl}
+                        autoIdleOn={autoIdleOn}
                         onOpenSettings={openUserSettings}
                     />
                 </div>
@@ -3570,14 +3573,22 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                         tab={phoneTab}
                         notificationCount={phoneNotificationCount}
                         you={
-                            <Avatar
-                                className="phone-tab-avatar"
-                                name={ownDisplayName}
-                                src={ownAvatarSources[0] ?? null}
-                                sources={ownAvatarSources}
-                                seed={ownUserId || undefined}
-                                userId={ownUserId || undefined}
-                            />
+                            <span className="phone-tab-avatar-wrap">
+                                <Avatar
+                                    className="phone-tab-avatar"
+                                    name={ownDisplayName}
+                                    src={ownAvatarSources[0] ?? null}
+                                    sources={ownAvatarSources}
+                                    seed={ownUserId || undefined}
+                                    userId={ownUserId || undefined}
+                                />
+                                {presenceEnabled ? (
+                                    <span
+                                        className={`phone-tab-presence status-menu-dot is-${presenceControl.effectiveChoice}`}
+                                        aria-hidden="true"
+                                    />
+                                ) : null}
+                            </span>
                         }
                         onSelect={setPhoneTab}
                     />

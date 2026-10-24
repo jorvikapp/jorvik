@@ -14,6 +14,7 @@ interface PhoneYouViewProps {
     avatarSources: string[];
     presenceEnabled: boolean;
     presence: PresenceSelectionController;
+    autoIdleOn: boolean;
     onOpenSettings: (tab: string) => void;
 }
 
@@ -38,6 +39,7 @@ export function PhoneYouView({
     avatarSources,
     presenceEnabled,
     presence,
+    autoIdleOn,
     onOpenSettings,
 }: PhoneYouViewProps): React.ReactElement {
     const [statusOpen, setStatusOpen] = useState(false);
@@ -103,6 +105,7 @@ export function PhoneYouView({
                         choice={presence.selection.choice}
                         statusMessage={presence.selection.statusMessage}
                         error={presence.error}
+                        autoIdleOn={autoIdleOn}
                         onChoose={presence.setChoice}
                         onStatusMessage={presence.setStatusMessage}
                         onClose={() => setStatusOpen(false)}

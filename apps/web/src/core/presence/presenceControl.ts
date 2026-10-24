@@ -17,11 +17,14 @@ export const MAX_STATUS_MESSAGE_LENGTH = 60;
 const BUSY_PRESENCE = "org.matrix.msc3026.busy";
 
 export const PRESENCE_CHOICES: { choice: PresenceChoice; label: string; description: string }[] = [
-    { choice: "online", label: "Online", description: "Visible and active" },
-    { choice: "idle", label: "Idle", description: "Shown as away" },
+    { choice: "online", label: "Online", description: "Goes idle when you're away" },
+    { choice: "idle", label: "Idle", description: "Shown as away until you change it" },
     { choice: "dnd", label: "Do Not Disturb", description: "Shown as busy" },
     { choice: "invisible", label: "Invisible", description: "Appear offline to everyone" },
 ];
+
+/** Online's description when auto-idle is set to Never, so it doesn't promise to go idle. */
+export const ONLINE_WITHOUT_AUTO_IDLE_DESCRIPTION = "Visible and active";
 
 /**
  * The presence value published in m.presence.

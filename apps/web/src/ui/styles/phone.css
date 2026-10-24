@@ -201,6 +201,21 @@
     opacity: 0.8;
 }
 
+.phone-tab-avatar-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+/* Your own status on the You tab, so a status you picked (say Idle) doesn't go unnoticed. */
+.phone-tab-presence.status-menu-dot {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--bg-rail);
+}
+
 .phone-tab-badge {
     position: absolute;
     top: -2px;

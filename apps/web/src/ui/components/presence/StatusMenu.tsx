@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 
 import {
     MAX_STATUS_MESSAGE_LENGTH,
+    ONLINE_WITHOUT_AUTO_IDLE_DESCRIPTION,
     PRESENCE_CHOICES,
     type PresenceChoice,
 } from "../../../core/presence/presenceControl";
@@ -10,6 +11,8 @@ interface StatusMenuProps {
     choice: PresenceChoice;
     statusMessage: string;
     error: string | null;
+    /** False when auto-idle is set to Never. */
+    autoIdleOn: boolean;
     onChoose: (choice: PresenceChoice) => void;
     onStatusMessage: (statusMessage: string) => void;
     onClose: () => void;
@@ -19,6 +22,7 @@ export function StatusMenu({
     choice,
     statusMessage,
     error,
+    autoIdleOn,
     onChoose,
     onStatusMessage,
     onClose,
@@ -74,7 +78,11 @@ export function StatusMenu({
                     <span className={`status-menu-dot is-${entry.choice}`} aria-hidden="true" />
                     <span className="status-menu-text">
                         <span className="status-menu-label">{entry.label}</span>
-                        <span className="status-menu-description">{entry.description}</span>
+                        <span className="status-menu-description">
+                            {entry.choice === "online" && !autoIdleOn
+                                ? ONLINE_WITHOUT_AUTO_IDLE_DESCRIPTION
+                                : entry.description}
+                        </span>
                     </span>
                 </button>
             ))}
