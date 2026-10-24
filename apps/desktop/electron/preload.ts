@@ -20,6 +20,17 @@ export interface HeorotDesktopNotificationTarget {
     eventId?: string;
 }
 
+/** A running game: "steam-<appid>" for a Steam game. */
+export interface HeorotDesktopGame {
+    id: string;
+    name: string;
+}
+
+function toGame(value: unknown): HeorotDesktopGame | null {
+    const game = value as { id?: unknown; name?: unknown } | null;
+    return game && typeof game.id === "string" && typeof game.name === "string" ? { id: game.id, name: game.name } : null;
+}
+
 export interface HeorotDesktopBridge {
     openExternal: (url: string) => Promise<void>;
     setMediaAuthState: (state: HeorotDesktopMediaAuthState) => Promise<void>;
@@ -36,9 +47,9 @@ export interface HeorotDesktopBridge {
     showNotification: (notification: HeorotDesktopNotification) => Promise<void>;
     focusWindow: () => Promise<void>;
     /** Starts or stops looking for a running game; resolves to the game running now, if any. */
-    setGameActivityEnabled: (enabled: boolean) => Promise<string | null>;
+    setGameActivityEnabled: (enabled: boolean) => Promise<HeorotDesktopGame | null>;
     gameActivitySupported: () => Promise<boolean>;
-    onGameActivity: (listener: (game: string | null) => void) => () => void;
+    onGameActivity: (listener: (game: HeorotDesktopGame | null) => void) => () => void;
     onNotificationClicked: (listener: (target: HeorotDesktopNotificationTarget) => void) => () => void;
     platform: NodeJS.Platform;
     versions: {
@@ -91,16 +102,15 @@ const bridge: HeorotDesktopBridge = {
     focusWindow: async (): Promise<void> => {
         await ipcRenderer.invoke("heorot:focusWindow");
     },
-    setGameActivityEnabled: async (enabled: boolean): Promise<string | null> => {
-        const game = (await ipcRenderer.invoke("heorot:setGameActivityEnabled", enabled)) as unknown;
-        return typeof game === "string" ? game : null;
+    setGameActivityEnabled: async (enabled: boolean): Promise<HeorotDesktopGame | null> => {
+        return toGame(await ipcRenderer.invoke("heorot:setGameActivityEnabled", enabled));
     },
     gameActivitySupported: async (): Promise<boolean> => {
         return (await ipcRenderer.invoke("heorot:gameActivitySupported")) === true;
     },
-    onGameActivity: (listener: (game: string | null) => void): (() => void) => {
+    onGameActivity: (listener: (game: HeorotDesktopGame | null) => void): (() => void) => {
         const handler = (_event: IpcRendererEvent, game: unknown): void => {
-            listener(typeof game === "string" ? game : null);
+            listener(toGame(game));
         };
         ipcRenderer.on("heorot:gameActivity", handler);
         return () => ipcRenderer.removeListener("heorot:gameActivity", handler);

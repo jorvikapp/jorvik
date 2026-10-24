@@ -23,7 +23,12 @@ import { plainUserDisplayName } from "../../core/users/userDisplayName";
 import { isPresenceEnabledForClient } from "../presence/presenceConfig";
 import { useAutoIdle } from "../presence/useAutoIdle";
 import { usePresenceSelection } from "../presence/usePresenceSelection";
-import { useGameActivity } from "../presence/useGameActivity";
+import {
+    useActivityReceiver,
+    useActivitySharing,
+} from "../activity/useActivity";
+import { useActivityPrivacy, useActivityPrivacyMigration } from "../activity/useActivityPrivacy";
+import { useGameDetection } from "../activity/useGameDetection";
 import { StatusMenu } from "./presence/StatusMenu";
 import { ensureDirectRoomMapping, getDirectRoomIds } from "../adapters/dmAdapter";
 import { describeJoinError, joinRoomWithRetry } from "../adapters/joinAdapter";
@@ -1229,8 +1234,21 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     );
     const userAway = useAutoIdle(presenceEnabled ? userSettings.privacy.autoIdleMinutes * 60_000 : 0);
     const autoIdleOn = userSettings.privacy.autoIdleMinutes > 0;
-    const playing = useGameActivity(presenceEnabled && userSettings.privacy.shareGameActivity);
-    const presenceControl = usePresenceSelection(client, presenceEnabled, userAway, playing);
+    const presenceControl = usePresenceSelection(client, presenceEnabled, userAway);
+    // Game activity: shared, encrypted, only with the people Activity Privacy picks; never in presence.
+    const activityPrivacy = useActivityPrivacy(client);
+    const detectedGame = useGameDetection(activityPrivacy.settings.enabled);
+    useActivityReceiver(client);
+    useActivitySharing(
+        client,
+        activityPrivacy.settings,
+        detectedGame,
+        presenceEnabled && presenceControl.effectiveChoice === "invisible",
+    );
+    const finishActivityPrivacyMigration = useCallback((): void => {
+        setUserSettings((current) => ({ ...current, privacy: { ...current.privacy, shareGameActivity: false } }));
+    }, []);
+    useActivityPrivacyMigration(client, userSettings.privacy.shareGameActivity, finishActivityPrivacyMigration);
     useEffect(() => {
         const desktopBadge = window.heorotDesktop?.setBadgeCount;
         if (desktopBadge) {
@@ -2697,6 +2715,18 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             tab,
         });
     }, []);
+    const activitySharingControl = useMemo(
+        () => ({
+            enabled: activityPrivacy.settings.enabled,
+            onToggle: (enabled: boolean): void => {
+                void activityPrivacy.save({ ...activityPrivacy.settings, enabled }).catch(() =>
+                    pushToast({ type: "error", message: "Couldn't change game activity sharing. Try again." }),
+                );
+            },
+            onOpenSettings: () => openUserSettings("activity"),
+        }),
+        [activityPrivacy, openUserSettings, pushToast],
+    );
 
     const openServerSettings = useCallback((tab = "overview"): void => {
         if (!selectedSpaceRoom) {
@@ -3404,6 +3434,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                                         statusMessage={presenceControl.selection.statusMessage}
                                         error={presenceControl.error}
                                         autoIdleOn={autoIdleOn}
+                                        activitySharing={activitySharingControl}
                                         onChoose={presenceControl.setChoice}
                                         onStatusMessage={presenceControl.setStatusMessage}
                                         onClose={() => setStatusMenuOpen(false)}
@@ -3420,6 +3451,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 <ChannelHeader
                     room={activeRoom}
                     directName={activeDirectName}
+                    directUserId={activeDirectPartnerId}
                     isDirectMessage={isActiveRoomDirect}
                     isOneToOneDirect={activeDirectPartnerId !== null}
                     showHashPrefix={shouldPrefixRoomWithHash}
@@ -3563,6 +3595,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                         presenceEnabled={presenceEnabled}
                         presence={presenceControl}
                         autoIdleOn={autoIdleOn}
+                        activitySharing={activitySharingControl}
                         onOpenSettings={openUserSettings}
                     />
                 </div>
@@ -3756,6 +3789,8 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 renderReactionImages={renderReactionImages}
                 onToggleRenderReactionImages={setRenderReactionImages}
                 onToast={pushToast}
+                statusMessage={presenceControl.effectiveStatusMessage}
+                detectedGame={detectedGame}
             />
             <ImportJsonWizard
                 client={client}

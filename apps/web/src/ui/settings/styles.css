@@ -1031,3 +1031,148 @@
     object-fit: cover;
     transform: scaleX(-1);
 }
+
+/* ---------- Activity Privacy ---------- */
+
+.activity-privacy-heading {
+    margin: 6px 0 0;
+    padding: 0;
+    color: var(--text-main);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.activity-privacy-scope {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.activity-privacy-spaces-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.activity-privacy-spaces-head .settings-search {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.activity-privacy-link {
+    flex: 0 0 auto;
+    padding: 4px 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.activity-privacy-link:hover {
+    text-decoration: underline;
+}
+
+.activity-privacy-spaces {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 320px;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+}
+
+.activity-privacy-space {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 4px;
+}
+
+.activity-privacy-space-avatar {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+    border-radius: 10px;
+    font-size: 13px;
+}
+
+.activity-privacy-space-text {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.activity-privacy-space-name {
+    overflow: hidden;
+    color: var(--text-main);
+    font-size: 14px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.activity-privacy-space-count {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.activity-privacy-space-switch {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+}
+
+.activity-privacy-audience {
+    color: var(--text-main);
+}
+
+/* ---------- Profile preview ---------- */
+
+.profile-preview-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-pane);
+}
+
+.profile-preview-avatar {
+    width: 56px;
+    height: 56px;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    font-size: 22px;
+}
+
+.profile-preview-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.profile-preview-name {
+    overflow: hidden;
+    color: var(--text-main);
+    font-size: 16px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.profile-preview-status {
+    margin: 2px 0 0;
+    color: var(--text-main);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}

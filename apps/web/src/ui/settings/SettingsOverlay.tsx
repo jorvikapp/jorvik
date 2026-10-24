@@ -20,6 +20,8 @@ import { EncryptionTab } from "./user/tabs/EncryptionTab";
 import { MyAccountTab } from "./user/tabs/MyAccountTab";
 import { NotificationsTab } from "./user/tabs/NotificationsTab";
 import { PersonalEmojiTab } from "./user/tabs/PersonalEmojiTab";
+import type { ActivityGame } from "../../core/activity/activityWire";
+import { ActivityPrivacyTab } from "./user/tabs/ActivityPrivacyTab";
 import { PrivacyTab } from "./user/tabs/PrivacyTab";
 import { ProfileTab } from "./user/tabs/ProfileTab";
 import { SignOutTab } from "./user/tabs/SignOutTab";
@@ -71,6 +73,7 @@ const USER_NAV: SettingsNavSection[] = [
             { id: "profile", label: "Profile" },
             { id: "emoji", label: "Emoji" },
             { id: "privacy", label: "Privacy & Safety" },
+            { id: "activity", label: "Activity Privacy" },
         ],
     },
     {
@@ -114,6 +117,10 @@ interface SettingsOverlayProps {
     renderReactionImages: boolean;
     onToggleRenderReactionImages: (enabled: boolean) => void;
     onToast: (toast: Omit<ToastState, "id">) => void;
+    /** The status message others see, for the profile preview. */
+    statusMessage?: string;
+    /** The game the desktop app sees running now, for Activity Privacy's "Hide". */
+    detectedGame?: ActivityGame | null;
 }
 
 function getDefaultTab(mode: SettingsMode): string {
@@ -139,6 +146,8 @@ export function SettingsOverlay({
     renderReactionImages,
     onToggleRenderReactionImages,
     onToast,
+    statusMessage = "",
+    detectedGame = null,
 }: SettingsOverlayProps): React.ReactElement | null {
     const matrix = useMatrix();
     const [, setSpaceStateTick] = useState(0);
@@ -297,7 +306,23 @@ export function SettingsOverlay({
             case "my-account":
                 return <MyAccountTab client={client} onToast={onToast} onSignOut={onLogout} />;
             case "profile":
-                return <ProfileTab client={client} onToast={onToast} />;
+                return (
+                    <ProfileTab
+                        client={client}
+                        onToast={onToast}
+                        statusMessage={statusMessage}
+                        onOpenActivityPrivacy={() => setActiveTab("activity")}
+                    />
+                );
+            case "activity":
+                return (
+                    <ActivityPrivacyTab
+                        client={client}
+                        detectedGame={detectedGame}
+                        onOpenProfile={() => setActiveTab("profile")}
+                        onToast={onToast}
+                    />
+                );
             case "emoji":
                 return (
                     <PersonalEmojiTab
@@ -362,6 +387,7 @@ export function SettingsOverlay({
                                 privacy,
                             })
                         }
+                        onOpenActivityPrivacy={() => setActiveTab("activity")}
                     />
                 );
             case "devices":

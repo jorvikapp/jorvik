@@ -1,7 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
+import { activityAudience, describeActivityAudience } from "../../../../core/activity/activityPrivacy";
+import { formatUserIdForDisplay } from "../../../../core/users/formatUserId";
+import { useJoinedSpaces, useUserActivity } from "../../../activity/useActivity";
+import { useActivityPrivacy } from "../../../activity/useActivityPrivacy";
 import { mediaFromMxc, thumbnailFromMxc } from "../../../adapters/media";
+import { ActivityLine } from "../../../components/activity/ActivityLine";
 import { Avatar } from "../../../components/Avatar";
 import type { ToastState } from "../../../components/Toast";
 
@@ -13,11 +18,17 @@ const BIO_FIELD = "bio";
 interface ProfileTabProps {
     client: MatrixClient;
     onToast: (toast: Omit<ToastState, "id">) => void;
+    /** The status message others see, for the preview. */
+    statusMessage?: string;
+    onOpenActivityPrivacy?: () => void;
 }
 
-export function ProfileTab({ client, onToast }: ProfileTabProps): React.ReactElement {
+export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivityPrivacy }: ProfileTabProps): React.ReactElement {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const userId = client.getUserId() ?? "";
+    const { settings: activitySettings } = useActivityPrivacy(client);
+    const spaces = useJoinedSpaces(client);
+    const ownActivity = useUserActivity(userId);
 
     const [displayName, setDisplayName] = useState("");
     const [avatarMxc, setAvatarMxc] = useState("");
@@ -108,6 +119,9 @@ export function ProfileTab({ client, onToast }: ProfileTabProps): React.ReactEle
         [avatarMxc, client],
     );
 
+    // Until the profile loads (or without a display name), the short form of the id, as elsewhere in the app.
+    const previewName = displayName.trim() || formatUserIdForDisplay(userId, client.getDomain()) || "User";
+
     const hasChanges =
         displayName.trim() !== baselineDisplayName.trim() ||
         avatarMxc !== baselineAvatarMxc ||
@@ -183,6 +197,42 @@ export function ProfileTab({ client, onToast }: ProfileTabProps): React.ReactEle
             </p>
 
             {loading ? <p className="settings-inline-note">Loading profile...</p> : null}
+
+            <div className="settings-section-card profile-preview">
+                <h3>How others see you</h3>
+                <div className="profile-preview-card">
+                    <Avatar
+                        className="profile-preview-avatar"
+                        name={previewName}
+                        src={avatarPreview}
+                        sources={[avatarPreview]}
+                        seed={userId || undefined}
+                        userId={userId || undefined}
+                    />
+                    <div className="profile-preview-main">
+                        <span className="profile-preview-name">{previewName}</span>
+                        {statusMessage ? <p className="profile-preview-status">{statusMessage}</p> : null}
+                        <ActivityLine userId={userId} className="profile-preview-activity" />
+                        {activitySettings.enabled && !ownActivity ? (
+                            <p className="settings-inline-note">When you play a game, it shows here.</p>
+                        ) : null}
+                    </div>
+                </div>
+                <p className="settings-inline-note">
+                    {describeActivityAudience(activitySettings, activityAudience(activitySettings, spaces))}
+                </p>
+                {onOpenActivityPrivacy ? (
+                    <div className="settings-actions-row">
+                        <button
+                            type="button"
+                            className="settings-button settings-button-secondary"
+                            onClick={onOpenActivityPrivacy}
+                        >
+                            Activity Privacy
+                        </button>
+                    </div>
+                ) : null}
+            </div>
 
             <div className="settings-profile-row">
                 {profileLoaded ? (

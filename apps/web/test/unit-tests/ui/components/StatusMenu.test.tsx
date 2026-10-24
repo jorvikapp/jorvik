@@ -1,6 +1,6 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StatusMenu } from "../../../../src/ui/components/presence/StatusMenu";
 
@@ -52,5 +52,34 @@ describe("StatusMenu", () => {
 
     it("doesn't promise auto-idle when it's set to Never", () => {
         expect(descriptions(false).Online).toBe("Visible and active");
+    });
+
+    it("has a quick switch for sharing game activity, and the way to Activity Privacy", () => {
+        const onToggle = vi.fn();
+        const onOpenSettings = vi.fn();
+        const onClose = vi.fn();
+        act(() => {
+            root.render(
+                <StatusMenu
+                    choice="online"
+                    statusMessage=""
+                    error={null}
+                    autoIdleOn
+                    activitySharing={{ enabled: false, onToggle, onOpenSettings }}
+                    onChoose={() => undefined}
+                    onStatusMessage={() => undefined}
+                    onClose={onClose}
+                />,
+            );
+        });
+        const label = [...container.querySelectorAll("label")].find((candidate) =>
+            candidate.textContent?.includes("Share game activity"),
+        );
+        act(() => label!.querySelector("input")!.click());
+        expect(onToggle).toHaveBeenCalledWith(true);
+
+        act(() => [...container.querySelectorAll("button")].find((button) => button.textContent === "Activity Privacy")!.click());
+        expect(onClose).toHaveBeenCalled();
+        expect(onOpenSettings).toHaveBeenCalled();
     });
 });

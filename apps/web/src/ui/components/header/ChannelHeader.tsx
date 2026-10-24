@@ -1,12 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { EventType, type Room } from "matrix-js-sdk/src/matrix";
 
+import { useMinuteClock, useUserActivity } from "../../activity/useActivity";
+import { activityText } from "../activity/ActivityLine";
 import type { RightSidebarMode } from "../rightPanel/types";
 
 interface ChannelHeaderProps {
     room: Room | null;
     /** A one-to-one DM's name (the person's), used instead of the room's. */
     directName?: string | null;
+    /** In a one-to-one DM, the other person, whose game shows under the name while they share it with us. */
+    directUserId?: string | null;
     isDirectMessage: boolean;
     isOneToOneDirect: boolean;
     showHashPrefix: boolean;
@@ -102,6 +106,7 @@ function HeaderIcon({ kind }: { kind: HeaderIconKind }): React.ReactElement {
 export function ChannelHeader({
     room,
     directName,
+    directUserId,
     isDirectMessage,
     isOneToOneDirect,
     showHashPrefix,
@@ -136,7 +141,12 @@ export function ChannelHeader({
                 : ""
         : "";
 
+    const activity = useUserActivity(directUserId);
+    const now = useMinuteClock(activity !== null);
     const secondaryText = useMemo(() => {
+        if (activity) {
+            return `\uD83C\uDFAE ${activityText(activity, now)}`;
+        }
         if (topic.trim().length > 0) {
             return topic.trim();
         }
@@ -144,7 +154,7 @@ export function ChannelHeader({
             return isDirectMessage ? "Direct message" : "No topic set";
         }
         return "Select a room to start chatting";
-    }, [isDirectMessage, room, topic]);
+    }, [activity, isDirectMessage, now, room, topic]);
 
     useEffect(() => {
         if (sidebarMode !== "search") {

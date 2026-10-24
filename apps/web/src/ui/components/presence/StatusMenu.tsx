@@ -7,12 +7,18 @@ import {
     type PresenceChoice,
 } from "../../../core/presence/presenceControl";
 
-interface StatusMenuProps {
+export interface StatusMenuProps {
     choice: PresenceChoice;
     statusMessage: string;
     error: string | null;
     /** False when auto-idle is set to Never. */
     autoIdleOn: boolean;
+    /** The quick "Share game activity" switch, with the way to Activity Privacy. */
+    activitySharing?: {
+        enabled: boolean;
+        onToggle: (enabled: boolean) => void;
+        onOpenSettings: () => void;
+    };
     onChoose: (choice: PresenceChoice) => void;
     onStatusMessage: (statusMessage: string) => void;
     onClose: () => void;
@@ -23,6 +29,7 @@ export function StatusMenu({
     statusMessage,
     error,
     autoIdleOn,
+    activitySharing,
     onChoose,
     onStatusMessage,
     onClose,
@@ -118,6 +125,30 @@ export function StatusMenu({
                 >
                     Clear status message
                 </button>
+            ) : null}
+
+            {activitySharing ? (
+                <>
+                    <div className="status-menu-separator" role="separator" />
+                    <label className="status-menu-activity">
+                        <input
+                            type="checkbox"
+                            checked={activitySharing.enabled}
+                            onChange={(event) => activitySharing.onToggle(event.target.checked)}
+                        />
+                        <span>Share game activity</span>
+                    </label>
+                    <button
+                        type="button"
+                        className="status-menu-clear status-menu-activity-link"
+                        onClick={() => {
+                            onClose();
+                            activitySharing.onOpenSettings();
+                        }}
+                    >
+                        Activity Privacy
+                    </button>
+                </>
             ) : null}
 
             {error ? <p className="status-menu-error">{error}</p> : null}

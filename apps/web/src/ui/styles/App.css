@@ -6126,6 +6126,20 @@ select,
     color: var(--text-main);
 }
 
+.status-menu-activity {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px 2px;
+    color: var(--text-main);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.status-menu-activity input {
+    accent-color: var(--accent);
+}
+
 .status-menu-error {
     margin: 0 10px 6px;
     font-size: 11px;
@@ -6211,6 +6225,34 @@ select,
 }
 
 /* A name and its badges on one line: the name gives way first. */
+/* ---------- game activity ---------- */
+
+.activity-line {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+    margin: 4px 0 0;
+    color: var(--text-main);
+    font-size: 13px;
+}
+
+.activity-line-icon {
+    flex: 0 0 auto;
+}
+
+.activity-line-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* Next to a name: kept whole, ahead of the badges. */
+.activity-icon {
+    flex: 0 0 auto;
+    font-size: 12px;
+    line-height: 1;
+}
+
 .user-name-line {
     display: flex;
     align-items: center;

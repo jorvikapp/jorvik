@@ -4,7 +4,7 @@ import { PRESENCE_CHOICES } from "../../../core/presence/presenceControl";
 import type { PresenceSelectionController } from "../../presence/usePresenceSelection";
 import { useAppVersion } from "../../version/useAppVersion";
 import { Avatar } from "../Avatar";
-import { StatusMenu } from "../presence/StatusMenu";
+import { StatusMenu, type StatusMenuProps } from "../presence/StatusMenu";
 import { BottomSheet } from "./BottomSheet";
 
 interface PhoneYouViewProps {
@@ -15,6 +15,7 @@ interface PhoneYouViewProps {
     presenceEnabled: boolean;
     presence: PresenceSelectionController;
     autoIdleOn: boolean;
+    activitySharing?: StatusMenuProps["activitySharing"];
     onOpenSettings: (tab: string) => void;
 }
 
@@ -25,6 +26,7 @@ const SETTINGS_ROWS: { tab: string; label: string; danger?: boolean }[] = [
     { tab: "profile", label: "Profile" },
     { tab: "emoji", label: "Emoji" },
     { tab: "privacy", label: "Privacy & Safety" },
+    { tab: "activity", label: "Activity Privacy" },
     { tab: "appearance", label: "Appearance" },
     { tab: "notifications", label: "Notifications" },
     { tab: "audio", label: "Voice and video" },
@@ -40,6 +42,7 @@ export function PhoneYouView({
     presenceEnabled,
     presence,
     autoIdleOn,
+    activitySharing,
     onOpenSettings,
 }: PhoneYouViewProps): React.ReactElement {
     const [statusOpen, setStatusOpen] = useState(false);
@@ -106,6 +109,7 @@ export function PhoneYouView({
                         statusMessage={presence.selection.statusMessage}
                         error={presence.error}
                         autoIdleOn={autoIdleOn}
+                        activitySharing={activitySharing}
                         onChoose={presence.setChoice}
                         onStatusMessage={presence.setStatusMessage}
                         onClose={() => setStatusOpen(false)}

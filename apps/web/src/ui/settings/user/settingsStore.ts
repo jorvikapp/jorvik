@@ -25,7 +25,10 @@ export interface PrivacySettings {
     autoIdleMinutes: number;
     /** The server fetches previewed links, so it sees links from encrypted chats too. */
     linkPreviewsInEncrypted: boolean;
-    /** The desktop app shows "Playing ..." in the user's status while a game runs. Off unless turned on. */
+    /**
+     * 1.0.27's "Show the game I'm playing", kept per device. Activity privacy (account data) replaced
+     * it: it's only read to carry it over once, then turned off.
+     */
     shareGameActivity: boolean;
 }
 

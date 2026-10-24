@@ -235,7 +235,7 @@ function showNativeNotification(rawPayload: unknown): void {
 
 const mediaAuthState: DesktopMediaAuthState = {};
 
-// "Playing ..." under the user's name; it only looks for games while the user has it turned on.
+// The game the user is playing, for their game activity; it only looks while they share it.
 const gameActivity = new GameActivityWatcher((game) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send("heorot:gameActivity", game);

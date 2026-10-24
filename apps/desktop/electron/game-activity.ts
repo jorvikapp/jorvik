@@ -4,36 +4,44 @@ import os from "node:os";
 import path from "node:path";
 
 /**
- * Which game is running, for "Playing ..." under the user's name. Steam's game comes from the process
- * Steam starts it under (Linux) or Steam's record of it (Windows, macOS), with its name from the Steam
- * library; anything else is matched by executable name against the list below. Only the game's name reaches the app, and only while the user has this turned on.
+ * Which game is running, for the user's game activity. Steam's game comes from the process Steam
+ * starts it under (Linux) or Steam's record of it (Windows, macOS), with its name from the Steam
+ * library; anything else is matched by executable name against the list below. Only the game's id and
+ * name reach the app, and only while the user shares their activity.
  */
 
-interface KnownGame {
+/** "steam-<appid>" for a Steam game; the list's own id otherwise. */
+export interface DetectedGame {
+    id: string;
     name: string;
+}
+
+interface KnownGame extends DetectedGame {
     /** Lower-case executable names, as tasklist, ps or /proc report them. */
     executables: string[];
 }
 
 /** Popular games that don't run through Steam: Riot, Epic, Battle.net, Mojang, Roblox and so on. */
 export const KNOWN_GAMES: KnownGame[] = [
-    { name: "Minecraft", executables: ["minecraft.windows.exe"] },
-    { name: "League of Legends", executables: ["league of legends.exe", "leagueoflegends"] },
-    { name: "VALORANT", executables: ["valorant-win64-shipping.exe"] },
-    { name: "Fortnite", executables: ["fortniteclient-win64-shipping.exe"] },
-    { name: "Roblox", executables: ["robloxplayerbeta.exe", "robloxplayer"] },
-    { name: "Genshin Impact", executables: ["genshinimpact.exe"] },
-    { name: "Honkai: Star Rail", executables: ["starrail.exe"] },
-    { name: "osu!", executables: ["osu!.exe", "osu!"] },
-    { name: "Overwatch 2", executables: ["overwatch.exe"] },
-    { name: "World of Warcraft", executables: ["wow.exe", "world of warcraft"] },
-    { name: "Hearthstone", executables: ["hearthstone.exe", "hearthstone"] },
-    { name: "Diablo IV", executables: ["diablo iv.exe"] },
-    { name: "Rocket League", executables: ["rocketleague.exe"] },
-    { name: "Apex Legends", executables: ["r5apex.exe"] },
-    { name: "Fall Guys", executables: ["fallguys_client_game.exe"] },
-    { name: "Grand Theft Auto V", executables: ["gta5.exe", "gta5_enhanced.exe"] },
+    { id: "minecraft", name: "Minecraft", executables: ["minecraft.windows.exe"] },
+    { id: "league-of-legends", name: "League of Legends", executables: ["league of legends.exe", "leagueoflegends"] },
+    { id: "valorant", name: "VALORANT", executables: ["valorant-win64-shipping.exe"] },
+    { id: "fortnite", name: "Fortnite", executables: ["fortniteclient-win64-shipping.exe"] },
+    { id: "roblox", name: "Roblox", executables: ["robloxplayerbeta.exe", "robloxplayer"] },
+    { id: "genshin-impact", name: "Genshin Impact", executables: ["genshinimpact.exe"] },
+    { id: "honkai-star-rail", name: "Honkai: Star Rail", executables: ["starrail.exe"] },
+    { id: "osu", name: "osu!", executables: ["osu!.exe", "osu!"] },
+    { id: "overwatch-2", name: "Overwatch 2", executables: ["overwatch.exe"] },
+    { id: "wow", name: "World of Warcraft", executables: ["wow.exe", "world of warcraft"] },
+    { id: "hearthstone", name: "Hearthstone", executables: ["hearthstone.exe", "hearthstone"] },
+    { id: "diablo-iv", name: "Diablo IV", executables: ["diablo iv.exe"] },
+    { id: "rocket-league", name: "Rocket League", executables: ["rocketleague.exe"] },
+    { id: "apex-legends", name: "Apex Legends", executables: ["r5apex.exe"] },
+    { id: "fall-guys", name: "Fall Guys", executables: ["fallguys_client_game.exe"] },
+    { id: "gta-v", name: "Grand Theft Auto V", executables: ["gta5.exe", "gta5_enhanced.exe"] },
 ];
+
+const MINECRAFT: DetectedGame = { id: "minecraft", name: "Minecraft" };
 
 /** Steam's running game id, from registry.vdf (Linux, macOS) or `reg query` (Windows); null when none. */
 export function parseRunningAppId(text: string): string | null {
@@ -107,9 +115,10 @@ export function parsePsColumn(output: string): Map<string, string> {
     return rows;
 }
 
-export function matchKnownGame(executables: Iterable<string>): string | null {
+export function matchKnownGame(executables: Iterable<string>): DetectedGame | null {
     const running = new Set(executables);
-    return KNOWN_GAMES.find((game) => game.executables.some((name) => running.has(name)))?.name ?? null;
+    const game = KNOWN_GAMES.find((known) => known.executables.some((name) => running.has(name)));
+    return game ? { id: game.id, name: game.name } : null;
 }
 
 function run(command: string, args: string[]): Promise<string> {
@@ -174,7 +183,7 @@ async function steamRoots(): Promise<string[]> {
     ];
 }
 
-async function steamGame(running: RunningPrograms): Promise<string | null> {
+async function steamGame(running: RunningPrograms): Promise<DetectedGame | null> {
     let appIds = running.steamAppIds;
     // Without a launch process to go by (Windows and macOS have none), use Steam's own record. It can outlive
     // a Steam that crashed mid-game, so on Windows and Linux it only counts while Steam itself is running.
@@ -192,7 +201,7 @@ async function steamGame(running: RunningPrograms): Promise<string | null> {
             for (const library of libraries) {
                 const name = parseAppManifestName(await readText(path.join(library, "steamapps", `appmanifest_${appId}.acf`)));
                 if (name) {
-                    return name;
+                    return { id: `steam-${appId}`, name };
                 }
             }
         }
@@ -249,13 +258,13 @@ async function runningPrograms(): Promise<RunningPrograms> {
     return { executables, minecraftJava, steamAppIds };
 }
 
-export async function detectGame(): Promise<string | null> {
+export async function detectGame(): Promise<DetectedGame | null> {
     const running = await runningPrograms();
     const steam = await steamGame(running);
     if (steam) {
         return steam;
     }
-    return running.minecraftJava ? "Minecraft" : matchKnownGame(running.executables);
+    return running.minecraftJava ? MINECRAFT : matchKnownGame(running.executables);
 }
 
 /** Flatpak and Snap keep other programs out of sight, so there is nothing to detect there. */
@@ -266,14 +275,14 @@ export function gameActivitySupported(): boolean {
 /** Checks for a game every 20 seconds while turned on, and reports when it changes. */
 export class GameActivityWatcher {
     private timer: NodeJS.Timeout | null = null;
-    private current: string | null = null;
+    private current: DetectedGame | null = null;
 
     public constructor(
-        private readonly onChange: (game: string | null) => void,
+        private readonly onChange: (game: DetectedGame | null) => void,
         private readonly intervalMs = 20_000,
     ) {}
 
-    public get game(): string | null {
+    public get game(): DetectedGame | null {
         return this.current;
     }
 
@@ -296,8 +305,8 @@ export class GameActivityWatcher {
         }
     }
 
-    private update(game: string | null): void {
-        if (game !== this.current) {
+    private update(game: DetectedGame | null): void {
+        if (game?.id !== this.current?.id || game?.name !== this.current?.name) {
             this.current = game;
             this.onChange(game);
         }

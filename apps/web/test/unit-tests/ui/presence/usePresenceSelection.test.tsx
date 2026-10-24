@@ -101,18 +101,7 @@ describe("usePresenceSelection auto-idle", () => {
     });
 });
 
-describe("usePresenceSelection game activity", () => {
-    function Playing({ client, playing }: { client: ReturnType<typeof makeClient>; playing: string | null }): null {
-        controller = usePresenceSelection(client as never, true, false, playing);
-        return null;
-    }
-
-    async function renderPlaying(client: ReturnType<typeof makeClient>, playing: string | null): Promise<void> {
-        await act(async () => {
-            root.render(<Playing client={client} playing={playing} />);
-        });
-    }
-
+describe("usePresenceSelection status message", () => {
     function statusMessages(client: ReturnType<typeof makeClient>): Array<string | undefined> {
         return client.setPresence.mock.calls.map(([body]) => (body as { status_msg?: string }).status_msg);
     }
@@ -121,36 +110,17 @@ describe("usePresenceSelection game activity", () => {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ choice, statusMessage }));
     }
 
-    it("shows the game as the status while it runs, without saving it as the user's status", async () => {
-        storeSelection("online", "");
-        const client = makeClient();
-
-        await renderPlaying(client, "Stardew Valley");
-        expect(controller?.effectiveStatusMessage).toBe("Playing Stardew Valley");
-        expect(controller?.selection.statusMessage).toBe("");
-
-        await renderPlaying(client, null);
-        expect(statusMessages(client)).toEqual(["Playing Stardew Valley", undefined]);
-        expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}").statusMessage).toBe("");
-    });
-
-    it("keeps a status the user set themselves", async () => {
+    // 1.0.27 put "Playing ..." here while a game ran; game activity now travels on its own, encrypted
+    // and only to the people picked (core/activity), so the status message is only ever the user's.
+    it("publishes the status the user set, and clears an empty one", async () => {
         storeSelection("online", "back at 8");
         const client = makeClient();
-
-        await renderPlaying(client, "Stardew Valley");
-
+        await render(client, false);
         expect(controller?.effectiveStatusMessage).toBe("back at 8");
-        expect(statusMessages(client)).toEqual(["back at 8"]);
-    });
 
-    it("shares nothing while invisible", async () => {
-        storeSelection("invisible", "");
-        const client = makeClient();
-
-        await renderPlaying(client, "Stardew Valley");
-
-        expect(controller?.effectiveStatusMessage).toBe("");
-        expect(statusMessages(client)).toEqual([undefined]);
+        await act(async () => {
+            controller?.setStatusMessage("");
+        });
+        expect(statusMessages(client)).toEqual(["back at 8", undefined]);
     });
 });

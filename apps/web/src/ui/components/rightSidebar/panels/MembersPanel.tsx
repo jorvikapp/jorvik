@@ -6,7 +6,9 @@ import { memberAvatarSources } from "../../../adapters/avatar";
 import { useMatrix } from "../../../providers/MatrixProvider";
 import { getPresenceSortRank, toAvatarPresenceState } from "../../../presence/buildPresenceVm";
 import { isPresenceEnabledForClient } from "../../../presence/presenceConfig";
+import { useUserActivity } from "../../../activity/useActivity";
 import { usePresenceMap } from "../../../presence/usePresence";
+import { ActivityIcon } from "../../activity/ActivityLine";
 import { Avatar } from "../../Avatar";
 import { UserBadges } from "../../badges/UserBadges";
 
@@ -69,6 +71,35 @@ function getLastActiveTs(member: RoomMember): number {
     } catch {
         return 0;
     }
+}
+
+/** Their status, or what they're playing if they share it with us; otherwise who they are. */
+function MemberSecondLine({
+    userId,
+    statusMessage,
+    idLabel,
+}: {
+    userId: string;
+    statusMessage: string | null | undefined;
+    idLabel: string;
+}): React.ReactElement {
+    const activity = useUserActivity(userId);
+    if (statusMessage) {
+        return (
+            <span className="rs-member-id rs-member-status" title={statusMessage}>
+                {statusMessage}
+            </span>
+        );
+    }
+    if (activity) {
+        const text = `Playing ${activity.game.name}`;
+        return (
+            <span className="rs-member-id rs-member-status rs-member-activity" title={text}>
+                {text}
+            </span>
+        );
+    }
+    return <span className="rs-member-id">{idLabel}</span>;
 }
 
 export function MembersPanel({
@@ -151,18 +182,14 @@ export function MembersPanel({
                             <span className="rs-member-meta">
                                 <span className="user-name-line">
                                     <span className="rs-member-name">{displayName}</span>
+                                    <ActivityIcon userId={member.userId} />
                                     <UserBadges userId={member.userId} />
                                 </span>
-                                {/* Their status, or "Playing ..." while their game runs; otherwise who they are. */}
-                                {presence?.statusMessage ? (
-                                    <span className="rs-member-id rs-member-status" title={presence.statusMessage}>
-                                        {presence.statusMessage}
-                                    </span>
-                                ) : (
-                                    <span className="rs-member-id">
-                                        {formatUserIdForDisplay(member.userId, localDomain)}
-                                    </span>
-                                )}
+                                <MemberSecondLine
+                                    userId={member.userId}
+                                    statusMessage={presence?.statusMessage}
+                                    idLabel={formatUserIdForDisplay(member.userId, localDomain)}
+                                />
                             </span>
                             <span className="rs-member-badge">{roleLabel}</span>
                         </button>

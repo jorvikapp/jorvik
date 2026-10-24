@@ -26,16 +26,18 @@ function client() {
     });
 }
 
-async function render(onChange = vi.fn()): Promise<void> {
+async function render(onOpenActivityPrivacy = vi.fn()): Promise<void> {
     await act(async () => {
-        root.render(<PrivacyTab client={client() as never} onToast={() => undefined} settings={SETTINGS} onChange={onChange} />);
+        root.render(
+            <PrivacyTab
+                client={client() as never}
+                onToast={() => undefined}
+                settings={SETTINGS}
+                onChange={vi.fn()}
+                onOpenActivityPrivacy={onOpenActivityPrivacy}
+            />,
+        );
     });
-}
-
-function gameToggle(): HTMLInputElement {
-    const label = [...container.querySelectorAll("label")].find((l) => l.textContent?.includes("Show the game I'm playing"));
-    if (!label) throw new Error("no game activity toggle");
-    return label.querySelector("input")!;
 }
 
 beforeEach(() => {
@@ -52,29 +54,14 @@ afterEach(() => {
 });
 
 describe("PrivacyTab game activity", () => {
-    it("is off by default and turns on in the desktop app", async () => {
-        window.heorotDesktop = { setGameActivityEnabled: async () => null, gameActivitySupported: async () => true };
-        const onChange = vi.fn();
-        await render(onChange);
+    // 1.0.27 had a "Show the game I'm playing" switch here; who sees the game now has its own page.
+    it("has no game switch of its own, and leads to Activity Privacy", async () => {
+        const onOpenActivityPrivacy = vi.fn();
+        await render(onOpenActivityPrivacy);
 
-        expect(gameToggle().checked).toBe(false);
-        expect(gameToggle().disabled).toBe(false);
-        act(() => gameToggle().click());
-        expect(onChange).toHaveBeenCalledWith({ ...SETTINGS, shareGameActivity: true });
-    });
-
-    it("can't be turned on in a browser, and says why", async () => {
-        await render();
-
-        expect(gameToggle().disabled).toBe(true);
-        expect(container.textContent).toContain("Only the desktop app can see which game you're playing.");
-    });
-
-    it("can't be turned on in the Flatpak and Snap versions, and says why", async () => {
-        window.heorotDesktop = { setGameActivityEnabled: async () => null, gameActivitySupported: async () => false };
-        await render();
-
-        expect(gameToggle().disabled).toBe(true);
-        expect(container.textContent).toContain("The Flatpak and Snap versions can't see other programs");
+        expect(container.textContent).not.toContain("Show the game I'm playing");
+        const button = [...container.querySelectorAll("button")].find((b) => b.textContent === "Activity Privacy");
+        act(() => button!.click());
+        expect(onOpenActivityPrivacy).toHaveBeenCalled();
     });
 });

@@ -4,6 +4,7 @@ import { Avatar } from "../Avatar";
 import { UserBadges } from "../badges/UserBadges";
 import type { PresenceVm } from "../../presence/buildPresenceVm";
 import { toAvatarPresenceState } from "../../presence/buildPresenceVm";
+import { ActivityLine } from "../activity/ActivityLine";
 import { PresenceText } from "../presence/PresenceText";
 
 import { formatUserIdForDisplay } from "../../../core/users/formatUserId";
@@ -130,6 +131,7 @@ export function ProfileHeader({
                 <UserBadges userId={userId} variant="chips" className="rp-profile-badges" />
                 {presence ? <PresenceText presence={presence} className="rp-profile-presence" /> : null}
                 {presence?.statusMessage ? <p className="rp-profile-status">{presence.statusMessage}</p> : null}
+                <ActivityLine userId={userId} className="rp-profile-activity" />
             </div>
             <div className="rp-profile-actions">
                 {onMessage ? (

@@ -766,6 +766,10 @@
     color: var(--text-main);
 }
 
+.rp-profile-activity {
+    margin-top: 6px;
+}
+
 .presence-text {
     display: flex;
     flex-direction: column;
