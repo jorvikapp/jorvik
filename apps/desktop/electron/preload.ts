@@ -50,6 +50,8 @@ export interface HeorotDesktopBridge {
     setGameActivityEnabled: (enabled: boolean) => Promise<HeorotDesktopGame | null>;
     gameActivitySupported: () => Promise<boolean>;
     onGameActivity: (listener: (game: HeorotDesktopGame | null) => void) => () => void;
+    /** The icon Steam keeps of the running game, as a PNG; null for other games or when there's none. */
+    getGameIcon: (gameId: string) => Promise<Uint8Array | null>;
     onNotificationClicked: (listener: (target: HeorotDesktopNotificationTarget) => void) => () => void;
     platform: NodeJS.Platform;
     versions: {
@@ -114,6 +116,10 @@ const bridge: HeorotDesktopBridge = {
         };
         ipcRenderer.on("heorot:gameActivity", handler);
         return () => ipcRenderer.removeListener("heorot:gameActivity", handler);
+    },
+    getGameIcon: async (gameId: string): Promise<Uint8Array | null> => {
+        const data: unknown = await ipcRenderer.invoke("heorot:getGameIcon", gameId);
+        return data instanceof Uint8Array ? new Uint8Array(data) : null;
     },
     onNotificationClicked: (listener: (target: HeorotDesktopNotificationTarget) => void): (() => void) => {
         const handler = (_event: IpcRendererEvent, target: HeorotDesktopNotificationTarget): void => {

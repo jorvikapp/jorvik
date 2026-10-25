@@ -12,6 +12,7 @@ import {
     ACTIVITY_HEARTBEAT_MS,
     ACTIVITY_LIFETIME_MS,
     type ActivityContent,
+    type ActivityIconFile,
 } from "../../../../src/core/activity/activityWire";
 
 vi.mock("@matrix-org/matrix-sdk-crypto-wasm", () => ({
@@ -26,11 +27,19 @@ vi.mock("@matrix-org/matrix-sdk-crypto-wasm", () => ({
 const T0 = 1_792_850_000_000;
 const WOW: PlayingGame = { id: "wow", name: "World of Warcraft", startedAt: T0 - 60_000 };
 const OSU: PlayingGame = { id: "osu", name: "osu!", startedAt: T0 };
+const ICON: ActivityIconFile = {
+    url: "mxc://s/osu",
+    key: { kty: "oct", alg: "A256CTR", k: "a".repeat(43), key_ops: ["encrypt", "decrypt"], ext: true },
+    iv: "b".repeat(22),
+    hashes: { sha256: "c".repeat(43) },
+    v: "v2",
+};
 
 interface Sent {
     to: string[];
     game: string | null;
     expiresAt?: number;
+    icon?: string;
 }
 
 function setup(delayMs = 0): { sender: ActivitySender; sent: Sent[] } {
@@ -40,7 +49,12 @@ function setup(delayMs = 0): { sender: ActivitySender; sent: Sent[] } {
             if (delayMs > 0) {
                 await new Promise((resolve) => setTimeout(resolve, delayMs));
             }
-            sent.push({ to: [...userIds], game: content.game?.id ?? null, expiresAt: content.expires_at });
+            sent.push({
+                to: [...userIds],
+                game: content.game?.id ?? null,
+                expiresAt: content.expires_at,
+                ...(content.game?.icon ? { icon: content.game.icon.url } : {}),
+            });
         },
     };
     return { sender: new ActivitySender(transport, "DEV"), sent };
@@ -106,6 +120,23 @@ describe("ActivitySender", () => {
         sender.update(OSU, ["@bob:s"]);
         await sender.flush();
         expect(sent.map(({ game }) => game)).toEqual(["wow", "osu"]);
+        sender.stop();
+    });
+
+    it("tells everyone again once the game's icon is ready, and keeps sending it", async () => {
+        const { sender, sent } = setup();
+        sender.update(OSU, ["@bob:s", "@carol:s"]);
+        sender.update({ ...OSU, icon: ICON }, ["@bob:s", "@carol:s"]);
+        sender.update({ ...OSU, icon: ICON }, ["@bob:s", "@carol:s"]);
+        await sender.flush();
+        expect(sent.map(({ to, game, icon }) => ({ to, game, icon }))).toEqual([
+            { to: ["@bob:s", "@carol:s"], game: "osu", icon: undefined },
+            { to: ["@bob:s", "@carol:s"], game: "osu", icon: "mxc://s/osu" },
+        ]);
+
+        await vi.advanceTimersByTimeAsync(ACTIVITY_HEARTBEAT_MS);
+        await sender.flush();
+        expect(sent[2]?.icon).toBe("mxc://s/osu");
         sender.stop();
     });
 

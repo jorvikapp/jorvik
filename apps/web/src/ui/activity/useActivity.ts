@@ -12,6 +12,13 @@ import {
 } from "matrix-js-sdk/src/matrix";
 
 import {
+    clearGameIconUrls,
+    loadGameIconUrl,
+    peekGameIconUrl,
+    rememberedGameIcon,
+    uploadGameIcon,
+} from "../../core/activity/activityIcons";
+import {
     MAX_ACTIVITY_RECIPIENTS,
     computeActivityRecipients,
     isSpaceIncluded,
@@ -27,7 +34,7 @@ import {
     subscribeActivity,
     type UserActivity,
 } from "../../core/activity/activityStore";
-import type { ActivityGame } from "../../core/activity/activityWire";
+import type { ActivityGame, ActivityIconFile } from "../../core/activity/activityWire";
 import { getDirectRoomIds } from "../../core/dm/directChats";
 
 /** Membership changes come in bursts (and loading members fires them too), so recipients are worked out again after a pause. */
@@ -35,7 +42,69 @@ const RECIPIENTS_SETTLE_MS = 5_000;
 
 /** Listens for other people's activity while signed in. */
 export function useActivityReceiver(client: MatrixClient | null): void {
-    useEffect(() => (client ? startActivityReceiver(client) : undefined), [client]);
+    useEffect(() => {
+        if (!client) {
+            return;
+        }
+        const stop = startActivityReceiver(client);
+        return () => {
+            stop();
+            clearGameIconUrls();
+        };
+    }, [client]);
+}
+
+/** A game's icon ready to show; null while it loads, when it can't, or when the game has none. */
+export function useGameIconUrl(client: MatrixClient | null | undefined, icon: ActivityIconFile | undefined): string | null {
+    const ready = icon ? peekGameIconUrl(icon) : null;
+    const [loaded, setLoaded] = useState<{ icon: ActivityIconFile; url: string | null } | null>(null);
+    useEffect(() => {
+        if (!client || !icon || ready !== undefined) {
+            return;
+        }
+        let active = true;
+        void loadGameIconUrl(client, icon).then((url) => {
+            if (active) {
+                setLoaded({ icon, url });
+            }
+        });
+        return () => {
+            active = false;
+        };
+    }, [client, icon, ready]);
+    return ready ?? (loaded && loaded.icon === icon ? loaded.url : null);
+}
+
+/**
+ * The icon to send with the game the user shares: the one uploaded for it before, or the icon Steam
+ * keeps of it, encrypted and uploaded now. Null meanwhile, in a browser, and for other games.
+ */
+function useSharedGameIcon(client: MatrixClient | null, gameId: string | null): ActivityIconFile | null {
+    const userId = client?.getUserId() ?? null;
+    const remembered = useMemo(() => (userId && gameId ? rememberedGameIcon(userId, gameId) : null), [gameId, userId]);
+    const [uploaded, setUploaded] = useState<{ gameId: string; icon: ActivityIconFile } | null>(null);
+    const known = remembered ?? (uploaded?.gameId === gameId ? uploaded.icon : null);
+    useEffect(() => {
+        const getGameIcon = typeof window === "undefined" ? undefined : window.heorotDesktop?.getGameIcon;
+        if (!client || !userId || !gameId || known || !getGameIcon) {
+            return;
+        }
+        let active = true;
+        void getGameIcon(gameId)
+            .then((png) => (png ? uploadGameIcon(client, userId, gameId, png) : null))
+            .then(
+                (icon) => {
+                    if (active && icon) {
+                        setUploaded({ gameId, icon });
+                    }
+                },
+                (error: unknown) => logger.warn("[Jorvik activity] could not upload the game's icon", error),
+            );
+        return () => {
+            active = false;
+        };
+    }, [client, gameId, known, userId]);
+    return known;
 }
 
 /** What someone is playing, as far as they share it with us; for the user themselves, what they share. */
@@ -116,12 +185,13 @@ export function useActivitySharing(
         setStart(detected ? { id: detected.id, at: Date.now() } : null);
     }
     const startedAt = start?.at ?? 0;
+    const shareable =
+        settings.enabled && !invisible && detected && !settings.hidden_games.includes(detected.id) ? detected : null;
+    // Looked for, and uploaded, only for a game that's shared.
+    const icon = useSharedGameIcon(client, shareable?.id ?? null);
     const shared = useMemo<PlayingGame | null>(
-        () =>
-            settings.enabled && !invisible && detected && !settings.hidden_games.includes(detected.id)
-                ? { ...detected, startedAt }
-                : null,
-        [detected, invisible, settings.enabled, settings.hidden_games, startedAt],
+        () => (shareable ? { ...shareable, ...(icon ? { icon } : {}), startedAt } : null),
+        [icon, shareable, startedAt],
     );
     const senderRef = useRef<ActivitySender | null>(null);
     const [membershipTick, setMembershipTick] = useState(0);
@@ -147,7 +217,15 @@ export function useActivitySharing(
         if (!userId) {
             return;
         }
-        setOwnActivity(userId, shared ? { game: { id: shared.id, name: shared.name }, startedAt: shared.startedAt } : null);
+        setOwnActivity(
+            userId,
+            shared
+                ? {
+                      game: { id: shared.id, name: shared.name, ...(shared.icon ? { icon: shared.icon } : {}) },
+                      startedAt: shared.startedAt,
+                  }
+                : null,
+        );
         return () => setOwnActivity(userId, null);
     }, [client, shared]);
 

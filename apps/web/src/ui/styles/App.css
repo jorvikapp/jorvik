@@ -6239,6 +6239,17 @@ select,
 
 .activity-line-icon {
     flex: 0 0 auto;
+    align-self: center;
+    display: inline-flex;
+}
+
+/* A game's own icon, in place of the controller: about the size of the text beside it. */
+.activity-game-icon {
+    display: block;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    object-fit: cover;
 }
 
 .activity-line-text {
@@ -6249,8 +6260,14 @@ select,
 /* Next to a name: kept whole, ahead of the badges. */
 .activity-icon {
     flex: 0 0 auto;
+    display: inline-flex;
     font-size: 12px;
     line-height: 1;
+}
+
+.activity-icon .activity-game-icon {
+    width: 14px;
+    height: 14px;
 }
 
 .user-name-line {

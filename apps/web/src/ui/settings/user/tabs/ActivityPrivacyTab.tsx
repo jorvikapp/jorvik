@@ -27,8 +27,8 @@ type DetectionSupport = "desktop" | "sandboxed" | "browser";
 
 const DETECTION_NOTES: Record<DetectionSupport, string> = {
     desktop:
-        "Steam games are recognized, and popular games from other launchers. Only the game's name goes out, " +
-        "end-to-end encrypted, to the people you pick below.",
+        "Steam games are recognized, and popular games from other launchers. Only the game's name goes out (with " +
+        "its icon, for Steam games), end-to-end encrypted, to the people you pick below.",
     sandboxed:
         "The Flatpak and Snap versions can't see other programs, so they can't tell which game you're playing. " +
         "What you pick here still applies to the desktop app on your other computers.",

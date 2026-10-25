@@ -212,7 +212,7 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
                     <div className="profile-preview-main">
                         <span className="profile-preview-name">{previewName}</span>
                         {statusMessage ? <p className="profile-preview-status">{statusMessage}</p> : null}
-                        <ActivityLine userId={userId} className="profile-preview-activity" />
+                        <ActivityLine client={client} userId={userId} className="profile-preview-activity" />
                         {activitySettings.enabled && !ownActivity ? (
                             <p className="settings-inline-note">When you play a game, it shows here.</p>
                         ) : null}

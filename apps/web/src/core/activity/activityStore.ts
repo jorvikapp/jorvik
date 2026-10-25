@@ -6,6 +6,7 @@ import {
     ACTIVITY_EVENT,
     contentDeviceId,
     parseIncomingActivity,
+    sameGame,
     type ActivityGame,
     type IncomingActivity,
 } from "./activityWire";
@@ -26,7 +27,7 @@ export interface UserActivity {
     receivedAt: number;
 }
 
-/** A device repeating the game it's already showing is ignored if it comes sooner than this. */
+/** A device repeating exactly what it's already showing is ignored if it comes sooner than this. */
 export const ACTIVITY_RATE_LIMIT_MS = 30_000;
 /** And no device gets more than this many through a minute, whatever it sends. */
 const MAX_ACCEPTED_PER_MINUTE = 6;
@@ -62,7 +63,8 @@ export function receiveActivity(userId: string, deviceId: string, incoming: Inco
     const key = `${userId}\u0000${deviceId}`;
     const recent = (acceptedTimes.get(key) ?? []).filter((time) => now - time < 60_000);
     const last = recent[recent.length - 1];
-    const repeat = current?.game.id === incoming.game.id && last !== undefined && now - last < ACTIVITY_RATE_LIMIT_MS;
+    // The same game again with its icon, once the sender has uploaded it, isn't a repeat.
+    const repeat = sameGame(current?.game, incoming.game) && last !== undefined && now - last < ACTIVITY_RATE_LIMIT_MS;
     if (repeat || recent.length >= MAX_ACCEPTED_PER_MINUTE) {
         return false;
     }
@@ -106,12 +108,7 @@ export function setOwnActivity(userId: string, activity: { game: ActivityGame; s
         }
         return;
     }
-    if (
-        own?.userId === userId &&
-        own.activity.game.id === activity.game.id &&
-        own.activity.game.name === activity.game.name &&
-        own.activity.startedAt === activity.startedAt
-    ) {
+    if (own?.userId === userId && sameGame(own.activity.game, activity.game) && own.activity.startedAt === activity.startedAt) {
         return;
     }
     own = {

@@ -51,6 +51,8 @@ export interface HeorotDesktopBridge {
     /** False in the Flatpak and Snap builds, which can't see other programs. */
     gameActivitySupported?: () => Promise<boolean>;
     onGameActivity?: (listener: (game: HeorotDesktopGame | string | null) => void) => () => void;
+    /** Since 1.0.28: the icon Steam keeps of the running game, as a PNG of at most 64x64; null otherwise. */
+    getGameIcon?: (gameId: string) => Promise<Uint8Array | null>;
     onNotificationClicked?: (listener: (target: HeorotDesktopNotificationTarget) => void) => () => void;
     platform?: string;
     versions?: {

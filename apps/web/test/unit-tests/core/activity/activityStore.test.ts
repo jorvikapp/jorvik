@@ -13,11 +13,18 @@ import {
     startActivityReceiver,
     subscribeActivity,
 } from "../../../../src/core/activity/activityStore";
-import { ACTIVITY_EVENT, type ActivityGame } from "../../../../src/core/activity/activityWire";
+import { ACTIVITY_EVENT, type ActivityGame, type ActivityIconFile } from "../../../../src/core/activity/activityWire";
 
 const NOW = 1_792_850_000_000;
 const WOW: ActivityGame = { id: "wow", name: "World of Warcraft" };
 const DOTA: ActivityGame = { id: "steam-570", name: "Dota 2" };
+const ICON: ActivityIconFile = {
+    url: "mxc://s/dota",
+    key: { kty: "oct", alg: "A256CTR", k: "a".repeat(43), key_ops: ["encrypt", "decrypt"], ext: true },
+    iv: "b".repeat(22),
+    hashes: { sha256: "c".repeat(43) },
+    v: "v2",
+};
 
 function playing(game: ActivityGame = WOW, expiresAt = NOW + 600_000) {
     return { game, startedAt: NOW - 60_000, expiresAt };
@@ -50,6 +57,13 @@ describe("activity store", () => {
         expect(getUserActivity("@bob:s")?.expiresAt).toBe(NOW + 900_000);
     });
 
+    it("takes the same game again with its icon straight away, then ignores repeats as before", () => {
+        expect(receiveActivity("@bob:s", "PC", playing(DOTA), NOW)).toBe(true);
+        expect(receiveActivity("@bob:s", "PC", playing({ ...DOTA, icon: ICON }), NOW + 2_000)).toBe(true);
+        expect(getUserActivity("@bob:s")?.game.icon).toEqual(ICON);
+        expect(receiveActivity("@bob:s", "PC", playing({ ...DOTA, icon: ICON }), NOW + 4_000)).toBe(false);
+    });
+
     it("lets no device through more than a handful of times a minute", () => {
         const accepted = ["a", "b", "c", "d", "e", "f", "g", "h"].map((id, index) =>
             receiveActivity("@spam:s", "PC", playing({ id, name: id }), NOW + index * 1_000),
@@ -70,6 +84,8 @@ describe("activity store", () => {
     it("holds the user's own shared game, for their own profile", () => {
         setOwnActivity("@me:s", { game: WOW, startedAt: NOW });
         expect(getUserActivity("@me:s")?.game).toEqual(WOW);
+        setOwnActivity("@me:s", { game: { ...WOW, icon: ICON }, startedAt: NOW });
+        expect(getUserActivity("@me:s")?.game.icon).toEqual(ICON);
         setOwnActivity("@me:s", null);
         expect(getUserActivity("@me:s")).toBeNull();
     });

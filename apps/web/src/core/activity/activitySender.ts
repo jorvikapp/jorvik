@@ -6,6 +6,7 @@ import {
     ACTIVITY_EVENT,
     ACTIVITY_HEARTBEAT_MS,
     playingContent,
+    sameGame,
     stoppedContent,
     type ActivityContent,
     type ActivityGame,
@@ -14,7 +15,8 @@ import {
 /**
  * Keeps the people who may see the user's game up to date (see activityWire.ts for the message):
  *
- * - a game starts: everyone picked is told at once, then again every few minutes while it runs;
+ * - a game starts: everyone picked is told at once, then again every few minutes while it runs, and
+ *   again when its icon is ready;
  * - someone drops out of the picked people (a space switched off, a DM left): they're told it stopped;
  * - someone new is picked: they're told what's running;
  * - the game stops, sharing is turned off or the game is hidden: everyone told is told it stopped.
@@ -32,7 +34,7 @@ export class ActivitySender {
     private game: PlayingGame | null = null;
     private recipients = new Set<string>();
     /** The game the current recipients were told about; null when they weren't told anything. */
-    private toldGameId: string | null = null;
+    private toldGame: ActivityGame | null = null;
     private heartbeat: ReturnType<typeof setInterval> | null = null;
     private sending: Promise<void> = Promise.resolve();
 
@@ -46,12 +48,13 @@ export class ActivitySender {
     public update(game: PlayingGame | null, recipients: readonly string[]): void {
         const next = new Set(game ? recipients : []);
         const removed = [...this.recipients].filter((userId) => !next.has(userId));
-        const gameChanged = (game && next.size > 0 ? game.id : null) !== this.toldGameId;
+        const telling = game && next.size > 0 ? game : null;
+        const gameChanged = !sameGame(telling, this.toldGame);
         const added = gameChanged ? [...next] : [...next].filter((userId) => !this.recipients.has(userId));
 
         this.game = game;
         this.recipients = next;
-        this.toldGameId = game && next.size > 0 ? game.id : null;
+        this.toldGame = telling;
 
         if (removed.length > 0) {
             this.send(removed, stoppedContent(this.deviceId));
@@ -73,14 +76,14 @@ export class ActivitySender {
     }
 
     private scheduleHeartbeat(restart: boolean): void {
-        const needed = this.toldGameId !== null;
+        const needed = this.toldGame !== null;
         if (this.heartbeat && (!needed || restart)) {
             clearInterval(this.heartbeat);
             this.heartbeat = null;
         }
         if (needed && !this.heartbeat) {
             this.heartbeat = setInterval(() => {
-                if (this.game && this.toldGameId !== null) {
+                if (this.game && this.toldGame !== null) {
                     this.send([...this.recipients], playingContent(this.deviceId, this.game, this.game.startedAt, this.now()));
                 }
             }, ACTIVITY_HEARTBEAT_MS);

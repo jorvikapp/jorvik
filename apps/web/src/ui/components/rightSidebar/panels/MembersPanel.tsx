@@ -182,7 +182,7 @@ export function MembersPanel({
                             <span className="rs-member-meta">
                                 <span className="user-name-line">
                                     <span className="rs-member-name">{displayName}</span>
-                                    <ActivityIcon userId={member.userId} />
+                                    <ActivityIcon client={client} userId={member.userId} />
                                     <UserBadges userId={member.userId} />
                                 </span>
                                 <MemberSecondLine

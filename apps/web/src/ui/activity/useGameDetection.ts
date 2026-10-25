@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { cleanGame, cleanActivityText, gameIdFromName, type ActivityGame } from "../../core/activity/activityWire";
+import { cleanGame, cleanActivityText, gameIdFromName, sameGame, type ActivityGame } from "../../core/activity/activityWire";
 
 /** The desktop app reports { id, name }; a desktop app from before ids came along reports just the name. */
 export function toDetectedGame(raw: unknown): ActivityGame | null {
@@ -9,11 +9,8 @@ export function toDetectedGame(raw: unknown): ActivityGame | null {
         const id = name ? gameIdFromName(name) : null;
         return name && id ? { id, name } : null;
     }
-    return cleanGame(raw);
-}
-
-function sameGame(left: ActivityGame | null, right: ActivityGame | null): boolean {
-    return left?.id === right?.id && left?.name === right?.name;
+    const game = cleanGame(raw);
+    return game ? { id: game.id, name: game.name } : null;
 }
 
 /**

@@ -7,7 +7,8 @@ import path from "node:path";
  * Which game is running, for the user's game activity. Steam's game comes from the process Steam
  * starts it under (Linux) or Steam's record of it (Windows, macOS), with its name from the Steam
  * library; anything else is matched by executable name against the list below. Only the game's id and
- * name reach the app, and only while the user shares their activity.
+ * name reach the app, plus the icon Steam keeps of a Steam game, and only while the user shares their
+ * activity.
  */
 
 /** "steam-<appid>" for a Steam game; the list's own id otherwise. */
@@ -207,6 +208,53 @@ async function steamGame(running: RunningPrograms): Promise<DetectedGame | null>
         }
     }
     return null;
+}
+
+/** Steam's app id for a game named "steam-<appid>"; null for any other game. */
+export function steamAppIdOf(gameId: string): string | null {
+    return /^steam-(\d{1,10})$/.exec(gameId)?.[1] ?? null;
+}
+
+/** Steam's own library cache names a game's icon by its hash: librarycache/<appid>/<sha1>.jpg. */
+const STEAM_ICON_FILE = /^[0-9a-f]{40}\.jpg$/i;
+/** Steam's icons are a few kilobytes; a file much bigger than that isn't one. */
+const MAX_STEAM_ICON_BYTES = 512 * 1024;
+
+/**
+ * The icon files Steam keeps of a game for its library list, newest first: in the game's own folder in
+ * Steam's library cache, or as <appid>_icon.jpg in the cache itself on a Steam from before that layout.
+ * Empty when Steam hasn't kept one.
+ */
+export async function steamIconFiles(appId: string): Promise<string[]> {
+    const found: { file: string; modified: number }[] = [];
+    for (const root of await steamRoots()) {
+        const cache = path.join(root, "appcache", "librarycache");
+        const folder = path.join(cache, appId);
+        let names: string[] = [];
+        try {
+            names = await fs.promises.readdir(folder);
+        } catch {
+            // An older Steam, or no Steam here.
+        }
+        const candidates = [
+            ...names.filter((name) => STEAM_ICON_FILE.test(name)).map((name) => path.join(folder, name)),
+            path.join(cache, `${appId}_icon.jpg`),
+        ];
+        for (const file of candidates) {
+            try {
+                const stat = await fs.promises.stat(file);
+                if (stat.isFile() && stat.size > 0 && stat.size <= MAX_STEAM_ICON_BYTES) {
+                    found.push({ file, modified: stat.mtimeMs });
+                }
+            } catch {
+                // Not there.
+            }
+        }
+        if (found.length > 0) {
+            break;
+        }
+    }
+    return found.sort((left, right) => right.modified - left.modified).map((entry) => entry.file);
 }
 
 async function runningPrograms(): Promise<RunningPrograms> {

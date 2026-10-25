@@ -4,15 +4,26 @@ import { describe, expect, it } from "vitest";
 import {
     ACTIVITY_LIFETIME_MS,
     cleanActivityText,
+    cleanGame,
+    cleanIcon,
     contentDeviceId,
     gameIdFromName,
     parseIncomingActivity,
     playingContent,
+    sameGame,
     stoppedContent,
+    type ActivityIconFile,
 } from "../../../../src/core/activity/activityWire";
 
 const NOW = 1_792_850_000_000;
 const WOW = { id: "wow", name: "World of Warcraft" };
+const ICON: ActivityIconFile = {
+    url: "mxc://matrix.jorvik.app/AbCdEf123",
+    key: { kty: "oct", alg: "A256CTR", k: "a".repeat(43), key_ops: ["encrypt", "decrypt"], ext: true },
+    iv: "b".repeat(22),
+    hashes: { sha256: "c".repeat(43) },
+    v: "v2",
+};
 
 describe("activity messages", () => {
     it("say what's playing, since when, and until when to believe it", () => {
@@ -68,6 +79,40 @@ describe("activity messages", () => {
         expect(gameIdFromName("World of Warcraft")).toBe("world-of-warcraft");
         expect(gameIdFromName("Honkai: Star Rail")).toBe("honkai-star-rail");
         expect(gameIdFromName("!!!")).toBeNull();
+    });
+
+    it("carry a Steam game's icon as an encrypted file, rebuilt from just the parts that matter", () => {
+        const sent = playingContent("DEV", { ...WOW, icon: ICON }, NOW, NOW);
+        expect(sent.game).toEqual({ ...WOW, icon: ICON });
+        expect(parseIncomingActivity(sent, NOW)).toMatchObject({ game: { ...WOW, icon: ICON } });
+        expect(playingContent("DEV", WOW, NOW, NOW).game).toEqual(WOW);
+        expect(
+            cleanIcon({ ...ICON, mimetype: "image/svg+xml", key: { ...ICON.key, key_ops: ["sign"], extra: true } }),
+        ).toEqual(ICON);
+    });
+
+    it("drop an icon that isn't a well-formed encrypted mxc file, but keep the game", () => {
+        const malformed: unknown[] = [
+            { ...ICON, url: "https://cdn.example/icon.jpg" },
+            { ...ICON, url: "mxc://server/../../etc" },
+            { ...ICON, v: "v1" },
+            { ...ICON, key: { ...ICON.key, alg: "A128CTR" } },
+            { ...ICON, key: { ...ICON.key, k: "short" } },
+            { ...ICON, iv: "not base64!" },
+            { ...ICON, hashes: {} },
+            "mxc://matrix.jorvik.app/AbCdEf123",
+        ];
+        for (const icon of malformed) {
+            expect(cleanGame({ ...WOW, icon })).toEqual(WOW);
+        }
+    });
+
+    it("tell a game from the same game with its icon", () => {
+        expect(sameGame(WOW, { ...WOW })).toBe(true);
+        expect(sameGame(WOW, { ...WOW, icon: ICON })).toBe(false);
+        expect(sameGame({ ...WOW, icon: ICON }, { ...WOW, icon: { ...ICON, iv: "d".repeat(22) } })).toBe(false);
+        expect(sameGame(null, null)).toBe(true);
+        expect(sameGame(WOW, null)).toBe(false);
     });
 
     it("only name a sending device that looks like one", () => {

@@ -217,6 +217,7 @@ export function UserProfilePanel({
     return (
         <div className="right-panel-body right-panel-body-user">
             <ProfileHeader
+                client={client}
                 displayName={displayName}
                 userId={userId}
                 localDomain={client.getDomain()}

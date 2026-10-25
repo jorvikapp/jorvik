@@ -25,7 +25,7 @@ import {
     writeWindowState,
 } from "./util";
 import { TrayBadge } from "./tray-badge";
-import { GameActivityWatcher, gameActivitySupported } from "./game-activity";
+import { GameActivityWatcher, gameActivitySupported, steamAppIdOf, steamIconFiles } from "./game-activity";
 
 const APP_TITLE = "Jorvik";
 // Keep the Linux window identity aligned with the generated desktop entry so
@@ -241,6 +241,29 @@ const gameActivity = new GameActivityWatcher((game) => {
         mainWindow.webContents.send("heorot:gameActivity", game);
     }
 });
+
+/** Largest icon handed to the page: activity shows it at text size, so more is only bytes. */
+const GAME_ICON_SIZE = 64;
+
+/** The icon Steam keeps of a Steam game, as a PNG of at most 64x64; null for other games or when there's none. */
+async function gameIconPng(gameId: string): Promise<Buffer | null> {
+    const appId = steamAppIdOf(gameId);
+    if (!appId) {
+        return null;
+    }
+    for (const file of await steamIconFiles(appId)) {
+        // Decoded and drawn again, so only a plain picture ever leaves this process.
+        const image = nativeImage.createFromPath(file);
+        const { width, height } = image.getSize();
+        // Steam's icons are square; anything else there isn't one.
+        if (image.isEmpty() || width !== height || width < 16) {
+            continue;
+        }
+        const sized = width > GAME_ICON_SIZE ? image.resize({ width: GAME_ICON_SIZE, height: GAME_ICON_SIZE, quality: "best" }) : image;
+        return sized.toPNG();
+    }
+    return null;
+}
 
 function clearMediaAuthState(): void {
     mediaAuthState.accessToken = undefined;
@@ -703,6 +726,18 @@ function registerIpc(): void {
     });
 
     ipcMain.handle("heorot:gameActivitySupported", () => gameActivitySupported());
+
+    // Only the game running now, so the page can't go through the user's Steam library.
+    ipcMain.handle("heorot:getGameIcon", async (_event, gameId: unknown) => {
+        if (typeof gameId !== "string" || gameActivity.game?.id !== gameId) {
+            return null;
+        }
+        try {
+            return await gameIconPng(gameId);
+        } catch {
+            return null;
+        }
+    });
 
     // A click on one of the page's notifications, which may come while the window is in the tray.
     ipcMain.handle("heorot:focusWindow", () => {

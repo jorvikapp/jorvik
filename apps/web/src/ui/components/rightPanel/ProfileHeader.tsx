@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import { Avatar } from "../Avatar";
 import { UserBadges } from "../badges/UserBadges";
@@ -10,6 +11,8 @@ import { PresenceText } from "../presence/PresenceText";
 import { formatUserIdForDisplay } from "../../../core/users/formatUserId";
 
 interface ProfileHeaderProps {
+    /** For the icon of the game they're playing. */
+    client?: MatrixClient;
     displayName: string;
     userId: string;
     localDomain?: string | null;
@@ -44,6 +47,7 @@ function hashToHue(value: string): number {
 }
 
 export function ProfileHeader({
+    client,
     displayName,
     userId,
     localDomain,
@@ -131,7 +135,7 @@ export function ProfileHeader({
                 <UserBadges userId={userId} variant="chips" className="rp-profile-badges" />
                 {presence ? <PresenceText presence={presence} className="rp-profile-presence" /> : null}
                 {presence?.statusMessage ? <p className="rp-profile-status">{presence.statusMessage}</p> : null}
-                <ActivityLine userId={userId} className="rp-profile-activity" />
+                <ActivityLine client={client} userId={userId} className="rp-profile-activity" />
             </div>
             <div className="rp-profile-actions">
                 {onMessage ? (

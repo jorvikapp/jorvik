@@ -1,9 +1,17 @@
 import React from "react";
+import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import type { UserActivity } from "../../../core/activity/activityStore";
-import { useMinuteClock, useUserActivity } from "../../activity/useActivity";
+import type { ActivityGame } from "../../../core/activity/activityWire";
+import { useGameIconUrl, useMinuteClock, useUserActivity } from "../../activity/useActivity";
 
-const GAME_ICON = "🎮";
+const GAME_EMOJI = "🎮";
+
+/** The game's own icon when it comes with one and has loaded; the controller otherwise. */
+function GameIcon({ client, game }: { client?: MatrixClient | null; game: ActivityGame }): React.ReactElement {
+    const url = useGameIconUrl(client, game.icon);
+    return url ? <img className="activity-game-icon" src={url} alt="" draggable={false} /> : <>{GAME_EMOJI}</>;
+}
 
 /** "1h 23m", "5m"; null under a minute. */
 export function formatPlayingFor(ms: number): string | null {
@@ -27,9 +35,12 @@ export function activityText(activity: UserActivity, now: number): string {
 
 /** What someone is playing and for how long, if they share it with us; nothing otherwise. */
 export function ActivityLine({
+    client,
     userId,
     className,
 }: {
+    /** For the game's icon; without it the line shows the controller. */
+    client?: MatrixClient | null;
     userId: string | null | undefined;
     className?: string;
 }): React.ReactElement | null {
@@ -42,15 +53,15 @@ export function ActivityLine({
     return (
         <p className={`activity-line${className ? ` ${className}` : ""}`} title={text}>
             <span className="activity-line-icon" aria-hidden="true">
-                {GAME_ICON}
+                <GameIcon client={client} game={activity.game} />
             </span>
             <span className="activity-line-text">{text}</span>
         </p>
     );
 }
 
-/** A small controller next to a name while its owner shares what they're playing with us. */
-export function ActivityIcon({ userId }: { userId: string }): React.ReactElement | null {
+/** The game's icon, or a small controller, next to a name while its owner shares what they're playing with us. */
+export function ActivityIcon({ client, userId }: { client?: MatrixClient | null; userId: string }): React.ReactElement | null {
     const activity = useUserActivity(userId);
     if (!activity) {
         return null;
@@ -58,7 +69,7 @@ export function ActivityIcon({ userId }: { userId: string }): React.ReactElement
     const label = `Playing ${activity.game.name}`;
     return (
         <span className="activity-icon" role="img" aria-label={label} title={label}>
-            {GAME_ICON}
+            <GameIcon client={client} game={activity.game} />
         </span>
     );
 }
