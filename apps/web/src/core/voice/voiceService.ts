@@ -2,6 +2,7 @@ import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import type { CoreConfig } from "../config/configTypes";
 import { getVoiceDiscovery } from "../voice/voiceDiscovery";
+import { fetchFromRelay } from "./relayAuth";
 
 export interface LiveKitTokenResponse {
     token: string;
@@ -67,32 +68,25 @@ function getClientHomeserverOrigin(client: MatrixClient): string | null {
 }
 
 // Returns the voice API base URL (already includes /voice prefix).
-// Prefers autodiscovery result; then logged-in homeserver domain; then legacy config.
+// Prefers autodiscovery result; then the app's own voice service (config), which is also where people
+// whose homeserver runs none find one; then the logged-in homeserver's domain.
 function getVoiceApiBaseUrl(client: MatrixClient, config: CoreConfig | null): string {
     const discovery = getVoiceDiscovery();
     if (discovery) return discovery.apiBaseUrl;
 
-    const homeserverOrigin = getClientHomeserverOrigin(client);
-    if (homeserverOrigin) {
-        return `${trimTrailingSlashes(homeserverOrigin)}/voice`;
+    const value = typeof config?.voice_service_url === "string" ? config.voice_service_url.trim() : "";
+    if (value) {
+        if (!value.startsWith("https://")) {
+            throw new Error("Voice service unavailable: `voice_service_url` must use https://.");
+        }
+        return trimTrailingSlashes(value) + "/voice";
     }
 
-    const value = typeof config?.voice_service_url === "string" ? config.voice_service_url.trim() : "";
-    if (!value) {
+    const homeserverOrigin = getClientHomeserverOrigin(client);
+    if (!homeserverOrigin) {
         throw new Error("Voice service unavailable: discovery failed and homeserver URL is unavailable.");
     }
-    if (!value.startsWith("https://")) {
-        throw new Error("Voice service unavailable: `voice_service_url` must use https://.");
-    }
-    return trimTrailingSlashes(value) + "/voice";
-}
-
-function getMatrixAccessToken(client: MatrixClient): string {
-    const token = client.getAccessToken();
-    if (!token) {
-        throw new Error("Missing Matrix access token in current session.");
-    }
-    return token;
+    return `${trimTrailingSlashes(homeserverOrigin)}/voice`;
 }
 
 export function isVoiceFeatureEnabled(config: CoreConfig | null): boolean {
@@ -142,14 +136,13 @@ export async function fetchLiveKitToken(
     options?: { signal?: AbortSignal; e2ee?: boolean },
 ): Promise<LiveKitTokenResponse> {
     const apiBaseUrl = getVoiceApiBaseUrl(client, config);
-    const response = await fetch(`${apiBaseUrl}/livekit/token`, {
+    // The device lets others send it this call's encryption keys; the relay can't tell it from OpenID.
+    const deviceId = client.getDeviceId() ?? undefined;
+    const response = await fetchFromRelay(client, `${apiBaseUrl}/livekit/token`, {
         method: "POST",
         signal: options?.signal,
-        headers: {
-            Authorization: `Bearer ${getMatrixAccessToken(client)}`,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(options?.e2ee ? { matrixRoomId, e2ee: true } : { matrixRoomId }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matrixRoomId, ...(options?.e2ee ? { e2ee: true } : {}), deviceId }),
     });
 
     if (!response.ok) {
@@ -176,14 +169,10 @@ export async function fetchVoiceParticipants(
     options?: { e2ee?: boolean },
 ): Promise<VoiceParticipantsResponse> {
     const apiBaseUrl = getVoiceApiBaseUrl(client, config);
-    const response = await fetch(
+    const response = await fetchFromRelay(
+        client,
         `${apiBaseUrl}/livekit/participants?matrixRoomId=${encodeURIComponent(matrixRoomId)}${options?.e2ee ? "&e2ee=1" : ""}`,
-        {
-            method: "GET",
-            headers: {
-                Authorization: `Bearer ${getMatrixAccessToken(client)}`,
-            },
-        },
+        { method: "GET" },
     );
 
     if (!response.ok) {
@@ -201,12 +190,9 @@ export async function updateVoiceParticipantState(
     payload: VoiceParticipantStateUpdateBody,
 ): Promise<void> {
     const apiBaseUrl = getVoiceApiBaseUrl(client, config);
-    const response = await fetch(`${apiBaseUrl}/livekit/state`, {
+    const response = await fetchFromRelay(client, `${apiBaseUrl}/livekit/state`, {
         method: "POST",
-        headers: {
-            Authorization: `Bearer ${getMatrixAccessToken(client)}`,
-            "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     });
 

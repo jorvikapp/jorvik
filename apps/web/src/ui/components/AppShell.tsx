@@ -103,7 +103,7 @@ import {
     isVoiceChannelHintContent,
     isVoiceChannelRoom,
 } from "../voice/voiceChannel";
-import { clearVoiceDiscovery, initVoiceDiscovery } from "../voice/voiceDiscovery";
+import { clearVoiceDiscovery, initVoiceDiscovery, setVoiceDiscoveryFallback } from "../voice/voiceDiscovery";
 import { isBadgesRoom, startUserBadges } from "../../core/badges/userBadges";
 import { getRoomNotificationMode, RoomNotificationMode } from "../adapters/roomNotificationAdapter";
 import { summarizeUnread, type UnreadSummary } from "../notifications/roomUnread";
@@ -1121,11 +1121,12 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             (client as MatrixClient & {
                 getHomeserverUrl?: () => string;
             }).getHomeserverUrl?.() ?? client.baseUrl;
+        setVoiceDiscoveryFallback(coreConfig?.voice_service_url);
         void initVoiceDiscovery(homeserverUrl).then(() => setVoiceDiscoveryReady(true));
         return () => {
             clearVoiceDiscovery();
         };
-    }, [client]);
+    }, [client, coreConfig?.voice_service_url]);
 
     useEffect(() => {
         const homeserverUrl =

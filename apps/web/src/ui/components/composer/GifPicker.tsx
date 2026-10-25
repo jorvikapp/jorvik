@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import { useGifFavourites, type GifItem } from "./gifFavourites";
+import { fetchFromRelay } from "../../../core/voice/relayAuth";
 import { isPhoneLayout } from "../../layout/phoneLayout";
 
 const GIF_API = "https://matrix.jorvik.app/gif";
@@ -17,12 +18,6 @@ function readStoredTab(): GifTab {
     } catch {
         return "trending";
     }
-}
-
-// The relay spends our KLIPY quota on every GIF request, so it wants to know who asks.
-function authHeaders(client: MatrixClient): Record<string, string> {
-    const accessToken = client.getAccessToken();
-    return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
 }
 
 export function GifPicker({ client, onSelect, onClose }: GifPickerProps): React.ReactElement {
@@ -42,7 +37,8 @@ export function GifPicker({ client, onSelect, onClose }: GifPickerProps): React.
         const timer = window.setTimeout(async () => {
             setLoading(true); setError(null);
             try {
-                const response = await fetch(`${GIF_API}/search?q=${encodeURIComponent(value)}`, { signal: controller.signal, headers: authHeaders(client) });
+                // The relay spends our KLIPY quota on every GIF request, so it wants to know who asks.
+                const response = await fetchFromRelay(client, `${GIF_API}/search?q=${encodeURIComponent(value)}`, { signal: controller.signal });
                 const payload = await response.json() as { results?: GifItem[]; error?: string };
                 if (!response.ok) throw new Error(payload.error || "GIF search failed");
                 setResults(Array.isArray(payload.results) ? payload.results : []);
@@ -59,7 +55,7 @@ export function GifPicker({ client, onSelect, onClose }: GifPickerProps): React.
         const controller = new AbortController();
         void (async () => {
             try {
-                const response = await fetch(`${GIF_API}/trending`, { signal: controller.signal, headers: authHeaders(client) });
+                const response = await fetchFromRelay(client, `${GIF_API}/trending`, { signal: controller.signal });
                 const payload = await response.json() as { results?: GifItem[] };
                 if (!response.ok) throw new Error("trending failed");
                 setTrending(Array.isArray(payload.results) ? payload.results : []);

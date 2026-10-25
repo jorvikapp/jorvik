@@ -58,6 +58,15 @@ async function doFetchVoiceDiscovery(homeserverUrl: string): Promise<VoiceDiscov
 
 let _discovery: VoiceDiscoveryResult | null = null;
 let _pending: Promise<VoiceDiscoveryResult | null> | null = null;
+let _fallbackUrl: string | null = null;
+
+/**
+ * Where to look when the user's homeserver runs no voice service: the one this app comes with (config's
+ * voice_service_url). It lets people from other homeservers into calls in rooms its own homeserver is in.
+ */
+export function setVoiceDiscoveryFallback(url: string | null | undefined): void {
+    _fallbackUrl = url?.trim() || null;
+}
 
 export async function initVoiceDiscovery(homeserverUrl: string): Promise<void> {
     if (_discovery) return;
@@ -65,7 +74,13 @@ export async function initVoiceDiscovery(homeserverUrl: string): Promise<void> {
         await _pending;
         return;
     }
-    _pending = doFetchVoiceDiscovery(homeserverUrl);
+    const fallbackUrl = _fallbackUrl;
+    _pending = doFetchVoiceDiscovery(homeserverUrl).then((found) =>
+        found ??
+        (fallbackUrl && fallbackUrl.replace(/\/$/, "") !== homeserverUrl.replace(/\/$/, "")
+            ? doFetchVoiceDiscovery(fallbackUrl)
+            : null),
+    );
     _discovery = await _pending;
     _pending = null;
 }
