@@ -75,6 +75,17 @@
   </branding>
 
   <releases>
+    <release version="1.0.28" date="2026-10-25">
+      <description>
+        <p>Choose exactly who sees the game you're playing, and Steam games show their own icon.</p>
+        <ul>
+          <li>Activity privacy: choose exactly who sees what you're playing (friends, all spaces, small spaces only, or per space), hide specific games, and keep your status message separate. Activity is end-to-end encrypted and never stored in room history</li>
+          <li>It has its own page in Settings, Activity Privacy, in place of "Show the game I'm playing", and a switch in the status menu. If you had that on, it stays on, now shared with your friends and spaces of up to 200 people</li>
+          <li>Steam games show their own icon next to your name and on your profile. It's end-to-end encrypted too, and nobody's app contacts Steam to show it</li>
+          <li>The status menu says what Online and Idle do: Online goes idle by itself while you're away, and Idle stays until you change it</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.27" date="2026-10-23">
       <description>
         <p>Show the game you're playing, and see the status people set.</p>
