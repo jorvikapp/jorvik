@@ -11,6 +11,7 @@ import {
 } from "matrix-js-sdk/src/matrix";
 
 import type { MatrixCredentials } from "../../../core/types/credentials";
+import { deviceDisplayName } from "../../../core/devices/deviceName";
 
 interface RegistrationInteractiveAuthProps {
     client: MatrixClient;
@@ -119,7 +120,7 @@ export function RegistrationInteractiveAuth({
     username,
     password,
     emailAddress,
-    initialDeviceDisplayName = "Jorvik Web",
+    initialDeviceDisplayName = deviceDisplayName(),
     onCompleted,
     onBack,
 }: RegistrationInteractiveAuthProps): React.ReactElement {

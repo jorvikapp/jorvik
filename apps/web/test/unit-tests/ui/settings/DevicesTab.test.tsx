@@ -29,7 +29,7 @@ afterEach(() => {
     delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
 });
 
-function makeClient(deleteDevice: Mock): MatrixClient {
+function makeClient(deleteDevice: Mock, setDeviceDetails: Mock = vi.fn().mockResolvedValue({})): MatrixClient {
     return {
         getDevices: vi.fn().mockResolvedValue({
             devices: [
@@ -43,6 +43,7 @@ function makeClient(deleteDevice: Mock): MatrixClient {
         getDeviceId: () => "CURRENT",
         getCrypto: () => undefined,
         deleteDevice,
+        setDeviceDetails,
     } as unknown as MatrixClient;
 }
 
@@ -144,5 +145,55 @@ describe("DevicesTab", () => {
 
         expect(container.querySelector(".settings-devices-signout")).toBeNull();
         expect(deleteDevice).not.toHaveBeenCalled();
+    });
+
+    it("renames a session right under it, and won't save an empty name", async () => {
+        const setDeviceDetails = vi.fn().mockResolvedValue({});
+        const client = makeClient(vi.fn(), setDeviceDetails);
+        await renderTab(client);
+        const row = rowFor("OLDPHONE");
+
+        await act(async () => {
+            buttonIn(row, "Rename").click();
+        });
+        const box = container.querySelector(".settings-devices-rename")!;
+        expect(row.nextElementSibling).toBe(box);
+        const input = box.querySelector<HTMLInputElement>("input[type=text]")!;
+        expect(input.value).toBe("Jorvik Web");
+        expect(input.maxLength).toBe(100);
+
+        await act(async () => {
+            setPassword(input, "   ");
+        });
+        expect(buttonIn(box, "Save").disabled).toBe(true);
+
+        await act(async () => {
+            setPassword(input, "  Old phone ");
+        });
+        await act(async () => {
+            buttonIn(box, "Save").click();
+        });
+        expect(setDeviceDetails).toHaveBeenCalledWith("OLDPHONE", { display_name: "Old phone" });
+        expect(container.querySelector(".settings-devices-rename")).toBeNull();
+        expect(client.getDevices).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps the rename box open with the error when the server refuses", async () => {
+        const setDeviceDetails = vi.fn().mockRejectedValue(new Error("Too many requests"));
+        await renderTab(makeClient(vi.fn(), setDeviceDetails));
+
+        await act(async () => {
+            buttonIn(rowFor("CURRENT"), "Rename").click();
+        });
+        await act(async () => {
+            buttonIn(container.querySelector(".settings-devices-rename")!, "Save").click();
+        });
+        expect(container.querySelector(".settings-devices-rename")?.textContent).toContain("Too many requests");
+
+        // Opening sign-out for another session closes it.
+        await act(async () => {
+            buttonIn(rowFor("UNUSED"), "Sign out").click();
+        });
+        expect(container.querySelector(".settings-devices-rename")).toBeNull();
     });
 });

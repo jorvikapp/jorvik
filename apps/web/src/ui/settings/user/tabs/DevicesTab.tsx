@@ -25,6 +25,16 @@ interface SignOutState {
     error: string | null;
 }
 
+interface RenameState {
+    deviceId: string;
+    name: string;
+    pending: boolean;
+    error: string | null;
+}
+
+/** Synapse refuses longer session names. */
+const MAX_DEVICE_NAME_LENGTH = 100;
+
 interface InteractiveAuthErrorData {
     session?: unknown;
     flows?: Array<{
@@ -120,6 +130,7 @@ export function DevicesTab({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [signOutState, setSignOutState] = useState<SignOutState | null>(null);
+    const [renameState, setRenameState] = useState<RenameState | null>(null);
     const signOutBoxRef = useRef<HTMLFormElement | null>(null);
 
     const loadDevices = useCallback(async (): Promise<void> => {
@@ -180,7 +191,40 @@ export function DevicesTab({
         [devices],
     );
 
+    const openRename = useCallback((device: DeviceRow): void => {
+        setSignOutState(null);
+        setRenameState({ deviceId: device.device_id, name: device.display_name ?? "", pending: false, error: null });
+    }, []);
+
+    const submitRename = useCallback(async (): Promise<void> => {
+        if (!renameState) {
+            return;
+        }
+        const { deviceId } = renameState;
+        const name = renameState.name.trim();
+        if (!name) {
+            return;
+        }
+        setRenameState((previous) => (previous ? { ...previous, pending: true, error: null } : previous));
+        try {
+            await client.setDeviceDetails(deviceId, { display_name: name });
+            setRenameState(null);
+            await loadDevices();
+        } catch (renameError) {
+            setRenameState((previous) =>
+                previous?.deviceId === deviceId
+                    ? {
+                          ...previous,
+                          pending: false,
+                          error: renameError instanceof Error ? renameError.message : "Couldn't rename the session.",
+                      }
+                    : previous,
+            );
+        }
+    }, [client, loadDevices, renameState]);
+
     const openSignOut = useCallback((device: DeviceRow): void => {
+        setRenameState(null);
         setSignOutState({
             device,
             pending: false,
@@ -264,6 +308,44 @@ export function DevicesTab({
             signOutBoxRef.current?.scrollIntoView({ block: "nearest" });
         }
     }, [signOutDeviceId, signOutNeedsPassword]);
+
+    const renderRenameBox = (state: RenameState): React.ReactElement => (
+        <form
+            className="settings-section-card settings-devices-rename"
+            onSubmit={(event) => {
+                event.preventDefault();
+                void submitRename();
+            }}
+        >
+            <label className="settings-field">
+                Session name
+                <input
+                    type="text"
+                    value={state.name}
+                    maxLength={MAX_DEVICE_NAME_LENGTH}
+                    onChange={(event) =>
+                        setRenameState((previous) => (previous ? { ...previous, name: event.target.value } : previous))
+                    }
+                    autoFocus
+                />
+            </label>
+            <p className="settings-inline-note">Other people can see session names, so keep it general.</p>
+            {state.error ? <p className="settings-inline-error">{state.error}</p> : null}
+            <div className="settings-actions-row">
+                <button type="submit" className="settings-button" disabled={state.pending || state.name.trim().length === 0}>
+                    {state.pending ? "Saving..." : "Save"}
+                </button>
+                <button
+                    type="button"
+                    className="settings-button settings-button-secondary"
+                    onClick={() => setRenameState(null)}
+                    disabled={state.pending}
+                >
+                    Cancel
+                </button>
+            </div>
+        </form>
+    );
 
     const renderSignOutBox = (state: SignOutState): React.ReactElement => (
         <form
@@ -373,6 +455,14 @@ export function DevicesTab({
                                         </button>
                                         <button
                                             type="button"
+                                            className="settings-button settings-button-secondary"
+                                            disabled={disableActions || renameState?.pending === true}
+                                            onClick={() => openRename(device)}
+                                        >
+                                            Rename
+                                        </button>
+                                        <button
+                                            type="button"
                                             className="settings-button settings-button-danger"
                                             disabled={disableActions || isCurrent}
                                             title={isCurrent ? "Use global sign out for current device." : undefined}
@@ -382,6 +472,7 @@ export function DevicesTab({
                                         </button>
                                     </div>
                                 </div>
+                                {renameState?.deviceId === device.device_id ? renderRenameBox(renameState) : null}
                                 {signOutState?.device.device_id === device.device_id ? renderSignOutBox(signOutState) : null}
                             </React.Fragment>
                         );

@@ -120,6 +120,7 @@ import { useClearedMentions } from "../notifications/clearedMentions";
 import { PhoneNotificationsView } from "./phone/PhoneNotificationsView";
 import { PhoneTabBar, type PhoneTab } from "./phone/PhoneTabBar";
 import { PhoneYouView } from "./phone/PhoneYouView";
+import { nameThisDevice } from "../../core/devices/deviceName";
 
 interface AppShellProps {
     client: MatrixClient;
@@ -1239,6 +1240,12 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const activityPrivacy = useActivityPrivacy(client);
     const detectedGame = useGameDetection(activityPrivacy.settings.enabled);
     useActivityReceiver(client);
+    // Sessions from before they had names of their own are called "Jorvik Web" or nothing; name this one.
+    useEffect(() => {
+        if (client) {
+            void nameThisDevice(client);
+        }
+    }, [client]);
     useActivitySharing(
         client,
         activityPrivacy.settings,

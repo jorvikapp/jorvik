@@ -36,6 +36,7 @@ import { subscribeAccessTokenRotated } from "../../core/lifecycle/tokenEvents";
 import { consumeHandedOver, getSessionLock, markHandedOver } from "../../core/lifecycle/sessionLock";
 import { disablePush, getWebPushConfig, isPushEnabledHere } from "../../core/push/webPush";
 import { syncMediaServiceWorkerAuthState } from "../serviceWorker/registerMediaServiceWorker";
+import { deviceDisplayName } from "../../core/devices/deviceName";
 
 export type MatrixSessionStatus =
     | "booting"
@@ -820,7 +821,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
                         identityServerUrl,
                         username,
                         password,
-                        initialDeviceDisplayName: "Jorvik Web",
+                        initialDeviceDisplayName: deviceDisplayName(),
                     });
                 } catch (loginError) {
                     const shouldFallback =
@@ -837,7 +838,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
                         identityServerUrl,
                         username,
                         password,
-                        initialDeviceDisplayName: "Jorvik Web",
+                        initialDeviceDisplayName: deviceDisplayName(),
                     });
                 }
 
