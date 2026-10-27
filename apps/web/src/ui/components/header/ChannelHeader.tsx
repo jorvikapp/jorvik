@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { EventType, type Room } from "matrix-js-sdk/src/matrix";
+import { EventType, type MatrixClient, type Room } from "matrix-js-sdk/src/matrix";
 
 import { useMinuteClock, useUserActivity } from "../../activity/useActivity";
-import { activityText } from "../activity/ActivityLine";
+import { activityText, GameIcon } from "../activity/ActivityLine";
 import type { RightSidebarMode } from "../rightPanel/types";
 
 interface ChannelHeaderProps {
     room: Room | null;
+    /** For the game's icon in a DM; without it the line shows the controller. */
+    client?: MatrixClient | null;
     /** A one-to-one DM's name (the person's), used instead of the room's. */
     directName?: string | null;
     /** In a one-to-one DM, the other person, whose game shows under the name while they share it with us. */
@@ -105,6 +107,7 @@ function HeaderIcon({ kind }: { kind: HeaderIconKind }): React.ReactElement {
 
 export function ChannelHeader({
     room,
+    client,
     directName,
     directUserId,
     isDirectMessage,
@@ -145,7 +148,7 @@ export function ChannelHeader({
     const now = useMinuteClock(activity !== null);
     const secondaryText = useMemo(() => {
         if (activity) {
-            return `\uD83C\uDFAE ${activityText(activity, now)}`;
+            return activityText(activity, now);
         }
         if (topic.trim().length > 0) {
             return topic.trim();
@@ -215,6 +218,11 @@ export function ChannelHeader({
                     ) : null}
                 </div>
                 <p className="channel-header-topic" title={secondaryText}>
+                    {activity ? (
+                        <span className="channel-header-activity-icon" aria-hidden="true">
+                            <GameIcon client={client} game={activity.game} />
+                        </span>
+                    ) : null}
                     {secondaryText}
                 </p>
             </div>

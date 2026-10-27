@@ -64,6 +64,18 @@
     white-space: nowrap;
 }
 
+/* The game's icon (or the controller) before "Playing ..." in a DM. */
+.channel-header-activity-icon {
+    display: inline-flex;
+    vertical-align: -3px;
+    margin-right: 5px;
+}
+
+.channel-header-activity-icon .activity-game-icon {
+    width: 14px;
+    height: 14px;
+}
+
 .channel-header-actions {
     display: flex;
     align-items: center;

@@ -3458,6 +3458,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             <section className="main-pane" ref={mainPaneRef} inert={isPhone && !phoneChatOpen ? true : undefined}>
                 <ChannelHeader
                     room={activeRoom}
+                    client={client}
                     directName={activeDirectName}
                     directUserId={activeDirectPartnerId}
                     isDirectMessage={isActiveRoomDirect}

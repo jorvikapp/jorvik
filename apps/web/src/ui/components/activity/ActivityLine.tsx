@@ -8,7 +8,7 @@ import { useGameIconUrl, useMinuteClock, useUserActivity } from "../../activity/
 const GAME_EMOJI = "🎮";
 
 /** The game's own icon when it comes with one and has loaded; the controller otherwise. */
-function GameIcon({ client, game }: { client?: MatrixClient | null; game: ActivityGame }): React.ReactElement {
+export function GameIcon({ client, game }: { client?: MatrixClient | null; game: ActivityGame }): React.ReactElement {
     const url = useGameIconUrl(client, game.icon);
     return url ? <img className="activity-game-icon" src={url} alt="" draggable={false} /> : <>{GAME_EMOJI}</>;
 }
