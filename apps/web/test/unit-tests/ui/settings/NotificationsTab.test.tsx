@@ -106,3 +106,52 @@ describe("NotificationsTab push card", () => {
         expect(container.textContent).not.toContain("Push notifications");
     });
 });
+
+describe("NotificationsTab notifications while Jorvik is open", () => {
+    const realNotification = (globalThis as { Notification?: unknown }).Notification;
+
+    function stubNotification(permission: string, answer = permission): void {
+        (globalThis as { Notification?: unknown }).Notification = {
+            permission,
+            requestPermission: vi.fn(async () => answer),
+        };
+    }
+
+    afterEach(() => {
+        (globalThis as { Notification?: unknown }).Notification = realNotification;
+    });
+
+    function desktopToggle(): HTMLInputElement | null {
+        const label = Array.from(container.querySelectorAll("label")).find((candidate) =>
+            candidate.textContent?.includes("Enable desktop notifications"),
+        );
+        return label?.querySelector("input") ?? null;
+    }
+
+    it("says in plain words when this browser blocks them", async () => {
+        stubNotification("denied");
+        await render();
+        expect(container.textContent).toContain("Notifications are blocked for Jorvik. Allow them in this browser's settings.");
+        expect(container.textContent).not.toContain("Permission:");
+    });
+
+    it("says nothing extra once they're allowed", async () => {
+        stubNotification("granted");
+        await render();
+        expect(container.textContent).not.toContain("blocked");
+        expect(container.textContent).not.toContain("can't show notifications");
+    });
+
+    it("asks again when the browser's prompt was only closed", async () => {
+        stubNotification("default", "default");
+        const onChange = vi.fn();
+        await act(async () => {
+            root.render(<NotificationsTab settings={SETTINGS} onChange={onChange} />);
+        });
+        await act(async () => {
+            desktopToggle()?.click();
+        });
+        expect(container.textContent).toContain("Try again and choose Allow.");
+        expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ notificationsEnabled: false }));
+    });
+});

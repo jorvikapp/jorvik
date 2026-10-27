@@ -5,7 +5,7 @@ import type { AppearanceSettings } from "../settingsStore";
 const CHAT_LINE_LENGTH_MIN_CH = 45;
 const CHAT_LINE_LENGTH_MAX_CH = 120;
 const CHAT_LINE_LENGTH_PREVIEW_BODY =
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus porttitor, nibh at gravida tristique, est arcu lacinia velit, sed efficitur justo sem vel mauris.";
+    "Heading out in ten minutes. Save me a spot in voice, and if anyone finds the map we used last week, drop it in here so we can pick up where we left off.";
 
 interface AppearanceTabProps {
     settings: AppearanceSettings;
@@ -35,7 +35,7 @@ export function AppearanceTab({
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Appearance</h2>
-            <p className="settings-tab-description">Local-only UI preferences for this browser session profile.</p>
+            <p className="settings-tab-description">How Jorvik looks on this device.</p>
 
             <div className="settings-section-card">
                 <h3>Theme</h3>
@@ -84,7 +84,7 @@ export function AppearanceTab({
                             })
                         }
                     />
-                    Use maximum width (current behavior)
+                    Use the full width
                 </label>
                 <div className="settings-chat-width-slider-row">
                     <span className="settings-chat-width-slider-label">
@@ -118,7 +118,7 @@ export function AppearanceTab({
                     </div>
                 </div>
             </div>
-            <p className="settings-inline-note">Limits only message text width. The timeline keeps wrapping on word boundaries.</p>
+            <p className="settings-inline-note">This only changes how wide message text can get.</p>
 
             <label className="settings-toggle">
                 <input
@@ -126,7 +126,7 @@ export function AppearanceTab({
                     checked={settings.compactMode}
                     onChange={(event) => onChange({ ...settings, compactMode: event.target.checked })}
                 />
-                Compact mode (higher message density)
+                Compact mode (fit more messages on screen)
             </label>
 
             <label className="settings-toggle">
@@ -135,7 +135,7 @@ export function AppearanceTab({
                     checked={settings.showTimestamps}
                     onChange={(event) => onChange({ ...settings, showTimestamps: event.target.checked })}
                 />
-                Show timestamps in timeline
+                Show message times
             </label>
 
             <label className="settings-toggle">
@@ -149,7 +149,7 @@ export function AppearanceTab({
                         })
                     }
                 />
-                Show avatars in Space channels list
+                Show channel pictures in Spaces
             </label>
 
             <label className="settings-toggle">
@@ -158,7 +158,7 @@ export function AppearanceTab({
                     checked={renderReactionImages}
                     onChange={(event) => onToggleRenderReactionImages(event.target.checked)}
                 />
-                Render reaction images
+                Show custom emoji reactions as images
             </label>
             {isDesktopRuntime ? (
                 <>
@@ -173,7 +173,7 @@ export function AppearanceTab({
                                 })
                             }
                         />
-                        Close button minimizes app (desktop)
+                        Keep Jorvik running when you close the window
                     </label>
                     <label className="settings-toggle">
                         <input
@@ -186,7 +186,7 @@ export function AppearanceTab({
                                 })
                             }
                         />
-                        Developer tools (desktop)
+                        Developer tools
                     </label>
                     <p className="settings-inline-note">
                         Lets {devToolsShortcut} open the developer tools. Only turn this on if you know what they're

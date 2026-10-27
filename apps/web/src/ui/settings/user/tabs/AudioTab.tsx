@@ -62,7 +62,7 @@ export function AudioTab({ settings, onChange }: AudioTabProps): React.ReactElem
                 setVideoInputs(cameras);
             } catch (deviceError) {
                 if (!disposed) {
-                    setError(deviceError instanceof Error ? deviceError.message : "Unable to enumerate audio devices.");
+                    setError(deviceError instanceof Error ? deviceError.message : "Couldn't list your microphones and speakers.");
                 }
             }
         };
@@ -302,7 +302,7 @@ export function AudioTab({ settings, onChange }: AudioTabProps): React.ReactElem
                     checked={settings.micTestLoopbackEnabled}
                     onChange={(event) => onChange({ ...settings, micTestLoopbackEnabled: event.target.checked })}
                 />
-                Mic test loopback (play your microphone to selected output)
+                Hear yourself during the microphone test
             </label>
 
             <div className="settings-section-card">

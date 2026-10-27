@@ -55,7 +55,7 @@ async function renderTab(client: unknown, room: unknown = makeRoom()): Promise<v
 
 function publishToggle(): HTMLInputElement | null {
     const labels = Array.from(container.querySelectorAll("label.settings-toggle"));
-    const label = labels.find(candidate => candidate.textContent?.includes("room directory"));
+    const label = labels.find(candidate => candidate.textContent?.includes("public Spaces"));
     return (label?.querySelector("input") as HTMLInputElement | undefined) ?? null;
 }
 
@@ -108,7 +108,7 @@ describe("VisibilityTab directory publishing", () => {
 
         const error = container.querySelector(".settings-inline-error")?.textContent ?? "";
         expect(error).toContain("Not allowed to publish room");
-        expect(error).toContain("restricts who may publish");
+        expect(error).toContain("only lets some people list Spaces publicly");
     });
 
     it("hides the toggle when the directory cannot be read, as for a remote space", async () => {
@@ -194,5 +194,33 @@ describe("VisibilityTab encryption", () => {
         await renderTab(makeClient(), encryptionRoom({ canEncrypt: false }));
         expect(encryptionCard().textContent).toContain("This Space isn't end-to-end encrypted.");
         expect(buttonNamed("Encrypt this Space")).toBeUndefined();
+    });
+});
+
+describe("VisibilityTab join options", () => {
+    function roomWithJoinRule(joinRule: string) {
+        return {
+            roomId: "!space:example.org",
+            currentState: {
+                getStateEvents: (type: string) => (type === "m.room.join_rules" ? { getContent: () => ({ join_rule: joinRule }) } : null),
+                maySendStateEvent: () => true,
+            },
+        } as never;
+    }
+
+    function joinOptions(): string[] {
+        const select = container.querySelector("select");
+        return Array.from(select?.querySelectorAll("option") ?? []).map((option) => option.value);
+    }
+
+    it("doesn't offer members-of-other-Spaces, which can't be set up here", async () => {
+        await renderTab(makeClient(), roomWithJoinRule("invite"));
+        expect(joinOptions()).toEqual(["invite", "public", "knock"]);
+    });
+
+    it("still shows it for a Space that already uses it", async () => {
+        await renderTab(makeClient(), roomWithJoinRule("restricted"));
+        expect(joinOptions()).toEqual(["invite", "public", "restricted", "knock"]);
+        expect((container.querySelector("select") as HTMLSelectElement).value).toBe("restricted");
     });
 });

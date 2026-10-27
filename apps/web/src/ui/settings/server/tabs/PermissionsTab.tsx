@@ -35,6 +35,33 @@ interface PowerLevelDraft {
 
 type UserPowerDraftMap = Record<string, string>;
 
+// What each kind of change is called here. Anything else shows its own type name, which is still accurate.
+const EVENT_TYPE_LABELS: Record<string, string> = {
+    [EventType.RoomName]: "Change the name",
+    [EventType.RoomAvatar]: "Change the picture",
+    [EventType.RoomTopic]: "Change the description",
+    [EventType.RoomCanonicalAlias]: "Change its address",
+    [EventType.RoomPowerLevels]: "Change ranks and permissions",
+    [EventType.RoomJoinRules]: "Change who can join",
+    [EventType.RoomHistoryVisibility]: "Change who can read its history",
+    [EventType.RoomGuestAccess]: "Change guest access",
+    [EventType.RoomEncryption]: "Turn on encryption",
+    [EventType.RoomServerAcl]: "Change which servers can take part",
+    [EventType.RoomTombstone]: "Upgrade the Space",
+    [EventType.RoomPinnedEvents]: "Pin messages",
+    [EventType.SpaceChild]: "Add or remove channels",
+    [EventType.SpaceParent]: "Put it inside another Space",
+    [EventType.RoomThirdPartyInvite]: "Invite people by email",
+    [EventType.RoomMessage]: "Send messages",
+    [EventType.Sticker]: "Send stickers",
+    [EventType.Reaction]: "React to messages",
+    [EventType.RoomRedaction]: "Delete messages",
+};
+
+function eventTypeLabel(eventType: string): string {
+    return EVENT_TYPE_LABELS[eventType] ?? eventType;
+}
+
 function readPowerLevels(room: Room): PowerLevelsContent {
     const powerLevelsEvent = room.currentState.getStateEvents(EventType.RoomPowerLevels, "");
     const content = powerLevelsEvent?.getContent() as PowerLevelsContent | undefined;
@@ -110,7 +137,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
     const eventPowerLevels = useMemo(
         () =>
             Object.entries(powerLevels.events ?? {}).sort(([leftType], [rightType]) =>
-                leftType.localeCompare(rightType, undefined, { sensitivity: "base" }),
+                eventTypeLabel(leftType).localeCompare(eventTypeLabel(rightType), undefined, { sensitivity: "base" }),
             ),
         [powerLevels.events],
     );
@@ -155,7 +182,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
             ban === null ||
             redact === null
         ) {
-            setError("Power levels must be whole numbers.");
+            setError("Ranks have to be whole numbers.");
             return;
         }
 
@@ -209,15 +236,15 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
             return false;
         }
         if (!canEditPowerLevels) {
-            setError("You do not have permission to edit user power levels.");
+            setError("Your rank doesn't let you change other people's ranks.");
             return false;
         }
         if (!canManageTargetUser(normalizedTarget)) {
-            setError("You can only edit users with lower power level than your own.");
+            setError("You can only change the rank of people below you.");
             return false;
         }
         if (nextLevel !== null && !canSetTargetLevel(normalizedTarget, nextLevel)) {
-            setError("Target power level must be lower than your own power level.");
+            setError("The new rank has to be below your own.");
             return false;
         }
 
@@ -252,11 +279,14 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
             });
             onToast({
                 type: "success",
-                message: nextLevel === null ? `Removed override for ${normalizedTarget}.` : `Updated ${normalizedTarget}.`,
+                message:
+                    nextLevel === null
+                        ? `${normalizedTarget} has the members' rank again.`
+                        : `Updated ${normalizedTarget}.`,
             });
             return true;
         } catch (userSaveError) {
-            const message = userSaveError instanceof Error ? userSaveError.message : "Failed to update user power level.";
+            const message = userSaveError instanceof Error ? userSaveError.message : "Couldn't change their rank.";
             setError(message);
             return false;
         } finally {
@@ -272,7 +302,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
             return;
         }
         if (level === null) {
-            setError("Power level must be a whole number.");
+            setError("The rank has to be a whole number.");
             return;
         }
 
@@ -286,25 +316,23 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
         <div className="settings-tab">
             <h2 className="settings-tab-title">Permissions</h2>
             <p className="settings-tab-description">
-                Manage Space power levels from <code>m.room.power_levels</code>.
+                Who can do what in this Space. Everyone has a rank, a number: the higher it is, the more they can do.
             </p>
 
             <div className="settings-permissions-summary">
-                <div>
-                    <strong>Role mapping:</strong> Admin {">="} 100, Mod {">="} 50, Member uses defaults.
-                </div>
-                <div>Your power level: {ownPowerLevel}</div>
-                <div>users_default: {powerLevels.users_default ?? 0}</div>
-                <div>events_default: {powerLevels.events_default ?? 0}</div>
-                <div>state_default: {powerLevels.state_default ?? 50}</div>
-                <div>invite/kick/ban/redact: {powerLevels.invite ?? 0}/{powerLevels.kick ?? 50}/{powerLevels.ban ?? 50}/{powerLevels.redact ?? 50}</div>
+                <div>Admins are rank 100 or higher and moderators 50 or higher. Everyone else is a member.</div>
+                <div>Your rank: {ownPowerLevel}</div>
             </div>
 
             <div className="settings-section-card">
-                <h3>Base power levels</h3>
+                <h3>Ranks</h3>
+                <p className="settings-inline-note">
+                    Everyone has the members' rank unless you give them their own. For everything else, this is the
+                    lowest rank that can do it.
+                </p>
                 <div className="settings-power-grid">
                     <label className="settings-field">
-                        <span>users_default</span>
+                        <span>Members' rank</span>
                         <input
                             type="number"
                             value={draft.usersDefault}
@@ -318,7 +346,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
                         />
                     </label>
                     <label className="settings-field">
-                        <span>events_default</span>
+                        <span>Send messages</span>
                         <input
                             type="number"
                             value={draft.eventsDefault}
@@ -332,7 +360,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
                         />
                     </label>
                     <label className="settings-field">
-                        <span>state_default</span>
+                        <span>Change settings</span>
                         <input
                             type="number"
                             value={draft.stateDefault}
@@ -346,7 +374,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
                         />
                     </label>
                     <label className="settings-field">
-                        <span>invite</span>
+                        <span>Invite people</span>
                         <input
                             type="number"
                             value={draft.invite}
@@ -360,7 +388,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
                         />
                     </label>
                     <label className="settings-field">
-                        <span>kick</span>
+                        <span>Remove people</span>
                         <input
                             type="number"
                             value={draft.kick}
@@ -374,7 +402,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
                         />
                     </label>
                     <label className="settings-field">
-                        <span>ban</span>
+                        <span>Ban people</span>
                         <input
                             type="number"
                             value={draft.ban}
@@ -388,7 +416,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
                         />
                     </label>
                     <label className="settings-field">
-                        <span>redact</span>
+                        <span>Delete other people's messages</span>
                         <input
                             type="number"
                             value={draft.redact}
@@ -403,7 +431,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
                     </label>
                 </div>
                 {!canEditPowerLevels ? (
-                    <p className="settings-inline-note">Read-only: your power level does not allow editing permissions.</p>
+                    <p className="settings-inline-note">Your rank doesn't let you change these.</p>
                 ) : null}
                 {error ? <p className="settings-inline-error">{error}</p> : null}
                 <div className="settings-actions-row">
@@ -413,39 +441,39 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
                         disabled={!hasChanges || saving || !canEditPowerLevels}
                         onClick={() => void save()}
                     >
-                        {saving ? "Saving..." : "Save base levels"}
+                        {saving ? "Saving..." : "Save ranks"}
                     </button>
                 </div>
             </div>
 
-            <h3 className="settings-subtitle">Event type requirements</h3>
+            <h3 className="settings-subtitle">Ranks for specific changes</h3>
             <div className="settings-table-wrap">
                 <table className="settings-table">
                     <thead>
                         <tr>
-                            <th>Event type</th>
-                            <th>Required PL</th>
+                            <th>Change</th>
+                            <th>Lowest rank</th>
                         </tr>
                     </thead>
                     <tbody>
                         {eventPowerLevels.map(([eventType, level]) => (
                             <tr key={eventType}>
-                                <td>{eventType}</td>
+                                <td>{eventTypeLabel(eventType)}</td>
                                 <td>{level}</td>
                             </tr>
                         ))}
                         {eventPowerLevels.length === 0 ? (
                             <tr>
-                                <td colSpan={2}>No explicit event overrides.</td>
+                                <td colSpan={2}>None set, so the ranks above apply.</td>
                             </tr>
                         ) : null}
                     </tbody>
                 </table>
             </div>
 
-            <h3 className="settings-subtitle">User power levels</h3>
+            <h3 className="settings-subtitle">People with their own rank</h3>
             <div className="settings-section-card">
-                <h3>Add or update user override</h3>
+                <h3>Give someone a rank</h3>
                 <div className="settings-user-override-add">
                     <label className="settings-field">
                         <span>User ID</span>
@@ -458,7 +486,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
                         />
                     </label>
                     <label className="settings-field">
-                        <span>Power level</span>
+                        <span>Rank</span>
                         <input
                             type="number"
                             value={addUserLevel}
@@ -472,7 +500,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
                         disabled={!canEditPowerLevels || saving || userActionPendingId !== null}
                         onClick={() => void addUserOverride()}
                     >
-                        Set override
+                        Set rank
                     </button>
                 </div>
             </div>
@@ -480,9 +508,9 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
                 <table className="settings-table">
                     <thead>
                         <tr>
-                            <th>User</th>
-                            <th>PL</th>
-                            <th>Actions</th>
+                            <th>Person</th>
+                            <th>Rank</th>
+                            <th>Change</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -519,7 +547,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
                                                 disabled={!canEditPowerLevels || saving || rowPending || !canSetFromDraft}
                                                 onClick={() => {
                                                     if (parsedUserDraftLevel === null) {
-                                                        setError("Power level must be a whole number.");
+                                                        setError("The rank has to be a whole number.");
                                                         return;
                                                     }
                                                     void updateUserOverride(userId, parsedUserDraftLevel);
@@ -562,7 +590,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
                                                 disabled={!canEditPowerLevels || saving || rowPending || !canManageTarget}
                                                 onClick={() => void updateUserOverride(userId, null)}
                                             >
-                                                Remove override
+                                                Remove
                                             </button>
                                         </div>
                                     </td>
@@ -571,7 +599,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
                         })}
                         {userPowerLevels.length === 0 ? (
                             <tr>
-                                <td colSpan={3}>No explicit user power levels.</td>
+                                <td colSpan={3}>Nobody has their own rank yet.</td>
                             </tr>
                         ) : null}
                     </tbody>
@@ -579,7 +607,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
             </div>
 
             <p className="settings-inline-note">
-                You can edit only users with lower power level than your own, and target level must stay below your level.
+                You can only change the rank of people below you, and only to a rank below your own.
             </p>
         </div>
     );

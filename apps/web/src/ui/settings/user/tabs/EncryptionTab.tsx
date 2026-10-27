@@ -205,7 +205,7 @@ export function EncryptionTab({ client, verificationNonce, onOpenVerification }:
             setSetupCopied(false);
             setSetupDownloaded(false);
             setSetupOpen(false);
-            setSetupSuccess(hasRecoveryKey ? "Recovery key changed." : "Recovery key set up.");
+            setSetupSuccess(hasRecoveryKey ? "Security key changed." : "Security key set up.");
             setSetupNonce((value) => value + 1);
         } catch (completeError) {
             setSetupError(completeError instanceof Error ? completeError.message : "Failed to set up secure backup.");
@@ -218,7 +218,7 @@ export function EncryptionTab({ client, verificationNonce, onOpenVerification }:
         <div className="settings-tab">
             <h2 className="settings-tab-title">Encryption & Recovery</h2>
             <p className="settings-tab-description">
-                Surface existing verification and key backup flows without changing crypto primitives.
+                Verify your devices, and keep a security key so you can read your encrypted messages on a new one.
             </p>
 
             {loading ? <p className="settings-inline-note">Loading encryption status...</p> : null}
@@ -230,16 +230,16 @@ export function EncryptionTab({ client, verificationNonce, onOpenVerification }:
                     <strong>{crossSigningReady ? "Ready" : "Not ready"}</strong>
                 </div>
                 <div className="settings-info-item">
-                    <span className="settings-info-label">Active key backup</span>
-                    <strong>{backupVersion ?? "Not enabled"}</strong>
+                    <span className="settings-info-label">Key backup</span>
+                    <strong>{backupVersion ? "On" : "Off"}</strong>
                 </div>
                 <div className="settings-info-item">
                     <span className="settings-info-label">This device verified</span>
                     <strong>{matrix.localDeviceVerified ? "Yes" : "No"}</strong>
                 </div>
                 <div className="settings-info-item">
-                    <span className="settings-info-label">Force verification policy</span>
-                    <strong>{matrix.forceVerificationEnabled ? "Enabled" : "Disabled"}</strong>
+                    <span className="settings-info-label">New devices must be verified</span>
+                    <strong>{matrix.forceVerificationEnabled ? "Yes" : "No"}</strong>
                 </div>
             </div>
 
@@ -256,7 +256,7 @@ export function EncryptionTab({ client, verificationNonce, onOpenVerification }:
                     className="settings-button settings-button-secondary"
                     onClick={() => void matrix.refreshDeviceVerification()}
                 >
-                    Refresh trust status
+                    Check again
                 </button>
             </div>
 
@@ -264,14 +264,14 @@ export function EncryptionTab({ client, verificationNonce, onOpenVerification }:
                 <div className="settings-recovery-header">
                     <h3>Secure Backup</h3>
                     <span className={`settings-recovery-badge${hasRecoveryKey ? " is-ready" : " is-missing"}`}>
-                        {hasRecoveryKey ? "Configured" : "Recommended"}
+                        {hasRecoveryKey ? "Set up" : "Recommended"}
                     </span>
                 </div>
 
                 <p className="settings-inline-note">
                     {hasRecoveryKey
-                        ? "Your account has a recovery key configured. You can rotate it if needed."
-                        : "Set up a recovery key to restore encrypted history on new sessions and devices."}
+                        ? "Your account has a security key. You can change it if you need to."
+                        : "Set up a security key so you can read your encrypted messages on a new device."}
                 </p>
 
                 {setupSuccess ? <p className="settings-inline-note settings-recovery-success">{setupSuccess}</p> : null}
@@ -292,7 +292,7 @@ export function EncryptionTab({ client, verificationNonce, onOpenVerification }:
                         }}
                         disabled={setupBusy}
                     >
-                        {setupOpen ? "Hide recovery setup" : hasRecoveryKey ? "Change recovery key" : "Set up recovery key"}
+                        {setupOpen ? "Hide setup" : hasRecoveryKey ? "Change security key" : "Set up security key"}
                     </button>
                 </div>
 
@@ -379,7 +379,7 @@ export function EncryptionTab({ client, verificationNonce, onOpenVerification }:
             </div>
 
             <p className="settings-inline-note">
-                Backup recovery still opens automatically during login when encrypted history needs a recovery credential.
+                When you sign in on a new device, Jorvik asks for your security key if it needs it to unlock your messages.
             </p>
         </div>
     );

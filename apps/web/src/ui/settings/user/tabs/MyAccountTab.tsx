@@ -49,15 +49,15 @@ export function MyAccountTab({ client, onToast, onSignOut }: MyAccountTabProps):
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">My Account</h2>
-            <p className="settings-tab-description">Current account and session identifiers.</p>
+            <p className="settings-tab-description">Who you're signed in as, and the details to share when you ask for help.</p>
 
             <div className="settings-info-grid">
                 <div className="settings-info-item">
-                    <span className="settings-info-label">MXID</span>
+                    <span className="settings-info-label">User ID</span>
                     <code>{userId}</code>
                 </div>
                 <div className="settings-info-item">
-                    <span className="settings-info-label">Homeserver</span>
+                    <span className="settings-info-label">Server</span>
                     <code>{homeserverDomain}</code>
                 </div>
                 <div className="settings-info-item">
@@ -78,16 +78,16 @@ export function MyAccountTab({ client, onToast, onSignOut }: MyAccountTabProps):
                     className="settings-button settings-button-secondary"
                     onClick={() =>
                         void copyText(userId)
-                            .then(() => onToast({ type: "success", message: "Copied MXID." }))
+                            .then(() => onToast({ type: "success", message: "Copied your user ID." }))
                             .catch((error: unknown) =>
                                 onToast({
                                     type: "error",
-                                    message: error instanceof Error ? error.message : "Failed to copy MXID.",
+                                    message: error instanceof Error ? error.message : "Couldn't copy your user ID.",
                                 }),
                             )
                     }
                 >
-                    Copy MXID
+                    Copy user ID
                 </button>
                 <button
                     type="button"
@@ -98,7 +98,7 @@ export function MyAccountTab({ client, onToast, onSignOut }: MyAccountTabProps):
                             .catch((error: unknown) =>
                                 onToast({
                                     type: "error",
-                                    message: error instanceof Error ? error.message : "Failed to copy device ID.",
+                                    message: error instanceof Error ? error.message : "Couldn't copy the device ID.",
                                 }),
                             )
                     }
@@ -114,7 +114,7 @@ export function MyAccountTab({ client, onToast, onSignOut }: MyAccountTabProps):
                             .catch((error: unknown) =>
                                 onToast({
                                     type: "error",
-                                    message: error instanceof Error ? error.message : "Failed to copy version.",
+                                    message: error instanceof Error ? error.message : "Couldn't copy the version.",
                                 }),
                             )
                     }

@@ -147,9 +147,7 @@ export function OverviewTab({ client, spaceRoom, onToast }: OverviewTabProps): R
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Overview</h2>
-            <p className="settings-tab-description">
-                Update Space profile details. These settings apply to all channels in this server.
-            </p>
+            <p className="settings-tab-description">The name, picture and description everyone sees for this Space.</p>
 
             <div className="settings-overview-avatar-row">
                 <div className="settings-overview-avatar-preview">
@@ -212,7 +210,7 @@ export function OverviewTab({ client, spaceRoom, onToast }: OverviewTabProps): R
 
             {!permissions.canEditName || !permissions.canEditTopic || !permissions.canEditAvatar ? (
                 <p className="settings-inline-note">
-                    Some fields are read-only because your power level does not allow editing these state events.
+                    Your rank doesn't let you change some of these.
                 </p>
             ) : null}
 

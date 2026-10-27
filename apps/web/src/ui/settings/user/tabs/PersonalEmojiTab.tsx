@@ -140,7 +140,7 @@ export function PersonalEmojiTab({ client, onOpenUploadDialog, onToast }: Person
         }
 
         if (pack.emojis[normalized]) {
-            setError(`${normalized} already exists in your personal pack.`);
+            setError(`You already have ${normalized}.`);
             return;
         }
 
@@ -174,9 +174,7 @@ export function PersonalEmojiTab({ client, onOpenUploadDialog, onToast }: Person
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Emoji</h2>
-            <p className="settings-tab-description">
-                Manage personal emoji stored as <code>{PERSONAL_EMOJI_PACK_EVENT_TYPE}</code> account data.
-            </p>
+            <p className="settings-tab-description">Your own emoji, for you to use in any Space or DM.</p>
 
             <div className="settings-actions-row">
                 <input
@@ -190,17 +188,17 @@ export function PersonalEmojiTab({ client, onOpenUploadDialog, onToast }: Person
                     type="button"
                     className="settings-button"
                     disabled={!canEdit}
-                    title={!canEdit ? "Guests cannot edit personal emoji pack." : "Upload emoji"}
+                    title={!canEdit ? "Guest accounts can't have their own emoji." : "Upload emoji"}
                     onClick={onOpenUploadDialog}
                 >
                     Upload emoji
                 </button>
             </div>
 
-            {loading ? <p className="settings-inline-note">Loading emoji pack...</p> : null}
+            {loading ? <p className="settings-inline-note">Loading your emoji...</p> : null}
             {error ? <p className="settings-inline-error">{error}</p> : null}
 
-            {!canEdit ? <p className="settings-inline-note">Read-only: guest sessions cannot edit personal emoji.</p> : null}
+            {!canEdit ? <p className="settings-inline-note">Guest accounts can't have their own emoji.</p> : null}
 
             <div className="settings-emoji-grid">
                 {filteredEmojis.map(([shortcode, emoji]) => {
@@ -225,7 +223,6 @@ export function PersonalEmojiTab({ client, onOpenUploadDialog, onToast }: Person
                                 ) : (
                                     <span className="settings-emoji-shortcode">{shortcode}</span>
                                 )}
-                                <span className="settings-emoji-meta">{emoji.url}</span>
                             </div>
                             <div className="settings-emoji-actions">
                                 {isRenaming ? (
@@ -278,7 +275,7 @@ export function PersonalEmojiTab({ client, onOpenUploadDialog, onToast }: Person
                     );
                 })}
                 {filteredEmojis.length === 0 && !loading ? (
-                    <div className="settings-empty">No emoji in this pack.</div>
+                    <div className="settings-empty">{search.trim() ? "No emoji match your search." : "No emoji yet."}</div>
                 ) : null}
             </div>
         </div>

@@ -47,7 +47,7 @@ export function MembersTab({ client, spaceRoom }: MembersTabProps): React.ReactE
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Members</h2>
-            <p className="settings-tab-description">Read-only member list for this Space.</p>
+            <p className="settings-tab-description">Everyone in this Space and their rank. You can change ranks in Permissions.</p>
 
             <div className="settings-members-list">
                 {members.map((member) => {

@@ -89,6 +89,13 @@ export function NotificationsTab({ settings, onChange }: NotificationsTabProps):
     const desktopPermission =
         typeof Notification === "undefined" ? "unsupported" : Notification.permission;
     const desktopEnabled = settings.notificationsEnabled;
+    // Said under the switch, so turning it on when it can't work needs no error of its own.
+    const permissionNote =
+        desktopPermission === "unsupported"
+            ? "This browser can't show notifications."
+            : desktopPermission === "denied"
+              ? "Notifications are blocked for Jorvik. Allow them in this browser's settings."
+              : null;
 
     const setDesktopEnabled = async (enabled: boolean): Promise<void> => {
         setError(null);
@@ -101,7 +108,6 @@ export function NotificationsTab({ settings, onChange }: NotificationsTabProps):
         }
 
         if (typeof Notification === "undefined") {
-            setError("Desktop notifications are not supported in this runtime.");
             return;
         }
 
@@ -113,7 +119,10 @@ export function NotificationsTab({ settings, onChange }: NotificationsTabProps):
 
         const permission = await Notification.requestPermission();
         if (permission !== "granted") {
-            setError("Desktop notifications permission was denied.");
+            // Blocked shows under the switch; a prompt that was only closed can be answered next time.
+            if (permission !== "denied") {
+                setError("Jorvik needs your permission to show notifications. Try again and choose Allow.");
+            }
             onChange({ ...settings, notificationsEnabled: false });
             return;
         }
@@ -170,9 +179,7 @@ export function NotificationsTab({ settings, onChange }: NotificationsTabProps):
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Notifications</h2>
-            <p className="settings-tab-description">
-                Matrix-native local notification handling using Matrix push-actions.
-            </p>
+            <p className="settings-tab-description">Choose how Jorvik lets you know about new messages.</p>
 
             <PushNotificationsCard hideBody={!settings.notificationBodyEnabled} />
 
@@ -186,16 +193,7 @@ export function NotificationsTab({ settings, onChange }: NotificationsTabProps):
                 />
                 Enable desktop notifications
             </label>
-            <p className="settings-inline-note">
-                Permission:{" "}
-                {desktopPermission === "unsupported"
-                    ? "unsupported"
-                    : desktopPermission === "granted"
-                      ? "granted"
-                      : desktopPermission === "denied"
-                        ? "denied"
-                        : "default"}
-            </p>
+            {permissionNote ? <p className="settings-inline-note">{permissionNote}</p> : null}
 
             <label className="settings-toggle">
                 <input

@@ -196,7 +196,7 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
             // refusal here is not something the user can fix in this dialog.
             setError(
                 status === 403
-                    ? `${message} Your homeserver restricts who may publish to its room directory.`
+                    ? `${message} Your server only lets some people list Spaces publicly.`
                     : message,
             );
         } finally {
@@ -223,36 +223,40 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
         <div className="settings-tab">
             <h2 className="settings-tab-title">Visibility</h2>
             <p className="settings-tab-description">
-                Configure who can join this Space, how much history is visible, and whether
-                people can find it by searching the server's room directory.
+                Who can join this Space, who can read its history, and whether people can find it in your server's
+                public Spaces.
             </p>
 
             <div className="settings-section-card">
                 <label className="settings-field">
-                    <span>Join rule</span>
+                    <span>Who can join</span>
                     <select
                         value={joinRule}
                         onChange={(event) => setJoinRule(event.target.value as JoinRule)}
                         disabled={saving || !canEditJoinRule}
                     >
-                        <option value={JoinRule.Invite}>Invite only</option>
-                        <option value={JoinRule.Public}>Public</option>
-                        <option value={JoinRule.Restricted}>Restricted</option>
-                        <option value={JoinRule.Knock}>Knock</option>
+                        <option value={JoinRule.Invite}>Only people who are invited</option>
+                        <option value={JoinRule.Public}>Anyone</option>
+                        {/* Only kept, never offered: the Spaces or channels it lets in can't be picked here, so
+                            choosing it would quietly let nobody in without an invite. */}
+                        {readJoinRule(spaceRoom) === JoinRule.Restricted ? (
+                            <option value={JoinRule.Restricted}>Members of certain Spaces or channels</option>
+                        ) : null}
+                        <option value={JoinRule.Knock}>Anyone can ask to join</option>
                     </select>
                 </label>
 
                 <label className="settings-field">
-                    <span>History visibility</span>
+                    <span>Who can read its history</span>
                     <select
                         value={historyVisibility}
                         onChange={(event) => setHistoryVisibility(event.target.value as HistoryVisibility)}
                         disabled={saving || !canEditHistoryVisibility}
                     >
-                        <option value={HistoryVisibility.Shared}>Shared</option>
-                        <option value={HistoryVisibility.Joined}>Joined</option>
-                        <option value={HistoryVisibility.Invited}>Invited</option>
-                        <option value={HistoryVisibility.WorldReadable}>World readable</option>
+                        <option value={HistoryVisibility.Shared}>Members, including from before they joined</option>
+                        <option value={HistoryVisibility.Joined}>Members, from when they joined</option>
+                        <option value={HistoryVisibility.Invited}>Members, from when they were invited</option>
+                        <option value={HistoryVisibility.WorldReadable}>Anyone, even without joining</option>
                     </select>
                 </label>
 
@@ -274,13 +278,13 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
                             onChange={(event) => setPublished(event.target.checked)}
                             disabled={saving || directoryStatus !== "ready"}
                         />
-                        Publish this Space in the server's room directory
+                        List this Space in your server's public Spaces
                     </label>
                 )}
 
                 {!canEditJoinRule || !canEditHistoryVisibility || !canEditGuestAccess ? (
                     <p className="settings-inline-note">
-                        Some controls are read-only because your power level does not allow editing these state events.
+                        Your rank doesn't let you change some of these.
                     </p>
                 ) : null}
             </div>

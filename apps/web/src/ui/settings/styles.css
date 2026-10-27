@@ -716,14 +716,6 @@
     font-weight: 700;
 }
 
-.settings-emoji-meta {
-    font-size: 12px;
-    color: var(--text-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .settings-emoji-actions {
     display: flex;
     align-items: center;

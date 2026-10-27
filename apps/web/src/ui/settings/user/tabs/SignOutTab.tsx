@@ -28,12 +28,12 @@ export function SignOutTab({ onSignOut }: SignOutTabProps): React.ReactElement {
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Sign out</h2>
-            <p className="settings-tab-description">End this current session.</p>
+            <p className="settings-tab-description">Sign out of Jorvik on this device.</p>
 
             <div className="settings-danger-card">
                 <div>
                     <h3>Sign out of this device</h3>
-                    <p>You will need to sign in again to access encrypted history on this session.</p>
+                    <p>Afterwards, you'll need your security key or another signed-in device to read your encrypted messages here.</p>
                 </div>
                 <button
                     type="button"
@@ -47,8 +47,8 @@ export function SignOutTab({ onSignOut }: SignOutTabProps): React.ReactElement {
             {isDesktopRuntime ? (
                 <div className="settings-danger-card">
                     <div>
-                        <h3>Quit desktop app</h3>
-                        <p>Close the desktop process completely.</p>
+                        <h3>Quit Jorvik</h3>
+                        <p>Close Jorvik completely, so it stops running in the background.</p>
                     </div>
                     <button
                         type="button"

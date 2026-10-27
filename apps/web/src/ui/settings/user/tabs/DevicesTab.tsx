@@ -339,7 +339,7 @@ export function DevicesTab({
                 {state.device.display_name || "Unnamed device"} ({state.device.device_id})
             </p>
             {!state.challenge ? (
-                <p className="settings-inline-note">This removes the selected session from your account on the homeserver.</p>
+                <p className="settings-inline-note">This signs that device out of your account.</p>
             ) : null}
             {canUsePassword ? (
                 <label className="settings-field">
@@ -401,7 +401,7 @@ export function DevicesTab({
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Devices</h2>
-            <p className="settings-tab-description">Active sessions overview.</p>
+            <p className="settings-tab-description">Everywhere you're signed in. Sign out of any you don't recognize.</p>
 
             <div className="settings-actions-row">
                 <button type="button" className="settings-button settings-button-secondary" onClick={onOpenOwnVerification}>
@@ -449,7 +449,7 @@ export function DevicesTab({
                                                       })
                                             }
                                         >
-                                            {isCurrent ? "Verify current" : "Verify"}
+                                            Verify
                                         </button>
                                         <button
                                             type="button"
@@ -463,7 +463,7 @@ export function DevicesTab({
                                             type="button"
                                             className="settings-button settings-button-danger"
                                             disabled={disableActions || isCurrent}
-                                            title={isCurrent ? "Use global sign out for current device." : undefined}
+                                            title={isCurrent ? "To sign out of this device, use Sign out in Settings." : undefined}
                                             onClick={() => openSignOut(device)}
                                         >
                                             Sign out

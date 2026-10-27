@@ -144,7 +144,7 @@ export function EmojiTab({ client, spaceRoom, onOpenUploadDialog, onToast }: Emo
         }
 
         if (pack.emojis[normalized]) {
-            setError(`${normalized} already exists in this space pack.`);
+            setError(`This Space already has ${normalized}.`);
             return;
         }
 
@@ -178,9 +178,7 @@ export function EmojiTab({ client, spaceRoom, onOpenUploadDialog, onToast }: Emo
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Emoji</h2>
-            <p className="settings-tab-description">
-                Manage custom server emoji stored as <code>{SPACE_EMOJI_PACK_EVENT_TYPE}</code> state.
-            </p>
+            <p className="settings-tab-description">Custom emoji that everyone in this Space can use.</p>
 
             <div className="settings-actions-row">
                 <input
@@ -194,19 +192,19 @@ export function EmojiTab({ client, spaceRoom, onOpenUploadDialog, onToast }: Emo
                     type="button"
                     className="settings-button"
                     disabled={!permissions.canEditEmojiPack}
-                    title={!permissions.canEditEmojiPack ? "You cannot edit the space emoji pack." : "Upload emoji"}
+                    title={!permissions.canEditEmojiPack ? "Your rank doesn't let you change this Space's emoji." : "Upload emoji"}
                     onClick={onOpenUploadDialog}
                 >
                     Upload emoji
                 </button>
             </div>
 
-            {loading ? <p className="settings-inline-note">Loading emoji pack...</p> : null}
+            {loading ? <p className="settings-inline-note">Loading emoji...</p> : null}
             {error ? <p className="settings-inline-error">{error}</p> : null}
 
             {!permissions.canEditEmojiPack ? (
                 <p className="settings-inline-note">
-                    Read-only: your power level does not allow editing the Space emoji pack.
+                    Your rank doesn't let you change this Space's emoji.
                 </p>
             ) : null}
 
@@ -233,7 +231,6 @@ export function EmojiTab({ client, spaceRoom, onOpenUploadDialog, onToast }: Emo
                                 ) : (
                                     <span className="settings-emoji-shortcode">{shortcode}</span>
                                 )}
-                                <span className="settings-emoji-meta">{emoji.url}</span>
                             </div>
                             <div className="settings-emoji-actions">
                                 {isRenaming ? (
@@ -286,7 +283,7 @@ export function EmojiTab({ client, spaceRoom, onOpenUploadDialog, onToast }: Emo
                     );
                 })}
                 {filteredEmojis.length === 0 && !loading ? (
-                    <div className="settings-empty">No emoji in this pack.</div>
+                    <div className="settings-empty">{search.trim() ? "No emoji match your search." : "No emoji yet."}</div>
                 ) : null}
             </div>
         </div>

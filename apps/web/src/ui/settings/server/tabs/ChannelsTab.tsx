@@ -43,7 +43,7 @@ export function ChannelsTab({
         <div className="settings-tab">
             <h2 className="settings-tab-title">Channels</h2>
             <p className="settings-tab-description">
-                Reorder channels for this Space. Ordering is fixed and persisted per-space.
+                Arrange this Space's channels. Everyone sees them in the order you set here.
             </p>
 
             <div className="settings-actions-row">

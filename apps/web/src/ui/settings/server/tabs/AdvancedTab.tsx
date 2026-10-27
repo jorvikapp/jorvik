@@ -61,7 +61,7 @@ export function AdvancedTab({ spaceRoom, onToast }: AdvancedTabProps): React.Rea
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Advanced</h2>
-            <p className="settings-tab-description">Low-level Space metadata and diagnostics.</p>
+            <p className="settings-tab-description">Technical details about this Space, for troubleshooting.</p>
 
             <div className="settings-info-grid">
                 <div className="settings-info-item">

@@ -192,9 +192,7 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Profile</h2>
-            <p className="settings-tab-description">
-                Global Matrix profile settings (same model as reference Matrix clients).
-            </p>
+            <p className="settings-tab-description">How you show up to others, in every Space and DM.</p>
 
             {loading ? <p className="settings-inline-note">Loading profile...</p> : null}
 
