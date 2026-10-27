@@ -75,6 +75,20 @@
   </branding>
 
   <releases>
+    <release version="1.0.29" date="2026-10-27">
+      <description>
+        <p>Sign in with single sign-on, and keep your read receipts to yourself.</p>
+        <ul>
+          <li>Sign in with single sign-on on servers that offer it. The desktop app does it in your browser, and wherever Jorvik asked for your password to confirm it's you, single sign-on works there too</li>
+          <li>Read receipts can stay private: turn off Send read receipts in Privacy &amp; Safety, and nobody sees how far you've read, on any of your devices</li>
+          <li>Read receipt pictures in direct messages move as soon as someone reads</li>
+          <li>A direct message's header shows the game the other person is playing with the game's own icon</li>
+          <li>Each device you're signed in on has its own name, like Jorvik Desktop (Linux), and you can rename them in Devices</li>
+          <li>Voice calls and GIF search prove who you are without handing over access to your account</li>
+          <li>Settings say what each option does in plain words, and a server's Permissions show what each rank lets people do</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.28" date="2026-10-25">
       <description>
         <p>Choose exactly who sees the game you're playing, and Steam games show their own icon.</p>
