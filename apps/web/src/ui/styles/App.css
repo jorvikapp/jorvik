@@ -298,6 +298,40 @@ textarea {
     color: var(--text-main);
 }
 
+/* Single sign-on: a button for each sign-in provider the server offers. */
+.login-sso {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.login-card .login-sso-button {
+    margin-top: 0;
+}
+
+.login-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.login-divider::before,
+.login-divider::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--border);
+}
+
+.login-sso-waiting,
+.login-sso-register {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
 .login-uia-header h2 {
     margin: 0;
 }

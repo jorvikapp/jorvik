@@ -27,6 +27,7 @@ afterEach(() => {
     });
     container.remove();
     delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    vi.unstubAllGlobals();
 });
 
 function makeClient(deleteDevice: Mock, setDeviceDetails: Mock = vi.fn().mockResolvedValue({})): MatrixClient {
@@ -44,6 +45,8 @@ function makeClient(deleteDevice: Mock, setDeviceDetails: Mock = vi.fn().mockRes
         getCrypto: () => undefined,
         deleteDevice,
         setDeviceDetails,
+        getFallbackAuthUrl: (stage: string, session: string) =>
+            `https://hs.example/_matrix/client/v3/auth/${stage}/fallback/web?session=${session}`,
     } as unknown as MatrixClient;
 }
 
@@ -130,6 +133,83 @@ describe("DevicesTab", () => {
         );
         expect(container.querySelector(".settings-devices-signout")).toBeNull();
         expect(client.getDevices).toHaveBeenCalledTimes(2);
+    });
+
+    describe("for an account that signs in with single sign-on", () => {
+        const SSO_PAGE = "https://hs.example/_matrix/client/v3/auth/m.login.sso/fallback/web?session=uia-2";
+
+        async function askedForSso(page: unknown): Promise<{ deleteDevice: Mock; opened: Mock; box: () => Element }> {
+            const deleteDevice = vi
+                .fn()
+                .mockRejectedValueOnce({ httpStatus: 401, data: { session: "uia-2", flows: [{ stages: ["m.login.sso"] }] } })
+                .mockResolvedValueOnce({});
+            const opened = vi.fn(() => page);
+            vi.stubGlobal("open", opened);
+            await renderTab(makeClient(deleteDevice));
+            await act(async () => {
+                buttonIn(rowFor("UNUSED"), "Sign out").click();
+            });
+            const box = (): Element => container.querySelector(".settings-devices-signout")!;
+            await act(async () => {
+                buttonIn(box(), "Confirm sign out").click();
+            });
+            return { deleteDevice, opened, box };
+        }
+
+        it("confirms on the server's page instead of asking for a password", async () => {
+            const { deleteDevice, opened, box } = await askedForSso(null);
+
+            expect(box().querySelector("input[type=password]")).toBeNull();
+            expect(box().textContent).toContain("Confirm it's you with single sign-on");
+            expect(buttonIn(box(), "Confirm sign out").disabled).toBe(true);
+
+            await act(async () => {
+                buttonIn(box(), "Continue with single sign-on").click();
+            });
+            expect(opened).toHaveBeenCalledWith(SSO_PAGE, "_blank");
+            await act(async () => {
+                buttonIn(box(), "Confirm sign out").click();
+            });
+
+            expect(deleteDevice).toHaveBeenLastCalledWith("UNUSED", { session: "uia-2" });
+            expect(container.querySelector(".settings-devices-signout")).toBeNull();
+        });
+
+        it("signs out by itself once the server's page says it's done", async () => {
+            const page = {};
+            const { deleteDevice, box } = await askedForSso(page);
+            await act(async () => {
+                buttonIn(box(), "Continue with single sign-on").click();
+            });
+
+            // Some other window saying so doesn't count.
+            const elsewhere = new MessageEvent("message", { data: "authDone" });
+            Object.defineProperty(elsewhere, "source", { value: {} });
+            await act(async () => {
+                window.dispatchEvent(elsewhere);
+            });
+            expect(deleteDevice).toHaveBeenCalledTimes(1);
+
+            const done = new MessageEvent("message", { data: "authDone" });
+            Object.defineProperty(done, "source", { value: page });
+            await act(async () => {
+                window.dispatchEvent(done);
+            });
+            expect(deleteDevice).toHaveBeenLastCalledWith("UNUSED", { session: "uia-2" });
+            expect(container.querySelector(".settings-devices-signout")).toBeNull();
+        });
+
+        it("says so when the server hasn't seen the page finished", async () => {
+            const { deleteDevice, box } = await askedForSso(null);
+            deleteDevice.mockReset().mockRejectedValueOnce({ httpStatus: 401, data: { session: "uia-2", flows: [{ stages: ["m.login.sso"] }] } });
+            await act(async () => {
+                buttonIn(box(), "Continue with single sign-on").click();
+            });
+            await act(async () => {
+                buttonIn(box(), "Confirm sign out").click();
+            });
+            expect(box().textContent).toContain("hasn't seen the confirmation yet");
+        });
     });
 
     it("closes the box on Cancel without signing anything out", async () => {

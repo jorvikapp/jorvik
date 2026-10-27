@@ -848,6 +848,13 @@
     background: rgba(237, 66, 69, 0.16);
 }
 
+/* Confirming on the server's own page, e.g. with single sign-on. */
+.settings-reauth-page {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
 .settings-table-wrap {
     border: 1px solid var(--border);
     border-radius: 10px;

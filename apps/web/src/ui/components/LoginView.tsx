@@ -1,13 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AuthType, MatrixError, type MatrixClient } from "matrix-js-sdk/src/matrix";
 
+import {
+    type DesktopSsoBridge,
+    discoverLoginOptions,
+    type LoginOptions,
+    signInWithSsoOnDesktop,
+    SSOAction,
+    ssoButtonLabel,
+    type SsoProvider,
+    ssoProvidersFromFlows,
+    startSsoRedirect,
+} from "../../core/auth/sso";
 import { clearLoginServer, readLoginServer, saveLoginServer, type LoginServer } from "../../core/config/loginServer";
 import type { MatrixCredentials } from "../../core/types/credentials";
 import { normalizeHomeserverUrl } from "../adapters/loginAdapter";
 import {
     authStepIsRequired,
     authStepIsUsed,
-    buildRegistrationSsoUrl,
     discoverRegistrationFlow,
     formatRegistrationError,
     looksLikeEmail,
@@ -29,6 +39,48 @@ interface LoginViewProps {
     error: string | null;
     onLogin: (homeserverUrl: string, username: string, password: string) => Promise<void>;
     onLoginWithCredentials: (credentials: MatrixCredentials) => Promise<void>;
+    /** Desktop single sign-on: signs in with the login token the browser brought back. */
+    onLoginWithSsoToken?: (homeserverUrl: string, loginToken: string) => Promise<void>;
+}
+
+/** The desktop app's side of single sign-on; null in a browser, where the page itself goes to sign in. */
+function desktopSsoBridge(): DesktopSsoBridge | null {
+    const bridge = typeof window === "undefined" ? undefined : window.heorotDesktop;
+    if (bridge?.ssoBegin && bridge.ssoWait && bridge.ssoCancel && bridge.openExternal) {
+        return {
+            ssoBegin: bridge.ssoBegin,
+            ssoWait: bridge.ssoWait,
+            ssoCancel: bridge.ssoCancel,
+            openExternal: bridge.openExternal,
+        };
+    }
+    return null;
+}
+
+interface SsoButtonsProps {
+    providers: SsoProvider[];
+    /** The only way in: the buttons look like the main action. */
+    primary: boolean;
+    disabled: boolean;
+    onPick: (provider: SsoProvider) => void;
+}
+
+function SsoButtons({ providers, primary, disabled, onPick }: SsoButtonsProps): React.ReactElement {
+    return (
+        <div className="login-sso">
+            {providers.map((provider) => (
+                <button
+                    key={`${provider.loginType}:${provider.id ?? ""}`}
+                    type="button"
+                    className={primary ? "login-sso-button" : "login-sso-button login-secondary-button"}
+                    disabled={disabled}
+                    onClick={() => onPick(provider)}
+                >
+                    {ssoButtonLabel(provider)}
+                </button>
+            ))}
+        </div>
+    );
 }
 
 export function LoginView({
@@ -39,6 +91,7 @@ export function LoginView({
     error,
     onLogin,
     onLoginWithCredentials,
+    onLoginWithSsoToken,
 }: LoginViewProps): React.ReactElement {
     const [mode, setMode] = useState<AuthMode>("sign_in");
     // A server picked in Server settings replaces config.json's until it is changed back.
@@ -65,8 +118,43 @@ export function LoginView({
     const [registerRequiresEmail, setRegisterRequiresEmail] = useState(false);
     const [registerBusy, setRegisterBusy] = useState(false);
     const [registerError, setRegisterError] = useState<string | null>(null);
-    const [registerSsoUrl, setRegisterSsoUrl] = useState<string | null>(null);
+    const [registerSsoProviders, setRegisterSsoProviders] = useState<SsoProvider[]>([]);
     const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+
+    // How the server lets people in, for its single sign-on buttons. Until it answers (or if it can't
+    // say), the password form shows as before.
+    const [loginOptions, setLoginOptions] = useState<{ homeserver: string; options: LoginOptions } | null>(null);
+    const [ssoBusy, setSsoBusy] = useState(false);
+    const [ssoError, setSsoError] = useState<string | null>(null);
+    // Desktop: the provider's page is open in the browser; its address, to open it again.
+    const [ssoWaitingUrl, setSsoWaitingUrl] = useState<string | null>(null);
+    const ssoWaiting = ssoWaitingUrl !== null;
+
+    useEffect(() => {
+        let cancelled = false;
+        const target = homeserver.trim();
+        if (!target) {
+            return;
+        }
+        void (async () => {
+            try {
+                const options = await discoverLoginOptions(normalizeHomeserverUrl(target));
+                if (!cancelled) {
+                    setLoginOptions({ homeserver: target, options });
+                }
+            } catch {
+                // Unreachable or not a homeserver: signing in says so.
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [homeserver]);
+
+    const currentOptions = loginOptions && loginOptions.homeserver === homeserver.trim() ? loginOptions.options : null;
+    const ssoProviders = currentOptions?.sso ?? [];
+    // Only hidden once the server has said it takes no passwords.
+    const passwordAllowed = !currentOptions || currentOptions.password || ssoProviders.length === 0;
 
     const chooseServer = useCallback(
         (server: LoginServer | null): void => {
@@ -79,10 +167,72 @@ export function LoginView({
             setHomeserver(server?.baseUrl ?? defaultHomeserver);
             setServerSettingsOpen(false);
             setRegisterError(null);
+            setRegisterSsoProviders([]);
+            setSsoError(null);
             setStaleError(error);
+            // A sign-in still open in the browser was for the old server.
+            void desktopSsoBridge()?.ssoCancel();
         },
         [defaultHomeserver, error],
     );
+
+    const startSso = useCallback(
+        async (provider: SsoProvider, action: SSOAction): Promise<void> => {
+            setSsoError(null);
+            setRegisterError(null);
+            setStaleError(error);
+            setSsoBusy(true);
+            let homeserverUrl: string;
+            try {
+                homeserverUrl = normalizeHomeserverUrl(homeserver);
+            } catch (urlError) {
+                setSsoError(urlError instanceof Error ? urlError.message : String(urlError));
+                setSsoBusy(false);
+                return;
+            }
+
+            const bridge = desktopSsoBridge();
+            if (!bridge) {
+                try {
+                    // Leaves the page; Jorvik picks up where it left off when the browser comes back.
+                    startSsoRedirect(homeserverUrl, provider, action);
+                } catch (startError) {
+                    setSsoError(
+                        startError instanceof Error && startError.name === "SecurityError"
+                            ? "Your browser won't let Jorvik remember where you signed in from. Allow site data and try again."
+                            : `Couldn't start single sign-on: ${startError instanceof Error ? startError.message : String(startError)}`,
+                    );
+                    setSsoBusy(false);
+                }
+                return;
+            }
+
+            setSsoWaitingUrl("");
+            try {
+                const loginToken = await signInWithSsoOnDesktop(bridge, homeserverUrl, provider, action, setSsoWaitingUrl);
+                setSsoWaitingUrl(null);
+                if (loginToken && onLoginWithSsoToken) {
+                    await onLoginWithSsoToken(homeserverUrl, loginToken);
+                }
+            } catch (ssoFailure) {
+                setSsoError(ssoFailure instanceof Error ? ssoFailure.message : String(ssoFailure));
+            } finally {
+                setSsoWaitingUrl(null);
+                setSsoBusy(false);
+            }
+        },
+        [error, homeserver, onLoginWithSsoToken],
+    );
+
+    const cancelSso = useCallback((): void => {
+        void desktopSsoBridge()?.ssoCancel();
+    }, []);
+
+    const reopenSso = useCallback((): void => {
+        if (ssoWaitingUrl) {
+            void desktopSsoBridge()?.openExternal(ssoWaitingUrl);
+        }
+    }, [ssoWaitingUrl]);
 
     const switchMode = useCallback((nextMode: AuthMode): void => {
         setMode(nextMode);
@@ -180,7 +330,7 @@ export function LoginView({
 
         setRegisterBusy(true);
         setRegisterError(null);
-        setRegisterSsoUrl(null);
+        setRegisterSsoProviders([]);
 
         try {
             const normalizedHomeserver = normalizeHomeserverUrl(homeserver);
@@ -224,15 +374,8 @@ export function LoginView({
         } catch (registrationFailure) {
             if (registrationFailure instanceof RegistrationProbeError && registrationFailure.code === "registration_disabled_sso") {
                 const ssoFlow = registrationFailure.ssoFlow;
-                const registrationClient = registrationFailure.client;
-                if (ssoFlow && registrationClient) {
-                    const loginType = ssoFlow.type === "m.login.cas" ? "cas" : "sso";
-                    setRegisterSsoUrl(
-                        buildRegistrationSsoUrl({
-                            client: registrationClient,
-                            loginType,
-                        }),
-                    );
+                if (ssoFlow) {
+                    setRegisterSsoProviders(ssoProvidersFromFlows([ssoFlow]));
                 }
             }
 
@@ -244,7 +387,11 @@ export function LoginView({
 
     const providerError = error && error !== staleError ? error : null;
     const displayError =
-        mode === "register" ? registerError ?? providerError : mode === "sign_in" ? providerError : null;
+        mode === "register"
+            ? registerError ?? ssoError ?? providerError
+            : mode === "sign_in"
+              ? ssoError ?? providerError
+              : null;
     const flowContentRef = useRef<HTMLDivElement | null>(null);
     const [flowHeight, setFlowHeight] = useState<number | null>(null);
 
@@ -296,6 +443,24 @@ export function LoginView({
         };
     }, [syncFlowHeight, mode, registerStep]);
 
+    const ssoWaitingPanel = (
+        <div className="login-sso-waiting" role="status">
+            <p className="login-subtitle">Continue in your browser</p>
+            <p className="login-inline-note">
+                Jorvik opened your server's sign-in page in your browser. Once you've signed in there, Jorvik carries on
+                by itself.
+            </p>
+            <div className="login-actions-row">
+                <button type="button" className="login-secondary-button" disabled={!ssoWaitingUrl} onClick={reopenSso}>
+                    Open the page again
+                </button>
+                <button type="button" className="login-secondary-button" onClick={cancelSso}>
+                    Cancel
+                </button>
+            </div>
+        </div>
+    );
+
     return (
         <div className="login-view">
             <div className="login-card login-card-wide">
@@ -326,52 +491,76 @@ export function LoginView({
                 ) : null}
                 <div className="login-flow-shell" style={flowHeight === null ? undefined : { height: `${flowHeight}px` }}>
                     <div className="login-flow-content" ref={flowContentRef}>
-                        {mode === "sign_in" ? (
+                        {mode !== "reset" && ssoWaiting ? (
+                    ssoWaitingPanel
+                ) : mode === "sign_in" ? (
                     <form onSubmit={handleSignInSubmit}>
                         <p className="login-subtitle">Sign in to continue</p>
 
-                        <label>
-                            Username or email
-                            <input
-                                type="text"
-                                value={username}
-                                onChange={(event) => setUsername(event.target.value)}
-                                placeholder="alice"
-                                autoComplete="username"
+                        {ssoProviders.length > 0 ? (
+                            <SsoButtons
+                                providers={ssoProviders}
+                                primary={!passwordAllowed}
+                                disabled={ssoBusy || loading}
+                                onPick={(provider) => void startSso(provider, SSOAction.LOGIN)}
                             />
-                        </label>
+                        ) : null}
+                        {ssoProviders.length > 0 && passwordAllowed ? (
+                            <p className="login-divider">
+                                <span>or</span>
+                            </p>
+                        ) : null}
 
-                        <label>
-                            Password
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                value={password}
-                                onChange={(event) => setPassword(event.target.value)}
-                                placeholder="********"
-                                autoComplete="current-password"
-                            />
-                        </label>
+                        {passwordAllowed ? (
+                            <>
+                                <label>
+                                    Username or email
+                                    <input
+                                        type="text"
+                                        value={username}
+                                        onChange={(event) => setUsername(event.target.value)}
+                                        placeholder="alice"
+                                        autoComplete="username"
+                                    />
+                                </label>
 
-                        <label className="login-checkbox">
-                            <input
-                                type="checkbox"
-                                checked={showPassword}
-                                onChange={(event) => setShowPassword(event.target.checked)}
-                            />
-                            <span>Show password</span>
-                        </label>
+                                <label>
+                                    Password
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        value={password}
+                                        onChange={(event) => setPassword(event.target.value)}
+                                        placeholder="********"
+                                        autoComplete="current-password"
+                                    />
+                                </label>
+
+                                <label className="login-checkbox">
+                                    <input
+                                        type="checkbox"
+                                        checked={showPassword}
+                                        onChange={(event) => setShowPassword(event.target.checked)}
+                                    />
+                                    <span>Show password</span>
+                                </label>
+                            </>
+                        ) : null}
 
                         {displayError && <p className="login-error">{displayError}</p>}
 
-                        <button type="submit" disabled={!canSignIn}>
-                            {loading ? "Signing in..." : "Sign in"}
-                        </button>
+                        {passwordAllowed ? (
+                            <>
+                                <button type="submit" disabled={!canSignIn}>
+                                    {loading ? "Signing in..." : "Sign in"}
+                                </button>
 
-                        <div className="login-actions-row">
-                            <button type="button" className="login-link-button" onClick={() => switchMode("reset")}>
-                                Forgot password?
-                            </button>
-                        </div>
+                                <div className="login-actions-row">
+                                    <button type="button" className="login-link-button" onClick={() => switchMode("reset")}>
+                                        Forgot password?
+                                    </button>
+                                </div>
+                            </>
+                        ) : null}
                     </form>
                 ) : mode === "reset" ? (
                     <PasswordResetView
@@ -381,6 +570,18 @@ export function LoginView({
                         onHomeserverChange={setHomeserver}
                         onBack={() => switchMode("sign_in")}
                     />
+                ) : registerStep === "form" && !passwordAllowed ? (
+                    <div className="login-sso-register">
+                        <p className="login-subtitle">Join Jorvik</p>
+                        <p className="login-inline-note">This server makes your account the first time you sign in with it.</p>
+                        <SsoButtons
+                            providers={ssoProviders}
+                            primary
+                            disabled={ssoBusy}
+                            onPick={(provider) => void startSso(provider, SSOAction.REGISTER)}
+                        />
+                        {displayError && <p className="login-error">{displayError}</p>}
+                    </div>
                 ) : registerStep === "form" ? (
                     <form onSubmit={handleRegisterSubmit}>
                         <p className="login-subtitle">Join Jorvik. Create your account and start connecting</p>
@@ -440,10 +641,13 @@ export function LoginView({
 
                         {displayError && <p className="login-error">{displayError}</p>}
 
-                        {registerSsoUrl ? (
-                            <button type="button" className="login-secondary-button" onClick={() => (window.location.href = registerSsoUrl)}>
-                                Continue with SSO registration
-                            </button>
+                        {registerSsoProviders.length > 0 ? (
+                            <SsoButtons
+                                providers={registerSsoProviders}
+                                primary={false}
+                                disabled={ssoBusy}
+                                onPick={(provider) => void startSso(provider, SSOAction.REGISTER)}
+                            />
                         ) : null}
 
                         <button type="submit" disabled={!canStartRegistration}>

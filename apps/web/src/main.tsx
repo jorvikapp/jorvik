@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 
+import { captureSsoReturn } from "./core/auth/sso";
 import { App } from "./ui/App";
 import { registerMediaServiceWorker } from "./ui/serviceWorker/registerMediaServiceWorker";
 import { applyAppearanceTheme, loadUserLocalSettings } from "./ui/settings/user/settingsStore";
@@ -11,6 +12,9 @@ import { installPhoneLayout } from "./ui/layout/phoneLayout";
 const { appearance } = loadUserLocalSettings();
 applyAppearanceTheme(appearance);
 void window.heorotDesktop?.setAppearanceTheme?.(appearance.theme);
+
+// The way back from single sign-on carries a one-time login token: out of the address bar at once.
+captureSsoReturn();
 
 // Before the first paint too, so a phone never shows the desktop layout first.
 installPhoneLayout();

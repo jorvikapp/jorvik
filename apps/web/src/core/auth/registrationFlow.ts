@@ -1,4 +1,4 @@
-import { createClient, MatrixError, SSOAction, type MatrixClient, type SSOFlow } from "matrix-js-sdk/src/matrix";
+import { createClient, MatrixError, type MatrixClient, type SSOFlow } from "matrix-js-sdk/src/matrix";
 
 export interface RegistrationFlow {
     stages: string[];
@@ -164,20 +164,6 @@ export async function discoverRegistrationFlow(options: DiscoverRegistrationFlow
             },
         );
     }
-}
-
-export function buildRegistrationSsoUrl(options: {
-    client: MatrixClient;
-    loginType: "sso" | "cas";
-    idpId?: string;
-}): string {
-    const callbackUrl = new URL(window.location.href);
-    return options.client.getSsoLoginUrl(
-        callbackUrl.toString(),
-        options.loginType,
-        options.idpId,
-        SSOAction.REGISTER,
-    );
 }
 
 export function formatRegistrationError(error: unknown): string {

@@ -26,4 +26,4 @@ export {
     StaleCrossSigningKeysError,
     waitForCrossSigningKeys,
 } from "../../core/crypto/crossSigning";
-export type { CrossSigningSituation } from "../../core/crypto/crossSigning";
+export type { CrossSigningSituation, ResetIdentityAuth } from "../../core/crypto/crossSigning";

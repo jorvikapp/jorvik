@@ -1,6 +1,7 @@
 import { decodeRecoveryKey } from "matrix-js-sdk/src/crypto-api/recovery-key";
-import { Method, type MatrixClient, type UIAuthCallback } from "matrix-js-sdk/src/matrix";
+import { type AuthDict, Method, type MatrixClient, type UIAuthCallback } from "matrix-js-sdk/src/matrix";
 
+import { afterPageAuth, passwordAuth, readReauthChallenge, type ReauthPageWay } from "../auth/reauth";
 import { withSecretStorageKeyProvider } from "../client/cryptoCallbacks";
 
 /**
@@ -20,7 +21,7 @@ import { withSecretStorageKeyProvider } from "../client/cryptoCallbacks";
  *   which also means this can never replace existing keys without one).
  * - in_secret_storage: the recovery key imports them.
  * - on_other_device: only another session has them (or nobody): verify from
- *   it, or reset with the account password.
+ *   it, or reset (the server asks for the account password or single sign-on).
  */
 export type CrossSigningSituation = "ready" | "unsaved" | "missing" | "in_secret_storage" | "on_other_device";
 
@@ -89,16 +90,40 @@ const uploadWithoutPassword: UIAuthCallback<void> = async (makeRequest) => {
     await makeRequest(null);
 };
 
-function uploadWithPassword(userId: string, password: string): UIAuthCallback<void> {
+/** How someone shows it's them when replacing their keys. */
+export interface ResetIdentityAuth {
+    /** The account password, for an account that has one. */
+    password?: string;
+    /**
+     * For a server that confirms on its own page instead (single sign-on, or approving on the account
+     * page): resolves once the person has done it there, rejects if they stop.
+     */
+    confirmOnPage?: (way: ReauthPageWay) => Promise<void>;
+}
+
+function uploadWithReauth(client: MatrixClient, auth: ResetIdentityAuth): UIAuthCallback<void> {
     return async (makeRequest) => {
         try {
             await makeRequest(null);
+            return;
         } catch (error) {
-            const session = (error as { data?: { session?: unknown } }).data?.session;
-            if ((error as { httpStatus?: number }).httpStatus !== 401 || typeof session !== "string") {
+            if ((error as { httpStatus?: number }).httpStatus !== 401) {
                 throw error;
             }
-            await makeRequest({ type: "m.login.password", identifier: { type: "m.id.user", user: userId }, password, session });
+            const challenge = readReauthChallenge(client, error);
+            const listedSession = (error as { data?: { session?: unknown } }).data?.session;
+            const session = challenge?.session ?? (typeof listedSession === "string" ? listedSession : null);
+            const pageWay = challenge?.ways.find((way): way is ReauthPageWay => way.kind !== "password");
+            if (auth.password && (!pageWay || challenge?.ways.some((way) => way.kind === "password"))) {
+                await makeRequest(passwordAuth(client.getSafeUserId(), auth.password, session) as AuthDict);
+                return;
+            }
+            if (pageWay && auth.confirmOnPage) {
+                await auth.confirmOnPage(pageWay);
+                await makeRequest(afterPageAuth(pageWay, session) as AuthDict | null);
+                return;
+            }
+            throw new Error("Your server asks for your account password to replace the keys.");
         }
     };
 }
@@ -219,21 +244,31 @@ async function checkPassword(client: MatrixClient, password: string): Promise<vo
 
 /**
  * Replaces the account's cross-signing identity: only for when the old keys
- * are gone. Needs the password (replacing keys requires it) and the recovery
- * key, so the new keys land in secret storage where other clients find them.
+ * are gone. Needs the person to show it's them (replacing keys requires it:
+ * the password, or single sign-on when the server asks for that) and the
+ * recovery key, so the new keys land in secret storage where other clients
+ * find them. A password is checked first; single sign-on happens on the
+ * server's page midway, after the new keys are saved, so stopping there
+ * leaves them unused until the reset is done again.
  */
-export async function resetCrossSigningIdentity(client: MatrixClient, password: string, recoveryKey: string): Promise<void> {
+export async function resetCrossSigningIdentity(
+    client: MatrixClient,
+    auth: ResetIdentityAuth,
+    recoveryKey: string,
+): Promise<void> {
     const crypto = client.getCrypto();
     if (!crypto) {
         throw new Error("Encryption is not available for this session.");
     }
     const key = await unlockSecretStorage(client, recoveryKey);
     try {
-        await checkPassword(client, password);
+        if (auth.password) {
+            await checkPassword(client, auth.password);
+        }
         await withKey(key, () =>
             crypto.bootstrapCrossSigning({
                 setupNewCrossSigning: true,
-                authUploadDeviceSigningKeys: uploadWithPassword(client.getSafeUserId(), password),
+                authUploadDeviceSigningKeys: uploadWithReauth(client, auth),
             }),
         );
     } finally {

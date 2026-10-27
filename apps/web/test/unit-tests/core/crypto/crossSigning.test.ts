@@ -33,6 +33,9 @@ interface FakeState {
     /** This session holds the backup's key, so a new security key can take the backup along. */
     holdsBackupKey: boolean;
     password: string;
+    /** The account confirms with single sign-on on the server's page, not a password. */
+    sso: boolean;
+    ssoDone: boolean;
 }
 
 /** Asks the app's crypto callbacks for the secret storage key, as the SDK does mid-bootstrap. */
@@ -50,6 +53,8 @@ function makeClient(initial: Partial<FakeState> = {}) {
         backupVersion: "1",
         holdsBackupKey: true,
         password: "right password",
+        sso: false,
+        ssoDone: false,
         ...initial,
     };
     const calls: string[] = [];
@@ -59,6 +64,12 @@ function makeClient(initial: Partial<FakeState> = {}) {
     // Synapse: replacing existing keys needs the password; a first upload does not (MSC3967).
     const uploadSigningKeys = async (auth: Record<string, unknown> | null): Promise<void> => {
         uiaAttempts.push(auth);
+        if (state.sso) {
+            if (state.onServer && !(auth?.session === "uia-1" && state.ssoDone)) {
+                throw Object.assign(new Error("UIA"), { httpStatus: 401, data: { session: "uia-1", flows: [{ stages: ["m.login.sso"] }] } });
+            }
+            return;
+        }
         if (state.onServer && !auth) {
             throw Object.assign(new Error("UIA"), { httpStatus: 401, data: { session: "uia-1" } });
         }
@@ -119,6 +130,7 @@ function makeClient(initial: Partial<FakeState> = {}) {
         getUserId: () => ME,
         getSafeUserId: () => ME,
         getCrypto: () => crypto,
+        getFallbackAuthUrl: (stage: string, session: string) => `https://hs.example/_matrix/client/v3/auth/${stage}/fallback/web?session=${session}`,
         http: { authedRequest },
         secretStorage: {
             hasKey: vi.fn(async () => state.hasSecretStorage),
@@ -214,19 +226,19 @@ describe("completeCrossSigningWithRecoveryKey", () => {
 describe("resetCrossSigningIdentity", () => {
     it("checks the password before anything is written", async () => {
         const { client, crypto } = makeClient({ onServer: true });
-        await expect(resetCrossSigningIdentity(client, "wrong password", RECOVERY_KEY)).rejects.toThrow("That password is not right.");
+        await expect(resetCrossSigningIdentity(client, { password: "wrong password" }, RECOVERY_KEY)).rejects.toThrow("That password is not right.");
         expect(crypto.bootstrapCrossSigning).not.toHaveBeenCalled();
     });
 
     it("checks the recovery key before the password", async () => {
         const { client, authedRequest } = makeClient({ onServer: true });
-        await expect(resetCrossSigningIdentity(client, "right password", WRONG_RECOVERY_KEY)).rejects.toThrow(/doesn't unlock/);
+        await expect(resetCrossSigningIdentity(client, { password: "right password" }, WRONG_RECOVERY_KEY)).rejects.toThrow(/doesn't unlock/);
         expect(authedRequest).not.toHaveBeenCalled();
     });
 
     it("replaces the keys with the password and saves them under the existing key", async () => {
         const { client, calls, keysSeen, uiaAttempts, authedRequest } = makeClient({ onServer: true });
-        await resetCrossSigningIdentity(client, "right password", RECOVERY_KEY);
+        await resetCrossSigningIdentity(client, { password: "right password" }, RECOVERY_KEY);
         expect(calls).toEqual(["POST /delete_devices", "POST /delete_devices", "bootstrapCrossSigning(new)"]);
         expect(authedRequest.mock.calls[0][3]).toEqual({ devices: [] });
         expect(uiaAttempts).toEqual([
@@ -239,8 +251,45 @@ describe("resetCrossSigningIdentity", () => {
     it("passes on errors that are not about the password", async () => {
         const { client, authedRequest, crypto } = makeClient({ onServer: true });
         authedRequest.mockRejectedValueOnce(Object.assign(new Error("slow down"), { httpStatus: 429 }));
-        await expect(resetCrossSigningIdentity(client, "right password", RECOVERY_KEY)).rejects.toThrow("slow down");
+        await expect(resetCrossSigningIdentity(client, { password: "right password" }, RECOVERY_KEY)).rejects.toThrow("slow down");
         expect(crypto.bootstrapCrossSigning).not.toHaveBeenCalled();
+    });
+
+    it("replaces the keys after single sign-on on the server's page, with no password to check", async () => {
+        const { client, calls, state, uiaAttempts, authedRequest } = makeClient({ onServer: true, sso: true });
+        const pages: unknown[] = [];
+        await resetCrossSigningIdentity(
+            client,
+            {
+                confirmOnPage: async (way) => {
+                    pages.push(way);
+                    state.ssoDone = true;
+                },
+            },
+            RECOVERY_KEY,
+        );
+        expect(authedRequest).not.toHaveBeenCalled();
+        expect(pages).toEqual([
+            { kind: "sso", url: "https://hs.example/_matrix/client/v3/auth/m.login.sso/fallback/web?session=uia-1" },
+        ]);
+        expect(uiaAttempts).toEqual([null, { session: "uia-1" }]);
+        expect(calls).toEqual(["bootstrapCrossSigning(new)"]);
+    });
+
+    it("stops when the person stops on the server's page", async () => {
+        const { client, uiaAttempts } = makeClient({ onServer: true, sso: true });
+        await expect(
+            resetCrossSigningIdentity(
+                client,
+                {
+                    confirmOnPage: async () => {
+                        throw new Error("The reset didn't finish.");
+                    },
+                },
+                RECOVERY_KEY,
+            ),
+        ).rejects.toThrow("The reset didn't finish.");
+        expect(uiaAttempts).toEqual([null]);
     });
 });
 

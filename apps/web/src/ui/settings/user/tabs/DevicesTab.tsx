@@ -5,6 +5,16 @@ import {
     type MatrixClient,
 } from "matrix-js-sdk/src/matrix";
 
+import {
+    afterPageAuth,
+    passwordAuth,
+    readReauthChallenge,
+    type ReauthChallenge,
+    type ReauthPageWay,
+    type ReauthWay,
+} from "../../../../core/auth/reauth";
+import { useReauthPage } from "../../../components/auth/useReauthPage";
+
 interface DevicesTabProps {
     client: MatrixClient;
     verificationNonce: number;
@@ -19,10 +29,14 @@ interface DeviceRow extends IMyDevice {
 interface SignOutState {
     device: DeviceRow;
     pending: boolean;
-    needsPassword: boolean;
-    session: string | null;
+    /** Once the server has asked to show it's you: the ways it takes. */
+    challenge: ReauthChallenge | null;
     password: string;
     error: string | null;
+}
+
+function isPageWay(way: ReauthWay): way is ReauthPageWay {
+    return way.kind !== "password";
 }
 
 interface RenameState {
@@ -35,18 +49,10 @@ interface RenameState {
 /** Synapse refuses longer session names. */
 const MAX_DEVICE_NAME_LENGTH = 100;
 
-interface InteractiveAuthErrorData {
-    session?: unknown;
-    flows?: Array<{
-        stages?: unknown;
-    }>;
-    error?: unknown;
-}
-
 interface MatrixErrorLike {
     message?: unknown;
     errcode?: unknown;
-    data?: InteractiveAuthErrorData;
+    data?: { error?: unknown };
 }
 
 function formatLastSeen(timestamp?: number): string {
@@ -70,54 +76,16 @@ function trustedStateLabel(state: DeviceRow["trustedState"]): string {
     }
 }
 
-function parseInteractiveAuthError(error: unknown): {
-    message: string;
-    session: string | null;
-    supportsPassword: boolean;
-} {
+function errorMessage(error: unknown): string {
     const fallbackMessage = error instanceof Error ? error.message : String(error);
-
     if (!error || typeof error !== "object") {
-        return {
-            message: fallbackMessage,
-            session: null,
-            supportsPassword: false,
-        };
+        return fallbackMessage;
     }
 
     const matrixError = error as MatrixErrorLike;
-    const session = typeof matrixError.data?.session === "string" ? matrixError.data.session : null;
-    const flows = Array.isArray(matrixError.data?.flows) ? matrixError.data.flows : [];
-    const supportsPassword = flows.some((flow) => {
-        if (!Array.isArray(flow.stages)) {
-            return false;
-        }
-
-        return flow.stages.some((stage) => stage === "m.login.password");
-    });
-
     const messageFromData = typeof matrixError.data?.error === "string" ? matrixError.data.error : null;
     const messageFromMatrix = typeof matrixError.message === "string" ? matrixError.message : null;
-    const message = messageFromData ?? messageFromMatrix ?? fallbackMessage;
-
-    return {
-        message,
-        session,
-        supportsPassword,
-    };
-}
-
-function buildPasswordAuth(userId: string, password: string, session: string): Record<string, unknown> {
-    return {
-        type: "m.login.password",
-        identifier: {
-            type: "m.id.user",
-            user: userId,
-        },
-        user: userId,
-        password,
-        session,
-    };
+    return messageFromData ?? messageFromMatrix ?? fallbackMessage;
 }
 
 export function DevicesTab({
@@ -228,12 +196,17 @@ export function DevicesTab({
         setSignOutState({
             device,
             pending: false,
-            needsPassword: false,
-            session: null,
+            challenge: null,
             password: "",
             error: null,
         });
     }, []);
+
+    const challenge = signOutState?.challenge ?? null;
+    const canUsePassword = challenge?.ways.some((way) => way.kind === "password") ?? false;
+    const pageWay = challenge?.ways.find(isPageWay) ?? null;
+    // When the server's page says it's done, sign out without another click.
+    const reauthPage = useReauthPage(pageWay, () => void submitSignOut());
 
     const submitSignOut = useCallback(async (): Promise<void> => {
         if (!signOutState) {
@@ -248,27 +221,28 @@ export function DevicesTab({
                 throw new Error("Missing user id for interactive authentication.");
             }
 
-            if (currentState.needsPassword) {
-                if (currentState.password.trim().length === 0) {
-                    throw new Error("Account password is required.");
-                }
-
-                if (!currentState.session) {
-                    throw new Error("Interactive authentication session is missing.");
-                }
-
-                const auth = buildPasswordAuth(currentUserId, currentState.password, currentState.session);
-                await client.deleteDevice(currentState.device.device_id, auth as any);
-            } else {
+            const asked = currentState.challenge;
+            if (!asked) {
                 await client.deleteDevice(currentState.device.device_id);
+            } else {
+                const askedPageWay = asked.ways.find(isPageWay) ?? null;
+                let auth: Record<string, unknown> | null;
+                if (asked.ways.some((way) => way.kind === "password") && currentState.password.trim().length > 0) {
+                    auth = passwordAuth(currentUserId, currentState.password, asked.session);
+                } else if (askedPageWay && reauthPage.opened) {
+                    auth = afterPageAuth(askedPageWay, asked.session);
+                } else {
+                    throw new Error(askedPageWay ? "Confirm it's you on your server's page first." : "Account password is required.");
+                }
+                await client.deleteDevice(currentState.device.device_id, (auth ?? undefined) as any);
             }
 
             setSignOutState(null);
             await loadDevices();
         } catch (removeError) {
-            const parsed = parseInteractiveAuthError(removeError);
+            const asked = readReauthChallenge(client, removeError);
 
-            if (!currentState.needsPassword && parsed.session) {
+            if (!currentState.challenge && asked) {
                 setSignOutState((previous) => {
                     if (!previous || previous.device.device_id !== currentState.device.device_id) {
                         return previous;
@@ -277,14 +251,18 @@ export function DevicesTab({
                     return {
                         ...previous,
                         pending: false,
-                        needsPassword: true,
-                        session: parsed.session,
-                        error: parsed.supportsPassword ? null : "Homeserver requires a UIA stage not supported by this UI.",
+                        challenge: asked,
+                        error: asked.ways.length > 0 ? null : "Your server asks for a check Jorvik can't do here.",
                     };
                 });
                 return;
             }
 
+            // Asked again after the page: the server hasn't seen it finished.
+            const message =
+                asked && !currentState.password && !(removeError as MatrixErrorLike).data?.error
+                    ? "Your server hasn't seen the confirmation yet. Finish it on its page, then try again."
+                    : errorMessage(removeError);
             setSignOutState((previous) => {
                 if (!previous || previous.device.device_id !== currentState.device.device_id) {
                     return previous;
@@ -293,21 +271,21 @@ export function DevicesTab({
                 return {
                     ...previous,
                     pending: false,
-                    error: parsed.message,
+                    error: message,
                 };
             });
         }
-    }, [client, currentUserId, loadDevices, signOutState]);
+    }, [client, currentUserId, loadDevices, reauthPage.opened, signOutState]);
 
     // The box opens under the session that was clicked, which can be far down a long list,
-    // so bring it into view, and again once it grows a password field.
+    // so bring it into view, and again once it asks to show it's you.
     const signOutDeviceId = signOutState?.device.device_id ?? null;
-    const signOutNeedsPassword = signOutState?.needsPassword ?? false;
+    const signOutAsked = challenge !== null;
     useEffect(() => {
         if (signOutDeviceId) {
             signOutBoxRef.current?.scrollIntoView({ block: "nearest" });
         }
-    }, [signOutDeviceId, signOutNeedsPassword]);
+    }, [signOutDeviceId, signOutAsked]);
 
     const renderRenameBox = (state: RenameState): React.ReactElement => (
         <form
@@ -360,7 +338,10 @@ export function DevicesTab({
             <p className="settings-inline-note">
                 {state.device.display_name || "Unnamed device"} ({state.device.device_id})
             </p>
-            {state.needsPassword ? (
+            {!state.challenge ? (
+                <p className="settings-inline-note">This removes the selected session from your account on the homeserver.</p>
+            ) : null}
+            {canUsePassword ? (
                 <label className="settings-field">
                     Account password
                     <input
@@ -380,12 +361,29 @@ export function DevicesTab({
                         autoFocus
                     />
                 </label>
-            ) : (
-                <p className="settings-inline-note">This removes the selected session from your account on the homeserver.</p>
-            )}
+            ) : null}
+            {pageWay ? (
+                <div className="settings-reauth-page">
+                    <p className="settings-inline-note">
+                        {pageWay.kind === "sso"
+                            ? `${canUsePassword ? "Or confirm" : "Confirm"} it's you with single sign-on, on your server's page.`
+                            : "Your server wants this approved on its account page first."}
+                        {reauthPage.opened ? " Once that's done, confirm here." : ""}
+                    </p>
+                    <div className="settings-actions-row">
+                        <button type="button" className="settings-button settings-button-secondary" onClick={reauthPage.open}>
+                            {pageWay.kind === "sso" ? "Continue with single sign-on" : "Open the account page"}
+                        </button>
+                    </div>
+                </div>
+            ) : null}
             {state.error ? <p className="settings-inline-error">{state.error}</p> : null}
             <div className="settings-actions-row">
-                <button type="submit" className="settings-button settings-button-danger" disabled={state.pending}>
+                <button
+                    type="submit"
+                    className="settings-button settings-button-danger"
+                    disabled={state.pending || (state.challenge !== null && !canUsePassword && !reauthPage.opened)}
+                >
                     {state.pending ? "Processing..." : "Confirm sign out"}
                 </button>
                 <button

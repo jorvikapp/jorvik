@@ -24,6 +24,7 @@ import {
     type RecoveryCredentialType,
     requestCrossSigningKeysFromOtherSessions,
     resetCrossSigningIdentity,
+    type ResetIdentityAuth,
     type SecurityRecoveryFlow,
     SetupUnfinishedError,
     StaleCrossSigningKeysError,
@@ -37,6 +38,7 @@ import { consumeHandedOver, getSessionLock, markHandedOver } from "../../core/li
 import { disablePush, getWebPushConfig, isPushEnabledHere } from "../../core/push/webPush";
 import { syncMediaServiceWorkerAuthState } from "../serviceWorker/registerMediaServiceWorker";
 import { deviceDisplayName } from "../../core/devices/deviceName";
+import { consumeSsoReturn } from "../../core/auth/sso";
 
 export type MatrixSessionStatus =
     | "booting"
@@ -140,6 +142,8 @@ interface MatrixContextValue extends MatrixState {
     openHere: () => Promise<void>;
     login: (homeserverUrl: string, username: string, password: string) => Promise<void>;
     loginWithCredentials: (credentials: MatrixCredentials) => Promise<void>;
+    /** Signs in with the one-time login token single sign-on sent back; shows any error on the sign-in screen. */
+    loginWithSsoToken: (homeserverUrl: string, loginToken: string) => Promise<void>;
     logout: () => Promise<void>;
     startDeviceVerification: () => Promise<void>;
     refreshDeviceVerification: () => Promise<void>;
@@ -150,7 +154,7 @@ interface MatrixContextValue extends MatrixState {
     completeSecurityRecovery: (credential: string) => Promise<void>;
     completeCrossSigning: (credential: string) => Promise<void>;
     /** Throws with a message to show next to the form, which stays filled in. */
-    resetIdentity: (password: string, securityKey: string) => Promise<void>;
+    resetIdentity: (auth: ResetIdentityAuth, securityKey: string) => Promise<void>;
     /** After another session verified this one while in use: collect the signing keys it sends. */
     collectKeysAfterVerification: () => Promise<void>;
     skipSecurityRecovery: () => void;
@@ -499,9 +503,93 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
         };
     }, [clearPendingSetupKey]);
 
-    // Starts the session saved in this browser, if there is one.
+    // Starts a session from credentials that aren't stored yet: from a password, a registration or single sign-on.
+    const startNewSession = useCallback(
+        async (core: CoreContext, config: CoreConfig | null, credentials: MatrixCredentials): Promise<void> => {
+            dispatch({ type: "set_status", status: "starting", error: null });
+            verificationSkippedRef.current = false;
+
+            try {
+                let client: MatrixClient;
+                try {
+                    client = await core.session.setLoggedIn(credentials, {
+                        clearStorage: false,
+                        startSyncing: true,
+                        persistSession: true,
+                    });
+                } catch (setLoggedInError) {
+                    if (!shouldRetryWithCleanStorage(setLoggedInError)) {
+                        throw setLoggedInError;
+                    }
+
+                    client = await core.session.setLoggedIn(credentials, {
+                        clearStorage: true,
+                        startSyncing: true,
+                        persistSession: true,
+                    });
+                }
+
+                await waitForClientReady(client);
+                if (!credentials.guest) {
+                    setMustVerifyFlag();
+                }
+
+                dispatch({ type: "set_client", client });
+                const postLoginState = await resolvePostLoginState(client, config, securityOptions());
+                applyPostLoginState(postLoginState);
+            } catch (error) {
+                dispatch({ type: "set_client", client: null });
+                dispatch({ type: "set_local_device_verified", verified: false });
+                dispatch({
+                    type: "set_status",
+                    status: "login_required",
+                    error: formatLoginError(error),
+                });
+                throw error;
+            }
+        },
+        [applyPostLoginState, securityOptions],
+    );
+
+    // Trades the one-time login token from single sign-on for a session. Shows what went wrong on the
+    // sign-in screen instead of throwing.
+    const signInWithLoginToken = useCallback(
+        async (core: CoreContext, config: CoreConfig | null, homeserverUrl: string, loginToken: string): Promise<void> => {
+            dispatch({ type: "set_status", status: "starting", error: null });
+            let credentials: MatrixCredentials;
+            try {
+                credentials = await core.session.loginWithToken(
+                    homeserverUrl,
+                    loginToken,
+                    getDefaultIdentityServer(config),
+                    deviceDisplayName(),
+                );
+            } catch (error) {
+                dispatch({ type: "set_client", client: null });
+                dispatch({ type: "set_local_device_verified", verified: false });
+                dispatch({
+                    type: "set_status",
+                    status: "login_required",
+                    error: `Single sign-on didn't finish: ${formatLoginError(error)}`,
+                });
+                return;
+            }
+
+            try {
+                await startNewSession(core, config, credentials);
+            } catch {
+                // startNewSession showed the error.
+            }
+        },
+        [startNewSession],
+    );
+
+    // Starts the session saved in this browser, if there is one; otherwise finishes single sign-on, when
+    // this page load is the way back from it.
     const restoreStoredSession = useCallback(
         async (core: CoreContext, config: CoreConfig, isCancelled: () => boolean): Promise<void> => {
+            // Taken either way: with a session already running here, a token from a sign-in page is dropped.
+            const ssoReturn = consumeSsoReturn();
             let restoredSession = false;
             let restoreError: string | null = null;
 
@@ -521,7 +609,15 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
             if (!restoredSession) {
                 dispatch({ type: "set_client", client: null });
                 dispatch({ type: "set_local_device_verified", verified: false });
-                dispatch({ type: "set_status", status: "login_required", error: restoreError });
+                if (ssoReturn && "loginToken" in ssoReturn) {
+                    await signInWithLoginToken(core, config, ssoReturn.homeserverUrl, ssoReturn.loginToken);
+                    return;
+                }
+                dispatch({
+                    type: "set_status",
+                    status: "login_required",
+                    error: restoreError ?? (ssoReturn && "error" in ssoReturn ? ssoReturn.error : null),
+                });
                 return;
             }
 
@@ -559,7 +655,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
 
             applyPostLoginState(postLoginState);
         },
-        [applyPostLoginState, securityOptions],
+        [applyPostLoginState, securityOptions, signInWithLoginToken],
     );
 
     useEffect(() => {
@@ -740,49 +836,20 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
                 throw new Error("Core context is not initialized yet");
             }
 
-            dispatch({ type: "set_status", status: "starting", error: null });
-            verificationSkippedRef.current = false;
-
-            try {
-                let client: MatrixClient;
-                try {
-                    client = await state.core.session.setLoggedIn(credentials, {
-                        clearStorage: false,
-                        startSyncing: true,
-                        persistSession: true,
-                    });
-                } catch (setLoggedInError) {
-                    if (!shouldRetryWithCleanStorage(setLoggedInError)) {
-                        throw setLoggedInError;
-                    }
-
-                    client = await state.core.session.setLoggedIn(credentials, {
-                        clearStorage: true,
-                        startSyncing: true,
-                        persistSession: true,
-                    });
-                }
-
-                await waitForClientReady(client);
-                if (!credentials.guest) {
-                    setMustVerifyFlag();
-                }
-
-                dispatch({ type: "set_client", client });
-                const postLoginState = await resolvePostLoginState(client, state.config, securityOptions());
-                applyPostLoginState(postLoginState);
-            } catch (error) {
-                dispatch({ type: "set_client", client: null });
-                dispatch({ type: "set_local_device_verified", verified: false });
-                dispatch({
-                    type: "set_status",
-                    status: "login_required",
-                    error: formatLoginError(error),
-                });
-                throw error;
-            }
+            await startNewSession(state.core, state.config, credentials);
         },
-        [applyPostLoginState, securityOptions, state.config, state.core],
+        [startNewSession, state.config, state.core],
+    );
+
+    const loginWithSsoToken = useCallback(
+        async (homeserverUrl: string, loginToken: string): Promise<void> => {
+            if (!state.core) {
+                throw new Error("Core context is not initialized yet");
+            }
+
+            await signInWithLoginToken(state.core, state.config, homeserverUrl, loginToken);
+        },
+        [signInWithLoginToken, state.config, state.core],
     );
 
     const login = useCallback(
@@ -1122,13 +1189,13 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
     );
 
     const resetIdentity = useCallback(
-        async (password: string, securityKey: string): Promise<void> => {
+        async (auth: ResetIdentityAuth, securityKey: string): Promise<void> => {
             if (!state.client) {
                 dispatch({ type: "set_status", status: "login_required", error: "Session expired. Please sign in again." });
                 return;
             }
 
-            await resetCrossSigningIdentity(state.client, password, securityKey);
+            await resetCrossSigningIdentity(state.client, auth, securityKey);
             await applySessionSecurity(state.client);
         },
         [applySessionSecurity, state.client],
@@ -1194,6 +1261,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
             openHere,
             login,
             loginWithCredentials,
+            loginWithSsoToken,
             logout,
             startDeviceVerification,
             refreshDeviceVerification,
@@ -1212,6 +1280,7 @@ export function MatrixProvider({ children }: React.PropsWithChildren): React.Rea
             openHere,
             login,
             loginWithCredentials,
+            loginWithSsoToken,
             logout,
             startDeviceVerification,
             refreshDeviceVerification,

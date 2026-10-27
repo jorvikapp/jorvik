@@ -2,7 +2,6 @@ export {
     RegistrationProbeError,
     authStepIsRequired,
     authStepIsUsed,
-    buildRegistrationSsoUrl,
     discoverRegistrationFlow,
     formatRegistrationError,
     looksLikeEmail,

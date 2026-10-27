@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
-import { isRecoveryKeyValid } from "../adapters/securityRecoveryAdapter";
+import { probeReauthWays, type ReauthPageWay, type ReauthWay } from "../../core/auth/reauth";
+import { isRecoveryKeyValid, type ResetIdentityAuth } from "../adapters/securityRecoveryAdapter";
+import { useReauthPage } from "./auth/useReauthPage";
 import { useIncomingSelfVerification } from "./verification/IncomingVerificationDialog";
 import { type IncomingVerificationRequest, VerificationDialog } from "./verification/VerificationDialog";
 
@@ -12,13 +14,20 @@ interface DeviceVerificationViewProps {
     canSkip: boolean;
     onRefreshStatus: () => Promise<void>;
     onSkip: () => Promise<void>;
-    onResetIdentity: (password: string, securityKey: string) => Promise<void>;
+    onResetIdentity: (auth: ResetIdentityAuth, securityKey: string) => Promise<void>;
     onLogout: () => Promise<void>;
     /** Which account this is, e.g. "@admin". */
     accountLabel?: string | null;
 }
 
 type ActionState = "refresh" | "skip" | "logout" | "reset" | null;
+
+/** Midway through a reset: the server's page to confirm on, and what to do after. */
+interface PageStep {
+    way: ReauthPageWay;
+    done: () => void;
+    stop: () => void;
+}
 
 export function DeviceVerificationView({
     client,
@@ -38,6 +47,49 @@ export function DeviceVerificationView({
     const [password, setPassword] = useState("");
     const [securityKey, setSecurityKey] = useState("");
     const [resetError, setResetError] = useState<string | null>(null);
+    // How the server wants the reset confirmed: undefined while asking, null when it can't say.
+    const [reauthWays, setReauthWays] = useState<ReauthWay[] | null | undefined>(undefined);
+    const [pageStep, setPageStep] = useState<PageStep | null>(null);
+    const reauthPage = useReauthPage(pageStep?.way ?? null, () => pageStep?.done());
+
+    useEffect(() => {
+        if (!resetOpen) {
+            return;
+        }
+        let cancelled = false;
+        setReauthWays(undefined);
+        void probeReauthWays(client).then((ways) => {
+            if (!cancelled) {
+                setReauthWays(ways);
+            }
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [client, resetOpen]);
+
+    const knowsPassword = reauthWays?.some((way) => way.kind === "password") ?? false;
+    // When the server can't say, ask for it without insisting.
+    const askPassword = reauthWays === null || knowsPassword;
+    const confirmsOnPage = !askPassword && (reauthWays?.some((way) => way.kind !== "password") ?? false);
+
+    const confirmOnPage = useCallback(
+        (way: ReauthPageWay) =>
+            new Promise<void>((resolve, reject) => {
+                setPageStep({
+                    way,
+                    done: () => {
+                        setPageStep(null);
+                        resolve();
+                    },
+                    stop: () => {
+                        setPageStep(null);
+                        reject(new Error("The reset didn't finish. Start it again to finish it."));
+                    },
+                });
+            }),
+        [],
+    );
 
     // Verification can also be started from the other session.
     useIncomingSelfVerification(client, (request) => {
@@ -57,7 +109,8 @@ export function DeviceVerificationView({
     };
 
     const securityKeyValid = securityKey.trim().length > 0 && isRecoveryKeyValid(securityKey.trim());
-    const canReset = password.length > 0 && securityKeyValid && pendingAction === null;
+    const canReset =
+        securityKeyValid && pendingAction === null && reauthWays !== undefined && (!knowsPassword || password.length > 0);
 
     const handleReset = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
         event.preventDefault();
@@ -68,7 +121,7 @@ export function DeviceVerificationView({
         setResetError(null);
         await runAction("reset", async () => {
             try {
-                await onResetIdentity(password, securityKey);
+                await onResetIdentity({ password: askPassword && password.length > 0 ? password : undefined, confirmOnPage }, securityKey);
             } catch (resetFailure) {
                 setResetError(resetFailure instanceof Error ? resetFailure.message : String(resetFailure));
             }
@@ -149,15 +202,22 @@ export function DeviceVerificationView({
                             signed out of all of them. Your messages and security key stay the same, but people who
                             verified you will need to verify you again.
                         </p>
-                        <label>
-                            Account password
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(event) => setPassword(event.target.value)}
-                                autoComplete="current-password"
-                            />
-                        </label>
+                        {askPassword ? (
+                            <label>
+                                Account password
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(event) => setPassword(event.target.value)}
+                                    autoComplete="current-password"
+                                />
+                            </label>
+                        ) : null}
+                        {confirmsOnPage ? (
+                            <p className="login-inline-note">
+                                Your server will ask you to confirm it's you on its own page while the reset runs.
+                            </p>
+                        ) : null}
                         <label>
                             Security key
                             <input
@@ -170,6 +230,27 @@ export function DeviceVerificationView({
                         </label>
                         {securityKey.length > 0 && !securityKeyValid ? (
                             <p className="security-key-invalid">Security key format is invalid.</p>
+                        ) : null}
+                        {pageStep ? (
+                            <div className="verification-gate-reauth" role="status">
+                                <p className="login-inline-note">
+                                    {pageStep.way.kind === "sso"
+                                        ? "To finish the reset, confirm it's you with single sign-on on your server's page."
+                                        : "To finish the reset, approve it on your server's account page."}
+                                    {reauthPage.opened ? " Then finish the reset here." : ""}
+                                </p>
+                                <div className="security-actions">
+                                    <button type="button" onClick={reauthPage.open}>
+                                        {pageStep.way.kind === "sso" ? "Continue with single sign-on" : "Open the account page"}
+                                    </button>
+                                    <button type="button" className="security-skip" disabled={!reauthPage.opened} onClick={pageStep.done}>
+                                        Finish reset
+                                    </button>
+                                    <button type="button" className="security-skip" onClick={pageStep.stop}>
+                                        Stop
+                                    </button>
+                                </div>
+                            </div>
                         ) : null}
                         {resetError ? <p className="login-error">{resetError}</p> : null}
                         <div className="security-actions">

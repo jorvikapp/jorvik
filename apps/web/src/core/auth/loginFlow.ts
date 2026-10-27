@@ -57,7 +57,7 @@ export async function assertPasswordLoginSupported(
     }
 
     if (flowTypes.has("m.login.sso") || flowTypes.has("m.login.cas")) {
-        throw new Error("This homeserver requires SSO login. Password login is disabled.");
+        throw new Error("This server signs you in through single sign-on, not with a password.");
     }
 
     throw new Error("This homeserver does not support password login.");

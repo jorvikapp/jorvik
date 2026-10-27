@@ -4,7 +4,8 @@ import { logger } from "matrix-js-sdk/src/logger";
 import { MatrixClientManager } from "../client/MatrixClientManager";
 import { createMatrixClient } from "../client/createMatrixClient";
 import { emitAccessTokenRotated } from "./tokenEvents";
-import { SSO_HOMESERVER_URL_KEY, SSO_ID_SERVER_URL_KEY, SSO_IDP_ID_KEY, WebPlatform } from "../platform/WebPlatform";
+import { SSO_PENDING_STORAGE_KEY } from "../auth/sso";
+import { WebPlatform } from "../platform/WebPlatform";
 import { CORE_SESSION_STORAGE_KEYS, getStoredSessionVars, persistCredentials } from "../storage/sessionStore";
 import { idbClear } from "../storage/storageAccess";
 import {
@@ -18,11 +19,7 @@ import type { MatrixClientAssignOpts, MatrixCredentials } from "../types/credent
 
 const LOGOUT_REQUEST_TIMEOUT_MS = 10_000;
 
-const CORE_TRANSIENT_STORAGE_KEYS = [
-    SSO_HOMESERVER_URL_KEY,
-    SSO_ID_SERVER_URL_KEY,
-    SSO_IDP_ID_KEY,
-] as const;
+const CORE_TRANSIENT_STORAGE_KEYS = [SSO_PENDING_STORAGE_KEY] as const;
 
 const CORE_STORAGE_KEYS_TO_CLEAR = [...CORE_SESSION_STORAGE_KEYS, ...CORE_TRANSIENT_STORAGE_KEYS] as const;
 

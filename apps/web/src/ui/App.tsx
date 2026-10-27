@@ -55,6 +55,7 @@ function AppRouter(): React.ReactElement {
                 error={matrix.error}
                 onLogin={matrix.login}
                 onLoginWithCredentials={matrix.loginWithCredentials}
+                onLoginWithSsoToken={matrix.loginWithSsoToken}
             />
         );
     }
