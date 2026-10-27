@@ -5,6 +5,7 @@ import { formatUserIdForDisplay } from "../../../../core/users/formatUserId";
 import { plainUserDisplayName } from "../../../../core/users/userDisplayName";
 import type { ToastState } from "../../../components/Toast";
 import { useIgnoredUsers } from "../../../moderation/useIgnoredUsers";
+import { useReadReceiptsPrivacy } from "../../../notifications/readReceipts";
 import { AUTO_IDLE_MINUTE_CHOICES, type PrivacySettings } from "../settingsStore";
 
 interface PrivacyTabProps {
@@ -17,31 +18,43 @@ interface PrivacyTabProps {
 
 export function PrivacyTab({ client, onToast, settings, onChange, onOpenActivityPrivacy }: PrivacyTabProps): React.ReactElement {
     const ignoredUsers = useIgnoredUsers(client);
+    const readReceipts = useReadReceiptsPrivacy(client);
 
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Privacy & Safety</h2>
-            <p className="settings-tab-description">
-                Local placeholder settings. Backend privacy rules are TODO.
-            </p>
+            <p className="settings-tab-description">What others can see about you, and who you've blocked.</p>
 
-            <label className="settings-toggle">
-                <input
-                    type="checkbox"
-                    checked={settings.showReadReceipts}
-                    onChange={(event) => onChange({ ...settings, showReadReceipts: event.target.checked })}
-                />
-                Show read receipts (stub)
-            </label>
-
-            <label className="settings-toggle">
-                <input
-                    type="checkbox"
-                    checked={settings.allowDmsFromServerMembers}
-                    onChange={(event) => onChange({ ...settings, allowDmsFromServerMembers: event.target.checked })}
-                />
-                Allow DMs from server members (stub)
-            </label>
+            <div className="settings-section-card">
+                <h3>Read receipts</h3>
+                <label className="settings-toggle">
+                    <input
+                        type="checkbox"
+                        checked={!readReceipts.keepPrivate}
+                        disabled={readReceipts.supported === false}
+                        onChange={(event) =>
+                            void readReceipts
+                                .setKeepPrivate(!event.target.checked)
+                                .catch(() => onToast({ type: "error", message: "Could not change read receipts. Try again." }))
+                        }
+                    />
+                    Send read receipts
+                </label>
+                <p className="settings-inline-note">
+                    {readReceipts.supported === false
+                        ? "Your server can't keep read receipts private, so they're always sent."
+                        : "Others can see how far you've read. Turn this off to keep that to yourself, on every device you use Jorvik on."}
+                </p>
+                <label className="settings-toggle">
+                    <input
+                        type="checkbox"
+                        checked={settings.showReadReceipts}
+                        onChange={(event) => onChange({ ...settings, showReadReceipts: event.target.checked })}
+                    />
+                    Show read receipts in direct messages
+                </label>
+                <p className="settings-inline-note">Pictures under a message show who has read up to there.</p>
+            </div>
 
             <div className="settings-section-card">
                 <h3>Link previews</h3>

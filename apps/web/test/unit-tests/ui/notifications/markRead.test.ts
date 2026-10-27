@@ -31,9 +31,11 @@ function room(roomId: string, events: ReturnType<typeof event>[], readUpTo: stri
     } as never;
 }
 
-function client(fail: string[] = []) {
+function client(fail: string[] = [], keepPrivate = false) {
     return {
         getUserId: () => ME,
+        getAccountData: (type: string) =>
+            keepPrivate && type === "app.jorvik.read_receipts" ? { getContent: () => ({ private: true }) } : undefined,
         setRoomReadMarkers: vi.fn(async (roomId: string) => {
             if (fail.includes(roomId)) {
                 throw new Error("nope");
@@ -76,5 +78,14 @@ describe("markRoomsRead", () => {
 
         await expect(markRoomsRead(c as never, [counted, next])).resolves.toEqual({ marked: 1, failed: 1 });
         expect(c.setRoomReadMarkers).toHaveBeenCalledTimes(2);
+    });
+
+    it("sends private receipts when the user keeps them to themselves", async () => {
+        const c = client([], true);
+        const latest = event("$2", "@bob:example.org");
+        const unread = room("!unread", [event("$1", "@bob:example.org"), latest], "$1");
+
+        await expect(markRoomsRead(c as never, [unread])).resolves.toEqual({ marked: 1, failed: 0 });
+        expect(c.setRoomReadMarkers).toHaveBeenCalledWith("!unread", "$2", undefined, latest);
     });
 });

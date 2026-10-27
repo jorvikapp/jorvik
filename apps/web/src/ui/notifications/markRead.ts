@@ -1,5 +1,6 @@
 import type { MatrixClient, MatrixEvent, Room } from "matrix-js-sdk/src/matrix";
 
+import { setReadMarkers } from "./readReceipts";
 import { getServerUnreadCount, hasUnreadActivity } from "./roomUnread";
 
 /**
@@ -22,8 +23,8 @@ export function latestMarkableEvent(room: Room): MatrixEvent | null {
 
 /**
  * Marks each room read up to its newest event, with the read marker and a receipt that
- * isn't tied to a thread, so threads clear too. Rooms with nothing new are left alone, and
- * one that fails doesn't stop the rest.
+ * isn't tied to a thread, so threads clear too; the receipt is private if the user keeps them
+ * private. Rooms with nothing new are left alone, and one that fails doesn't stop the rest.
  */
 export async function markRoomsRead(
     client: MatrixClient,
@@ -45,7 +46,7 @@ export async function markRoomsRead(
             continue;
         }
         try {
-            await client.setRoomReadMarkers(room.roomId, latestId, latest);
+            await setReadMarkers(client, room.roomId, latestId, latest);
             marked += 1;
         } catch {
             failed += 1;

@@ -19,8 +19,8 @@ export interface NotificationsSettings {
 }
 
 export interface PrivacySettings {
+    /** Others' read receipts in direct messages. Whether the user's own are sent is account data. */
     showReadReceipts: boolean;
-    allowDmsFromServerMembers: boolean;
     /** Minutes without activity before an Online status shows as Idle; 0 turns it off. */
     autoIdleMinutes: number;
     /** The server fetches previewed links, so it sees links from encrypted chats too. */
@@ -75,7 +75,6 @@ const DEFAULT_SETTINGS: UserLocalSettings = {
     },
     privacy: {
         showReadReceipts: true,
-        allowDmsFromServerMembers: true,
         autoIdleMinutes: DEFAULT_AUTO_IDLE_MINUTES,
         linkPreviewsInEncrypted: true,
         shareGameActivity: false,
@@ -147,7 +146,6 @@ function normalizeSettings(raw: unknown): UserLocalSettings {
         },
         privacy: {
             showReadReceipts: privacy.showReadReceipts !== false,
-            allowDmsFromServerMembers: privacy.allowDmsFromServerMembers !== false,
             autoIdleMinutes: (AUTO_IDLE_MINUTE_CHOICES as readonly unknown[]).includes(privacy.autoIdleMinutes)
                 ? (privacy.autoIdleMinutes as number)
                 : DEFAULT_AUTO_IDLE_MINUTES,

@@ -11,33 +11,47 @@ let root: Root;
 
 const SETTINGS: PrivacySettings = {
     showReadReceipts: true,
-    allowDmsFromServerMembers: true,
     autoIdleMinutes: 10,
     linkPreviewsInEncrypted: true,
     shareGameActivity: false,
 };
 
-function client() {
+function client({ privateReceipts = true, saved = undefined as unknown, saveFails = false } = {}) {
     const emitter = new EventEmitter();
     return Object.assign(emitter, {
         getIgnoredUsers: () => [],
         getDomain: () => "example.org",
+        getAccountData: (type: string) =>
+            type === "app.jorvik.read_receipts" && saved !== undefined ? { getContent: () => saved } : undefined,
+        setAccountData: vi.fn(async () => {
+            if (saveFails) {
+                throw new Error("offline");
+            }
+            return {};
+        }),
+        isVersionSupported: async () => privateReceipts,
+        doesServerSupportUnstableFeature: async () => false,
         removeListener: emitter.removeListener.bind(emitter),
     });
 }
 
-async function render(onOpenActivityPrivacy = vi.fn()): Promise<void> {
+async function render(onOpenActivityPrivacy = vi.fn(), c = client(), onToast = vi.fn()): Promise<void> {
     await act(async () => {
         root.render(
             <PrivacyTab
-                client={client() as never}
-                onToast={() => undefined}
+                client={c as never}
+                onToast={onToast}
                 settings={SETTINGS}
                 onChange={vi.fn()}
                 onOpenActivityPrivacy={onOpenActivityPrivacy}
             />,
         );
     });
+}
+
+function toggle(label: string): HTMLInputElement {
+    const row = [...container.querySelectorAll("label.settings-toggle")].find((l) => l.textContent?.trim() === label);
+    return row!.querySelector("input")!;
 }
 
 beforeEach(() => {
@@ -63,5 +77,54 @@ describe("PrivacyTab game activity", () => {
         const button = [...container.querySelectorAll("button")].find((b) => b.textContent === "Activity Privacy");
         act(() => button!.click());
         expect(onOpenActivityPrivacy).toHaveBeenCalled();
+    });
+});
+
+describe("PrivacyTab read receipts", () => {
+    it("says what each switch does, with no placeholders left", async () => {
+        await render();
+
+        const text = container.textContent ?? "";
+        for (const gone of ["(stub)", "TODO", "placeholder", "Allow DMs from server members"]) {
+            expect(text).not.toContain(gone);
+        }
+        expect(toggle("Send read receipts").checked).toBe(true);
+        expect(toggle("Show read receipts in direct messages").checked).toBe(true);
+    });
+
+    it("keeps them private on every device when Send read receipts is turned off", async () => {
+        const c = client();
+        await render(vi.fn(), c);
+
+        await act(async () => toggle("Send read receipts").click());
+        expect(c.setAccountData).toHaveBeenCalledWith("app.jorvik.read_receipts", { private: true });
+        expect(toggle("Send read receipts").checked).toBe(false);
+
+        // Turned back on from another device.
+        act(() => {
+            c.emit("accountData", { getType: () => "app.jorvik.read_receipts", getContent: () => ({ private: false }) });
+        });
+        expect(toggle("Send read receipts").checked).toBe(true);
+    });
+
+    it("shows the saved choice again if it can't be saved", async () => {
+        const onToast = vi.fn();
+        await render(vi.fn(), client({ saveFails: true }), onToast);
+
+        await act(async () => toggle("Send read receipts").click());
+        expect(toggle("Send read receipts").checked).toBe(true);
+        expect(onToast).toHaveBeenCalledWith({ type: "error", message: "Could not change read receipts. Try again." });
+    });
+
+    it("can't be turned off where the server can't keep them private", async () => {
+        await render(vi.fn(), client({ privateReceipts: false }));
+
+        expect(toggle("Send read receipts").disabled).toBe(true);
+        expect(container.textContent).toContain("Your server can't keep read receipts private, so they're always sent.");
+    });
+
+    it("starts off when the account already keeps them private", async () => {
+        await render(vi.fn(), client({ saved: { private: true } }));
+        expect(toggle("Send read receipts").checked).toBe(false);
     });
 });
