@@ -25,6 +25,7 @@ import { locateNewMessages, mayBeMessage, newMessagesLabel, readUpToEventIds } f
 import { useCurrentDay } from "../messages/useCurrentDay";
 import { getServerUnreadCount, hasUnreadActivity } from "../notifications/roomUnread";
 import { latestMarkableEvent } from "../notifications/markRead";
+import { ownReadReceiptType, setReadMarkers } from "../notifications/readReceipts";
 import { mxcThumbnailToHttp } from "../utils/mxc";
 import { Avatar } from "./Avatar";
 import { UserBadges } from "./badges/UserBadges";
@@ -2198,11 +2199,11 @@ export function Timeline({
 
         readMarkerInFlightByRoomRef.current.add(room.roomId);
         try {
-            await client.setRoomReadMarkers(room.roomId, latestEventId, latestEvent);
+            await setReadMarkers(client, room.roomId, latestEventId, latestEvent);
             lastReadEventIdByRoomRef.current.set(room.roomId, latestEventId);
         } catch {
             try {
-                await client.sendReadReceipt(latestEvent, undefined, true);
+                await client.sendReadReceipt(latestEvent, ownReadReceiptType(client), true);
                 lastReadEventIdByRoomRef.current.set(room.roomId, latestEventId);
             } catch {
                 // Ignore transient receipt failures; next scroll/focus-at-bottom will retry.
@@ -2421,12 +2422,29 @@ export function Timeline({
         window.addEventListener("keydown", onKeyDown);
         return () => window.removeEventListener("keydown", onKeyDown);
     }, [hasNewMessages, jumpToNewMessages]);
+    // Someone reading up to a message moves their receipt without any new event, so the pictures
+    // follow receipts as they arrive, not only new messages.
+    const [receiptRerenderTick, setReceiptRerenderTick] = useState(0);
+    useEffect(() => {
+        if (!room || !showReadReceipts) {
+            return undefined;
+        }
+        const onReceipt = (_event: MatrixEvent, receiptRoom: Room): void => {
+            if (receiptRoom.roomId === room.roomId) {
+                setReceiptRerenderTick((tick) => tick + 1);
+            }
+        };
+        client.on(RoomEvent.Receipt, onReceipt);
+        return () => {
+            client.removeListener(RoomEvent.Receipt, onReceipt);
+        };
+    }, [client, room, showReadReceipts]);
     const readReceiptsByEventId = useMemo<Map<string, ReadReceiptEntry[]>>(
         () =>
             showReadReceipts && room
                 ? collectReadReceiptsByEventId(client, room, events, ownUserId)
                 : new Map<string, ReadReceiptEntry[]>(),
-        [client, events, ownUserId, room, showReadReceipts],
+        [client, events, ownUserId, receiptRerenderTick, room, showReadReceipts],
     );
 
     // Images, decrypted media and link previews reserve no space and arrive
