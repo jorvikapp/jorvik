@@ -26,6 +26,9 @@ export interface HeorotDesktopGame {
     name: string;
 }
 
+/** How single sign-on in the browser ended. */
+export type HeorotDesktopSsoResult = { loginToken: string } | { cancelled: true } | { timedOut: true };
+
 function toGame(value: unknown): HeorotDesktopGame | null {
     const game = value as { id?: unknown; name?: unknown } | null;
     return game && typeof game.id === "string" && typeof game.name === "string" ? { id: game.id, name: game.name } : null;
@@ -53,6 +56,11 @@ export interface HeorotDesktopBridge {
     /** The icon Steam keeps of the running game, as a PNG; null for other games or when there's none. */
     getGameIcon: (gameId: string) => Promise<Uint8Array | null>;
     onNotificationClicked: (listener: (target: HeorotDesktopNotificationTarget) => void) => () => void;
+    /** Single sign-on: a one-time local address for the homeserver to send the browser back to. */
+    ssoBegin: () => Promise<string>;
+    /** Resolves when the browser comes back with the login token, or the wait is cancelled or runs out. */
+    ssoWait: () => Promise<HeorotDesktopSsoResult>;
+    ssoCancel: () => Promise<void>;
     platform: NodeJS.Platform;
     versions: {
         electron: string;
@@ -127,6 +135,15 @@ const bridge: HeorotDesktopBridge = {
         };
         ipcRenderer.on("heorot:notificationClicked", handler);
         return () => ipcRenderer.removeListener("heorot:notificationClicked", handler);
+    },
+    ssoBegin: async (): Promise<string> => {
+        return (await ipcRenderer.invoke("heorot:ssoBegin")) as string;
+    },
+    ssoWait: async (): Promise<HeorotDesktopSsoResult> => {
+        return (await ipcRenderer.invoke("heorot:ssoWait")) as HeorotDesktopSsoResult;
+    },
+    ssoCancel: async (): Promise<void> => {
+        await ipcRenderer.invoke("heorot:ssoCancel");
     },
     platform: process.platform,
     versions: {

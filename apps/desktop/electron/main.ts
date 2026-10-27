@@ -26,6 +26,7 @@ import {
 } from "./util";
 import { TrayBadge } from "./tray-badge";
 import { GameActivityWatcher, gameActivitySupported, steamAppIdOf, steamIconFiles } from "./game-activity";
+import { beginSso, cancelSso, waitForSso } from "./sso";
 
 const APP_TITLE = "Jorvik";
 // Keep the Linux window identity aligned with the generated desktop entry so
@@ -744,6 +745,14 @@ function registerIpc(): void {
         focusMainWindow();
     });
 
+    // Single sign-on: the browser comes back to a one-time local address with a login token, and
+    // Jorvik comes to the front to finish signing in.
+    ipcMain.handle("heorot:ssoBegin", () => beginSso(() => focusMainWindow()));
+    ipcMain.handle("heorot:ssoWait", () => waitForSso());
+    ipcMain.handle("heorot:ssoCancel", () => {
+        cancelSso();
+    });
+
     ipcMain.handle("heorot:showNotification", (_event, payload: unknown) => {
         showNativeNotification(payload);
     });
@@ -846,4 +855,5 @@ void bootstrap();
 app.on("before-quit", () => {
     trayBadge?.dispose();
     trayBadge = null;
+    cancelSso();
 });

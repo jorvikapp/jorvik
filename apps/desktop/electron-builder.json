@@ -127,7 +127,8 @@
       "default",
       "audio-record",
       "password-manager-service",
-      "camera"
+      "camera",
+      "network-bind"
     ]
   }
 }

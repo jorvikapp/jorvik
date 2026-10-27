@@ -26,7 +26,8 @@
     "dist:mac:x64:signed": "npm run build && electron-builder --config electron-builder.json --publish never -m dmg zip --x64",
     "dist:mac:arm64:signed": "npm run build && electron-builder --config electron-builder.json --publish never -m dmg zip --arm64",
     "dist:mac:universal:signed": "npm run build && electron-builder --config electron-builder.json --publish never -m dmg zip --universal",
-    "build:tray-badges": "node scripts/gen-tray-badges.js ../web/public/jorvik-icon.png build/tray-badges"
+    "build:tray-badges": "node scripts/gen-tray-badges.js ../web/public/jorvik-icon.png build/tray-badges",
+    "test": "npm run build:electron && node --test test/"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
