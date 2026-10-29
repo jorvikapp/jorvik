@@ -932,6 +932,18 @@ button.phone-notif:active {
     max-height: 100%;
 }
 
+/* An import's channel list: a channel's choices go on their own lines, under its name. */
+.is-phone-layout .import-tree-channel-controls {
+    flex-basis: 100%;
+    margin-left: 0;
+    padding-left: 22px;
+}
+
+/* No columns to keep in line here, so voice channels drop the space for the choice they don't have. */
+.is-phone-layout .import-tree-channel-select.is-hidden {
+    display: none;
+}
+
 .is-phone-layout .toast {
     left: 12px;
     right: 12px;

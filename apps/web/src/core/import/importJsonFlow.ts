@@ -18,6 +18,7 @@ const CHANNEL_ACCESS_EVENT = "com.heorot.channel_access";
 export interface JsonExportGuild {
     id: string;
     name: string;
+    description?: string | null;
 }
 
 export interface JsonExportCategory {
@@ -82,6 +83,15 @@ function delay(ms: number): Promise<void> {
 
 interface RateLimitState {
     pauseUntil: number;
+    /** Called about once a second while waiting for the server, with how long is left. */
+    onWait?: (waitMs: number) => void;
+}
+
+async function waitOut(state: RateLimitState): Promise<void> {
+    for (let waitMs = state.pauseUntil - Date.now(); waitMs > 0; waitMs = state.pauseUntil - Date.now()) {
+        state.onWait?.(waitMs);
+        await delay(Math.min(waitMs, 1000));
+    }
 }
 
 async function withRateLimit<T>(
@@ -91,10 +101,7 @@ async function withRateLimit<T>(
 ): Promise<T> {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         if (sharedState) {
-            const waitMs = sharedState.pauseUntil - Date.now();
-            if (waitMs > 0) {
-                await delay(waitMs);
-            }
+            await waitOut(sharedState);
         }
 
         try {
@@ -214,11 +221,18 @@ export async function runJsonImport(
         onProgress(progress);
     };
 
+    // What the progress says while the server makes the import wait.
+    const waitMessage = (waitMs: number): string =>
+        `Your server asked Jorvik to slow down. Carrying on in ${Math.ceil(waitMs / 1000)} s.`;
+
     // 1. Create main space
-    onProgress({ stage: "space", current: 0, total: 1, message: `Creating space "${exportData.guild.name}"...` });
+    onProgress({ stage: "space", current: 0, total: 1, message: `Creating Space "${exportData.guild.name}"...` });
+    rateLimitState.onWait = (waitMs) =>
+        emitProgress({ stage: "space", current: 0, total: 1, message: waitMessage(waitMs) }, true);
     const spaceResponse = await withRateLimit(() =>
         client.createRoom({
             name: exportData.guild.name,
+            topic: exportData.guild.description || undefined,
             preset: Preset.PrivateChat,
             creation_content: { type: "m.space" },
             initial_state: [
@@ -240,9 +254,20 @@ export async function runJsonImport(
     const spaceId = spaceResponse.room_id;
     emitProgress({ stage: "space", current: 1, total: 1, message: "Space created." }, true);
 
-    // 2. Create channels
-    const CHANNEL_CONCURRENCY = 5;
+    // 2. Create channels, one at a time. Servers limit how fast an account can make rooms (Synapse: 10 at once, then
+    // about one a minute), and channels made side by side would only take turns being refused until they gave up.
+    const CHANNEL_CONCURRENCY = 1;
     let channelsCreated = 0;
+    rateLimitState.onWait = (waitMs) =>
+        emitProgress({
+            stage: "channels",
+            current: channelsCreated,
+            total: supportedChannels.length,
+            message: signal.cancelled
+                ? waitMessage(waitMs)
+                : `Your server limits how fast channels can be made. Next one in ${Math.ceil(waitMs / 1000)} s, ` +
+                  `${supportedChannels.length - channelsCreated} to go.`,
+        }, true);
     await inParallel(supportedChannels, CHANNEL_CONCURRENCY, async (channel) => {
         if (signal.cancelled) return;
         const isVoice = channel.type === "voice";
@@ -282,11 +307,6 @@ export async function runJsonImport(
 
             if (cfg.minPL > 0) {
                 initialState.push({
-                    type: EventType.RoomPowerLevels,
-                    state_key: "",
-                    content: { events_default: cfg.minPL },
-                });
-                initialState.push({
                     type: CHANNEL_ACCESS_EVENT,
                     state_key: "",
                     content: { min_power_level: cfg.minPL },
@@ -305,6 +325,9 @@ export async function runJsonImport(
                     name: channel.name,
                     topic: channel.topic ?? undefined,
                     preset: Preset.PrivateChat,
+                    // Merged into the server's usual power levels. A power levels event in initial_state would replace
+                    // them, leaving the creator without the rights to finish making the room.
+                    power_level_content_override: cfg.minPL > 0 ? { events_default: cfg.minPL } : undefined,
                     initial_state: initialState,
                 }),
             rateLimitState,
@@ -343,6 +366,13 @@ export async function runJsonImport(
     }, true);
 
     // 3. Write categories and channel order
+    rateLimitState.onWait = (waitMs) =>
+        emitProgress({
+            stage: "channels",
+            current: channelsCreated,
+            total: supportedChannels.length,
+            message: waitMessage(waitMs),
+        }, true);
     if (!signal.cancelled) {
         const categoryIds = new Set(exportData.categories.map((c) => c.id));
         const sortedCategories = [...exportData.categories].sort((a, b) => a.position - b.position);
@@ -389,6 +419,13 @@ export async function runJsonImport(
     });
 
     let emojisUploaded = 0;
+    rateLimitState.onWait = (waitMs) =>
+        emitProgress({
+            stage: "emojis",
+            current: emojisUploaded,
+            total: emojisToUpload.length,
+            message: waitMessage(waitMs),
+        }, true);
 
     if (emojisToUpload.length > 0) {
         const EMOJI_CONCURRENCY = 5;

@@ -9,6 +9,7 @@ import {
     rememberServer,
 } from "../../adapters/directoryAdapter";
 import { describeJoinError, joinRoomWithRetry } from "../../adapters/joinAdapter";
+import type { ImportSource } from "./ImportJsonWizard";
 import { RoomDialog } from "./RoomDialog";
 
 interface CreateSpaceDialogProps {
@@ -18,7 +19,7 @@ interface CreateSpaceDialogProps {
     onCreated?: (roomId: string) => void;
     onJoined?: (roomId: string) => void;
     onJoinPublicSpaceRequest?: (target: string) => Promise<string>;
-    onImport?: () => void;
+    onImport?: (source: ImportSource) => void;
 }
 
 type SpaceVisibilityChoice = "private" | "public";
@@ -78,6 +79,7 @@ export function CreateSpaceDialog({
     onImport,
 }: CreateSpaceDialogProps): React.ReactElement | null {
     const [activeTab, setActiveTab] = useState<CreateSpaceTab>("create");
+    const [importSource, setImportSource] = useState<ImportSource>("discord");
     const [step, setStep] = useState<"visibility" | "details">("visibility");
     const [visibilityChoice, setVisibilityChoice] = useState<SpaceVisibilityChoice>("private");
     const [name, setName] = useState("");
@@ -123,6 +125,7 @@ export function CreateSpaceDialog({
         }
 
         setActiveTab("create");
+        setImportSource("discord");
         setStep("visibility");
         setVisibilityChoice("private");
         setName("");
@@ -345,7 +348,7 @@ export function CreateSpaceDialog({
                         <button
                             type="button"
                             className="room-dialog-button room-dialog-button-primary"
-                            onClick={() => { onClose(); onImport(); }}
+                            onClick={() => { onClose(); onImport(importSource); }}
                             disabled={isGuest}
                         >
                             Continue
@@ -375,16 +378,34 @@ export function CreateSpaceDialog({
                         className={`room-dialog-tab${activeTab === "import" ? " is-active" : ""}`}
                         onClick={() => setActiveTab("import")}
                     >
-                        Import from JSON
+                        Import
                     </button>
                 ) : null}
             </div>
 
             {activeTab === "import" ? (
                 <div className="create-space-panel">
-                    <p className="room-dialog-muted">
-                        Import a server from a JSON export file. The wizard will create a Space with all channels and emoji.
-                    </p>
+                    <p className="room-dialog-muted">Start a Space with the channels of a server you already have.</p>
+                    <div className="create-space-import-sources">
+                        <label className="room-dialog-checkbox">
+                            <input
+                                type="radio"
+                                name="space-import-source"
+                                checked={importSource === "discord"}
+                                onChange={() => setImportSource("discord")}
+                            />
+                            From Discord, with a server template link
+                        </label>
+                        <label className="room-dialog-checkbox">
+                            <input
+                                type="radio"
+                                name="space-import-source"
+                                checked={importSource === "json"}
+                                onChange={() => setImportSource("json")}
+                            />
+                            From a JSON export file
+                        </label>
+                    </div>
                     {isGuest ? (
                         <p className="room-dialog-warning">Register or sign in to import a Space.</p>
                     ) : null}

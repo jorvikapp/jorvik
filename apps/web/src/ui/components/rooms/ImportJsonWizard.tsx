@@ -13,16 +13,30 @@ import {
     type ImportResult,
     type ImportSignal,
 } from "../../adapters/importJsonAdapter";
+import {
+    DiscordTemplateError,
+    discordTemplateToImport,
+    fetchDiscordTemplate,
+    parseDiscordTemplateCode,
+} from "../../adapters/discordTemplateAdapter";
 import { RoomDialog } from "./RoomDialog";
+
+/** Where an import comes from: a Discord server's template link, or a JSON export file. */
+export type ImportSource = "discord" | "json";
 
 interface ImportJsonWizardProps {
     client: MatrixClient;
     open: boolean;
+    source: ImportSource;
     onClose: () => void;
     onImported: (spaceId: string) => void;
 }
 
 type WizardStep = "select" | "configure" | "importing" | "done";
+
+// Synapse lets an account make 10 rooms at once, then about one a minute. An import makes a room for the Space and
+// one for each channel.
+const ROOMS_AT_ONCE = 10;
 
 function ImportChannelRow({
     channel,
@@ -42,28 +56,34 @@ function ImportChannelRow({
             <div className="import-tree-channel-controls">
                 <select
                     className="import-tree-channel-select"
+                    aria-label={`Who can join ${channel.name}`}
                     value={config.isPublic ? "public" : "invite"}
                     onChange={(e) => onChange({ ...config, isPublic: e.target.value === "public" })}
                 >
-                    <option value="invite">Invite</option>
-                    <option value="public">Public</option>
+                    <option value="public">Anyone can join</option>
+                    <option value="invite">Invite only</option>
                 </select>
                 <select
                     className="import-tree-channel-select"
+                    aria-label={`Encryption for ${channel.name}`}
                     value={config.isEncrypted ? "enc" : "plain"}
                     onChange={(e) => onChange({ ...config, isEncrypted: e.target.value === "enc" })}
                 >
                     <option value="enc">Encrypted</option>
-                    <option value="plain">Unencrypted</option>
+                    <option value="plain">Not encrypted</option>
                 </select>
+                {/* Voice channels have no chat to post in. Hidden rather than left out, so the rows line up. */}
                 <select
-                    className="import-tree-channel-select"
+                    className={`import-tree-channel-select${isVoice ? " is-hidden" : ""}`}
+                    aria-label={`Who can post in ${channel.name}`}
+                    aria-hidden={isVoice || undefined}
+                    tabIndex={isVoice ? -1 : undefined}
                     value={config.minPL}
                     onChange={(e) => onChange({ ...config, minPL: Number(e.target.value) as 0 | 50 | 100 })}
                 >
-                    <option value={0}>Member</option>
-                    <option value={50}>Mod</option>
-                    <option value={100}>Admin</option>
+                    <option value={0}>Anyone can post</option>
+                    <option value={50}>Only mods post</option>
+                    <option value={100}>Only admins post</option>
                 </select>
             </div>
         </div>
@@ -73,6 +93,7 @@ function ImportChannelRow({
 export function ImportJsonWizard({
     client,
     open,
+    source,
     onClose,
     onImported,
 }: ImportJsonWizardProps): React.ReactElement | null {
@@ -83,10 +104,16 @@ export function ImportJsonWizard({
     const [progress, setProgress] = useState<ImportProgress | null>(null);
     const [result, setResult] = useState<ImportResult | null>(null);
     const [channelConfig, setChannelConfig] = useState<Record<string, ChannelImportConfig>>({});
+    const [templateLink, setTemplateLink] = useState("");
+    // The code of the template in exportData, so going back and on again keeps the changes made to it.
+    const [templateCode, setTemplateCode] = useState<string | null>(null);
+    const [loadingTemplate, setLoadingTemplate] = useState(false);
 
     const jsonInputRef = useRef<HTMLInputElement>(null);
     const emojiInputRef = useRef<HTMLInputElement>(null);
     const signalRef = useRef<ImportSignal>({ cancelled: false });
+    // Counts requests for templates, so an answer that comes after the wizard was closed or asked again is ignored.
+    const templateRequestRef = useRef(0);
 
     const resetState = (): void => {
         setStep("select");
@@ -96,6 +123,10 @@ export function ImportJsonWizard({
         setProgress(null);
         setResult(null);
         setChannelConfig({});
+        setTemplateLink("");
+        setTemplateCode(null);
+        setLoadingTemplate(false);
+        templateRequestRef.current += 1;
     };
 
     const handleClose = (): void => {
@@ -113,14 +144,14 @@ export function ImportJsonWizard({
             try {
                 const parsed = parseJsonExport(JSON.parse(reader.result as string));
                 if (!parsed) {
-                    setParseError("Invalid export format.");
+                    setParseError("That file isn't a server export Jorvik can read.");
                     setExportData(null);
                 } else {
                     setParseError(null);
                     setExportData(parsed);
                 }
             } catch {
-                setParseError("Failed to parse JSON file.");
+                setParseError("That file isn't valid JSON.");
                 setExportData(null);
             }
         };
@@ -139,6 +170,35 @@ export function ImportJsonWizard({
             }
         }
         setEmojiFiles(map);
+    };
+
+    const loadTemplate = async (): Promise<void> => {
+        const code = parseDiscordTemplateCode(templateLink);
+        if (!code) {
+            setParseError("That isn't a Discord template link. Template links start with https://discord.new/");
+            return;
+        }
+        if (code === templateCode && exportData) {
+            setStep("configure");
+            return;
+        }
+
+        const request = ++templateRequestRef.current;
+        setLoadingTemplate(true);
+        setParseError(null);
+        try {
+            const imported = discordTemplateToImport(await fetchDiscordTemplate(code));
+            if (request !== templateRequestRef.current) return;
+            setExportData(imported.exportData);
+            setChannelConfig(imported.channelConfig);
+            setTemplateCode(code);
+            setStep("configure");
+        } catch (err) {
+            if (request !== templateRequestRef.current) return;
+            setParseError(err instanceof DiscordTemplateError ? err.message : "Couldn't read the template. Try again.");
+        } finally {
+            if (request === templateRequestRef.current) setLoadingTemplate(false);
+        }
     };
 
     const startImport = async (): Promise<void> => {
@@ -173,17 +233,32 @@ export function ImportJsonWizard({
     const emojiReadyCount = exportData
         ? exportData.emojis.filter((e) => e.status === "ok" && emojiFiles.has(e.path.split("/").pop() ?? "")).length
         : 0;
+    const minutesToWait = Math.max(0, supportedChannels.length + 1 - ROOMS_AT_ONCE);
 
     const progressPercent =
         progress && progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
 
     const getTitle = (): string => {
         switch (step) {
-            case "select": return "Import from JSON export";
-            case "configure": return "Configure channels";
+            case "select": return source === "discord" ? "Import from Discord" : "Import from a JSON file";
+            case "configure": return "Check the channels";
             case "importing": return "Importing...";
-            case "done": return "Import complete";
+            case "done": return result?.spaceId ? "Import complete" : "Import failed";
         }
+    };
+
+    const renderSummary = (): React.ReactElement | null => {
+        if (!exportData) return null;
+        return (
+            <div className="import-wizard-summary">
+                <p className="import-wizard-summary-name">{exportData.guild.name}</p>
+                <p className="room-dialog-muted">
+                    {exportData.categories.length} categories &middot; {textChannelCount} text &middot;{" "}
+                    {voiceChannelCount} voice
+                    {source === "json" ? <> &middot; {emojiOkCount} emoji</> : null}
+                </p>
+            </div>
+        );
     };
 
     const renderFooter = (): React.ReactElement => {
@@ -193,14 +268,25 @@ export function ImportJsonWizard({
                     <button type="button" className="room-dialog-button room-dialog-button-secondary" onClick={handleClose}>
                         Cancel
                     </button>
-                    <button
-                        type="button"
-                        className="room-dialog-button room-dialog-button-primary"
-                        onClick={() => setStep("configure")}
-                        disabled={!exportData}
-                    >
-                        Next
-                    </button>
+                    {source === "discord" ? (
+                        <button
+                            type="button"
+                            className="room-dialog-button room-dialog-button-primary"
+                            onClick={() => void loadTemplate()}
+                            disabled={!templateLink.trim() || loadingTemplate}
+                        >
+                            {loadingTemplate ? "Loading..." : "Next"}
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            className="room-dialog-button room-dialog-button-primary"
+                            onClick={() => setStep("configure")}
+                            disabled={!exportData}
+                        >
+                            Next
+                        </button>
+                    )}
                 </>
             );
         }
@@ -248,7 +334,7 @@ export function ImportJsonWizard({
                         handleClose();
                     }}
                 >
-                    {result?.spaceId ? "Go to space" : "Close"}
+                    {result?.spaceId ? "Go to Space" : "Close"}
                 </button>
             );
         }
@@ -258,14 +344,51 @@ export function ImportJsonWizard({
 
     return (
         <RoomDialog open={open} title={getTitle()} onClose={handleClose} footer={renderFooter()}>
-            {step === "select" && (
+            {step === "select" && source === "discord" && (
                 <div className="import-wizard-step">
                     <p className="room-dialog-muted">
-                        Select the JSON export file and optionally the emoji folder.
+                        Copy a Discord server's categories and channels into a new Space, along with who can see and
+                        post in each channel. Messages, members and emoji stay on Discord.
+                    </p>
+                    <ol className="import-wizard-list">
+                        <li>In Discord, open Server Settings and choose Server Template. You need to own the server or be able to manage it.</li>
+                        <li>Make a template, or sync the one you have so it's up to date, and copy its link.</li>
+                        <li>Paste the link here.</li>
+                    </ol>
+
+                    <label className="room-dialog-field">
+                        <span>Template link</span>
+                        <input
+                            type="text"
+                            value={templateLink}
+                            onChange={(event) => {
+                                setTemplateLink(event.target.value);
+                                setParseError(null);
+                            }}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter" && templateLink.trim() && !loadingTemplate) void loadTemplate();
+                            }}
+                            placeholder="https://discord.new/..."
+                            autoComplete="off"
+                            spellCheck={false}
+                            className="room-dialog-input"
+                        />
+                    </label>
+
+                    {parseError && <p className="room-dialog-error">{parseError}</p>}
+
+                    <p className="room-dialog-muted">Discord leaves announcement, forum and stage channels out of templates.</p>
+                </div>
+            )}
+
+            {step === "select" && source === "json" && (
+                <div className="import-wizard-step">
+                    <p className="room-dialog-muted">
+                        Choose the JSON export file, and the folder of emoji images if you have one.
                     </p>
 
                     <label className="room-dialog-field">
-                        <span>Export JSON file</span>
+                        <span>JSON export file</span>
                         <input
                             ref={jsonInputRef}
                             type="file"
@@ -277,15 +400,7 @@ export function ImportJsonWizard({
 
                     {parseError && <p className="room-dialog-error">{parseError}</p>}
 
-                    {exportData && (
-                        <div className="import-wizard-summary">
-                            <p className="import-wizard-summary-name">{exportData.guild.name}</p>
-                            <p className="room-dialog-muted">
-                                {exportData.categories.length} categories &middot; {textChannelCount} text &middot;{" "}
-                                {voiceChannelCount} voice &middot; {emojiOkCount} emoji
-                            </p>
-                        </div>
-                    )}
+                    {renderSummary()}
 
                     <label className="room-dialog-field">
                         <span>Emoji folder (optional)</span>
@@ -308,17 +423,27 @@ export function ImportJsonWizard({
 
             {step === "configure" && exportData && (
                 <div className="import-wizard-step">
-                    <p className="room-dialog-muted">
-                        Review your channels and set the minimum power level required to post in each one.
-                        {emojiOkCount > 0 && (
-                            <>
-                                {" "}Emoji pack:{" "}
-                                {emojiReadyCount > 0
-                                    ? `${emojiReadyCount} of ${emojiOkCount} emoji will be uploaded.`
-                                    : `${emojiOkCount} available - select emoji folder to upload.`}
-                            </>
-                        )}
-                    </p>
+                    {source === "discord" ? (
+                        <>
+                            {renderSummary()}
+                            <p className="room-dialog-muted">
+                                Each channel is set up to match who could see it and post in it on Discord. Change
+                                anything you like before you import.
+                            </p>
+                        </>
+                    ) : (
+                        <p className="room-dialog-muted">
+                            Choose who can join each channel, whether it's encrypted, and who can post in it.
+                            {emojiOkCount > 0 && (
+                                <>
+                                    {" "}
+                                    {emojiReadyCount > 0
+                                        ? `${emojiReadyCount} of ${emojiOkCount} emoji will be uploaded.`
+                                        : `Choose the emoji folder to upload the ${emojiOkCount} emoji too.`}
+                                </>
+                            )}
+                        </p>
+                    )}
                     <div className="import-tree">
                         {(() => {
                             const catIds = new Set(exportData.categories.map((c) => c.id));
@@ -359,8 +484,16 @@ export function ImportJsonWizard({
                             })}
                     </div>
                     <p className="room-dialog-muted" style={{ marginTop: 8 }}>
-                        All channels will be private. You can invite members after the import.
+                        Everyone in the Space can join the channels anyone can join. Invite people to the invite-only
+                        ones after the import.
                     </p>
+                    {minutesToWait > 0 && (
+                        <p className="room-dialog-muted">
+                            Your server may only let you make about one channel a minute after the first ten, so this
+                            could take {minutesToWait === 1 ? "about a minute" : `about ${minutesToWait} minutes`}. Keep
+                            Jorvik open until it's done.
+                        </p>
+                    )}
                 </div>
             )}
 
@@ -378,19 +511,28 @@ export function ImportJsonWizard({
                 <div className="import-wizard-step">
                     {result.spaceId ? (
                         <>
-                            <p className="import-wizard-success">Import successful!</p>
+                            <p className="import-wizard-success">Your Space is ready.</p>
                             <ul className="import-wizard-list">
                                 <li>Channels created: {result.channelsCreated}</li>
-                                <li>Emoji uploaded: {result.emojisUploaded}</li>
+                                {source === "json" ? <li>Emoji uploaded: {result.emojisUploaded}</li> : null}
                             </ul>
+                            {source === "discord" ? (
+                                <>
+                                    <p className="room-dialog-muted">Still to do, in the Space's Server Settings:</p>
+                                    <ul className="import-wizard-list">
+                                        <li>Add the server's picture under Overview, and its emoji under Emoji.</li>
+                                        <li>Bring people over: invite them, or let anyone join under Visibility.</li>
+                                    </ul>
+                                </>
+                            ) : null}
                         </>
                     ) : (
-                        <p className="room-dialog-error">Import failed.</p>
+                        <p className="room-dialog-error">The import didn't work.</p>
                     )}
                     {result.errors.length > 0 && (
                         <details className="import-wizard-errors">
                             <summary className="room-dialog-muted">
-                                {result.errors.length} warning(s)
+                                {result.errors.length === 1 ? "1 thing didn't work" : `${result.errors.length} things didn't work`}
                             </summary>
                             <ul className="import-wizard-error-list">
                                 {result.errors.map((e, i) => (

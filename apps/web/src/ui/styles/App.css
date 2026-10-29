@@ -4438,6 +4438,14 @@ textarea {
     animation: fade-slide-in var(--motion-normal) var(--motion-ease-enter);
 }
 
+.create-space-import-sources {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 10px;
+}
+
 @keyframes fade-in {
     from {
         opacity: 0;
@@ -5879,6 +5887,7 @@ img.voice-ctrl-icon {
 
 .import-tree-channel {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
     padding: 3px 8px;
@@ -5894,8 +5903,10 @@ img.voice-ctrl-icon {
     text-align: center;
 }
 
+/* Keeps room for the name: on a narrow screen the controls go under it instead. */
 .import-tree-channel-name {
-    flex: 1;
+    flex: 1 1 120px;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -5903,8 +5914,10 @@ img.voice-ctrl-icon {
 
 .import-tree-channel-controls {
     display: flex;
+    flex-wrap: wrap;
     gap: 4px;
     flex-shrink: 0;
+    margin-left: auto;
 }
 
 .import-tree-channel-select {
@@ -5915,6 +5928,10 @@ img.voice-ctrl-icon {
     border: 1px solid var(--border-color, #444);
     color: inherit;
     cursor: pointer;
+}
+
+.import-tree-channel-select.is-hidden {
+    visibility: hidden;
 }
 
 /* Electron window drag regions - html is draggable by default,

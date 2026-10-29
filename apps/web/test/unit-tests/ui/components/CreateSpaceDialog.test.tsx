@@ -86,3 +86,33 @@ describe("CreateSpaceDialog encryption", () => {
         expect(encryptionState(client)).toBeUndefined();
     });
 });
+
+describe("CreateSpaceDialog import", () => {
+    async function continueImport(choose?: string): Promise<ReturnType<typeof vi.fn>> {
+        const onImport = vi.fn();
+        await act(async () => {
+            root.render(<CreateSpaceDialog client={makeClient() as never} open onClose={() => undefined} onImport={onImport} />);
+        });
+        await act(async () => {
+            buttonNamed("Import").click();
+        });
+        if (choose) {
+            const label = Array.from(container.querySelectorAll("label")).find((candidate) => candidate.textContent?.includes(choose));
+            await act(async () => {
+                (label?.querySelector("input") as HTMLInputElement).click();
+            });
+        }
+        await act(async () => {
+            buttonNamed("Continue").click();
+        });
+        return onImport;
+    }
+
+    it("imports from Discord unless another source is chosen", async () => {
+        expect(await continueImport()).toHaveBeenCalledWith("discord");
+    });
+
+    it("imports from a JSON export file when that's chosen", async () => {
+        expect(await continueImport("From a JSON export file")).toHaveBeenCalledWith("json");
+    });
+});

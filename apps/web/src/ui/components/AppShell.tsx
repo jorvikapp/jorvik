@@ -71,7 +71,7 @@ import { RailContextMenu } from "./RailContextMenu";
 import { Avatar } from "./Avatar";
 import { CreateRoomDialog } from "./rooms/CreateRoomDialog";
 import { CreateSpaceDialog } from "./rooms/CreateSpaceDialog";
-import { ImportJsonWizard } from "./rooms/ImportJsonWizard";
+import { ImportJsonWizard, type ImportSource } from "./rooms/ImportJsonWizard";
 import { CreateDirectChatDialog } from "./rooms/CreateDirectChatDialog";
 import { InviteDialog } from "./rooms/InviteDialog";
 import { AddToRoomDialog } from "./rooms/AddToRoomDialog";
@@ -979,7 +979,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const [createRoomOpen, setCreateRoomOpen] = useState(false);
     const [createRoomParentSpaceId, setCreateRoomParentSpaceId] = useState<string | null>(null);
     const [createSpaceOpen, setCreateSpaceOpen] = useState(false);
-    const [importJsonOpen, setImportJsonOpen] = useState(false);
+    const [importSource, setImportSource] = useState<ImportSource | null>(null);
     const [spaceOnboardingSpaceId, setSpaceOnboardingSpaceId] = useState<string | null>(null);
     const [joinRoomOpen, setJoinRoomOpen] = useState(false);
     const [inviteOpen, setInviteOpen] = useState(false);
@@ -2842,7 +2842,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             createDirectChatOpen ||
             createRoomOpen ||
             createSpaceOpen ||
-            importJsonOpen ||
+            importSource ||
             joinRoomOpen ||
             inviteOpen ||
             roomSettingsRoomId ||
@@ -3703,7 +3703,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     setCreateSpaceOpen(false);
                     pushToast({ type: "success", message: "Joined public Space." });
                 }}
-                onImport={() => setImportJsonOpen(true)}
+                onImport={setImportSource}
             />
             <JoinRoomDialog
                 client={client}
@@ -3803,10 +3803,11 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             />
             <ImportJsonWizard
                 client={client}
-                open={importJsonOpen}
-                onClose={() => setImportJsonOpen(false)}
+                open={importSource !== null}
+                source={importSource ?? "discord"}
+                onClose={() => setImportSource(null)}
                 onImported={(spaceId) => {
-                    setImportJsonOpen(false);
+                    setImportSource(null);
                     focusRoom(spaceId);
                     pushToast({ type: "success", message: "Import completed." });
                 }}
