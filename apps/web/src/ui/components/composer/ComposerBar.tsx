@@ -17,8 +17,12 @@ interface ComposerBarProps {
     onDragLeave: (event: React.DragEvent<HTMLDivElement>) => void;
     onDrop: (event: React.DragEvent<HTMLDivElement>) => void;
     onAttach: () => void;
+    // On phones the + opens a menu of where to pick from.
+    attachMenu?: boolean;
     // Phones get a send button; elsewhere Enter sends.
     showSend?: boolean;
+    // Files waiting to go: they can be sent without any text.
+    hasFilesToSend?: boolean;
     onSend?: () => void;
     onToggleEmoji: () => void;
     onToggleGif: () => void;
@@ -43,7 +47,9 @@ export function ComposerBar({
     onDragLeave,
     onDrop,
     onAttach,
+    attachMenu = false,
     showSend = false,
+    hasFilesToSend = false,
     onSend,
     onToggleEmoji,
     onToggleGif,
@@ -57,6 +63,7 @@ export function ComposerBar({
                 className="composer-plus-button"
                 onClick={onAttach}
                 disabled={disabled}
+                aria-haspopup={attachMenu ? "dialog" : undefined}
                 aria-label="Upload attachment"
                 title="Upload attachment"
             >
@@ -105,7 +112,7 @@ export function ComposerBar({
                     </div>
                 </div>
             </div>
-            {showSend && value.trim().length > 0 ? (
+            {showSend && (value.trim().length > 0 || hasFilesToSend) ? (
                 <button
                     type="button"
                     className="composer-send-button"

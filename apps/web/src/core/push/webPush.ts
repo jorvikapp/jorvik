@@ -1,6 +1,7 @@
 import type { IPusher, IPusherRequest, MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import type { CoreConfig } from "../config/configTypes";
+import { isAppleTouchDevice } from "../platform/appleTouch";
 
 /**
  * Push notifications through the homeserver's push gateway (Sygnal's webpush). The browser gives
@@ -51,12 +52,6 @@ export function getWebPushConfig(config: CoreConfig | null | undefined): WebPush
         return null;
     }
     return { gatewayUrl, appId, vapidPublicKey };
-}
-
-function isAppleTouchDevice(): boolean {
-    const userAgent = navigator.userAgent;
-    // iPads ask for the desktop site, so they say Macintosh but have a touch screen.
-    return /iPhone|iPad|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && navigator.maxTouchPoints > 1);
 }
 
 function isHomeScreenApp(): boolean {

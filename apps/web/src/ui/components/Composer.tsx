@@ -21,6 +21,7 @@ import { findLastEditableMessage } from "../messages/editableMessages";
 import { useRoomTyping } from "../hooks/useRoomTyping";
 import { mediaFromMxc } from "../adapters/media";
 import { mxcThumbnailToHttp } from "../utils/mxc";
+import { AttachPicker, shouldUseAttachMenu, type AttachPickerHandle } from "./composer/AttachPicker";
 import { ComposerBar } from "./composer/ComposerBar";
 import { EmojiPicker } from "./composer/EmojiPicker";
 import { GifPicker } from "./composer/GifPicker";
@@ -787,6 +788,7 @@ export function Composer({
 }: ComposerProps): React.ReactElement {
     // Phones send with a button, so Return can start a new line as phone keyboards expect.
     const isPhone = usePhoneLayout();
+    const attachAsMenu = shouldUseAttachMenu(isPhone);
     const ownUserId = client.getUserId() ?? "";
     const [text, setText] = useState("");
     const [sendingText, setSendingText] = useState(false);
@@ -801,7 +803,7 @@ export function Composer({
     const [mentionSelectionIndex, setMentionSelectionIndex] = useState(0);
     const [emojiQuery, setEmojiQuery] = useState<EmojiQueryState | null>(null);
     const [emojiSelectionIndex, setEmojiSelectionIndex] = useState(0);
-    const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const attachPickerRef = useRef<AttachPickerHandle | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const emojiButtonRef = useRef<HTMLButtonElement | null>(null);
     const emojiPickerRef = useRef<HTMLDivElement | null>(null);
@@ -1754,14 +1756,6 @@ export function Composer({
         }));
     }, [updateUpload]);
 
-    const handleFileSelection = (files: FileList | null): void => {
-        enqueueFiles(files);
-
-        if (fileInputRef.current) {
-            fileInputRef.current.value = "";
-        }
-    };
-
     const handleGifSelection = useCallback(async (url: string, title: string): Promise<void> => {
         // Picking a GIF sends it immediately. Unlike a file attachment there is
         // nothing to caption or review, so parking it in the queue just adds a
@@ -2046,8 +2040,10 @@ export function Composer({
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                onAttach={() => fileInputRef.current?.click()}
+                onAttach={() => attachPickerRef.current?.open()}
+                attachMenu={attachAsMenu}
                 showSend={isPhone}
+                hasFilesToSend={uploads.some((upload) => upload.roomId === room?.roomId && upload.status === "queued")}
                 onSend={() => void sendMessage()}
                 onToggleEmoji={() => setEmojiPickerOpen((open) => !open)}
                 onToggleGif={() => { setGifPickerOpen((open) => !open); setEmojiPickerOpen(false); }}
@@ -2124,16 +2120,7 @@ export function Composer({
                     ))}
                 </div>
             ) : null}
-            <input
-                ref={fileInputRef}
-                className="composer-file-input"
-                type="file"
-                multiple
-                onChange={(event) => {
-                    handleFileSelection(event.target.files);
-                }}
-                disabled={!room}
-            />
+            <AttachPicker ref={attachPickerRef} asMenu={attachAsMenu} disabled={!room} onFiles={enqueueFiles} />
             {uploads.length > 0 ? (
                 <div className="composer-upload-list" role="status" aria-live="polite">
                     {uploads.map((upload) => {
