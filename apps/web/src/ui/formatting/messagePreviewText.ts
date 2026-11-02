@@ -1,3 +1,5 @@
+import { UNDECRYPTABLE_MSGTYPE, UNDECRYPTABLE_PREVIEW } from "../messages/undecryptable";
+
 /**
  * A message as plain text, for the places that show it outside the timeline:
  * notifications, reply previews, pins and search. Formatting marks are left
@@ -7,6 +9,7 @@
 export const SPOILER_PLACEHOLDER = "(spoiler)";
 
 export interface PreviewableContent {
+    msgtype?: unknown;
     body?: unknown;
     format?: unknown;
     formatted_body?: unknown;
@@ -35,6 +38,10 @@ const BLOCK_TAGS = new Set([
 const SKIPPED_TAGS = new Set(["MX-REPLY", "SCRIPT", "STYLE"]);
 
 export function messagePreviewText(content: PreviewableContent): string {
+    // Its body is the decryption error, not anything anyone wrote.
+    if (content.msgtype === UNDECRYPTABLE_MSGTYPE) {
+        return UNDECRYPTABLE_PREVIEW;
+    }
     if (
         content.format === "org.matrix.custom.html" &&
         typeof content.formatted_body === "string" &&

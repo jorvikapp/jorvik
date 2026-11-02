@@ -12,6 +12,7 @@ import { useMessageActions } from "../../hooks/useMessageActions";
 import { reportMessage } from "../../../core/moderation/reports";
 import { ReportDialog } from "../moderation/ReportDialog";
 import { usePhoneLayout } from "../../layout/phoneLayout";
+import { UNDECRYPTABLE_PREVIEW } from "../../messages/undecryptable";
 
 interface Position {
     x: number;
@@ -306,7 +307,7 @@ export function MessageActionsBar({
                 <MessageActionSheet
                     open={isContextMenuOpen}
                     senderName={room.getMember(event.getSender() ?? "")?.name ?? event.getSender() ?? ""}
-                    preview={plainTextBody?.trim() || "Attachment"}
+                    preview={event.isDecryptionFailure() ? UNDECRYPTABLE_PREVIEW : plainTextBody?.trim() || "Attachment"}
                     canEdit={canEdit}
                     canDelete={canDelete}
                     canCopyText={Boolean(plainTextBody && plainTextBody.trim().length > 0)}

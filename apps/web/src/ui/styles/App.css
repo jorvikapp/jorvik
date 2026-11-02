@@ -2672,6 +2672,33 @@ textarea {
     background: var(--border);
 }
 
+/* Stands for the messages from before you joined, which can't be read. */
+.timeline-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 6px 12px 6px 50px;
+    padding: 8px 10px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.35;
+    max-width: var(--timeline-text-max-width);
+}
+
+.timeline-notice-icon {
+    flex-shrink: 0;
+}
+
+/* A message that couldn't be decrypted: why, in place of its text. */
+.timeline-body-undecryptable {
+    display: inline-flex;
+    gap: 6px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
 /* Holds the bar at the top of the timeline without taking any room in it
    (the margin cancels the timeline's gap), so no message moves when the bar
    comes or goes. Inside the timeline, the bar takes clicks in the desktop app. */

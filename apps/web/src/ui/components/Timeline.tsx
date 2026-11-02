@@ -32,6 +32,13 @@ import { UserBadges } from "./badges/UserBadges";
 import { messagePreviewText } from "../formatting/messagePreviewText";
 import { MessageRenderer } from "./MessageRenderer";
 import { MessageActionsBar } from "./messages/MessageActionsBar";
+import {
+    collapseSentBeforeJoining,
+    isSentBeforeJoining,
+    SENT_BEFORE_JOINING_NOTICE,
+    UNDECRYPTABLE_MSGTYPE,
+    undecryptableText,
+} from "../messages/undecryptable";
 import { Toast, type ToastState } from "./Toast";
 import { ReactionsRow } from "./reactions/ReactionsRow";
 import { useLongPress } from "../layout/longPress";
@@ -85,6 +92,11 @@ interface RenderEvent {
     timeTitle: string;
     /** "Today", "Yesterday" or a date, on the first message of each day. */
     dayDivider: string | null;
+    /**
+     * Couldn't be decrypted: "before-joining" stands for a run of messages sent before you joined,
+     * shown as one notice; "message" is any other, shown with why instead of its text.
+     */
+    undecryptable: "before-joining" | "message" | null;
 }
 
 interface ReplySummary {
@@ -570,7 +582,11 @@ function isEditEvent(event: MatrixEvent): boolean {
     return getReplaceTargetEventId(event) !== null;
 }
 
-function resolveEditedMessageContent(editEvent: MatrixEvent): MessageContent | null {
+export function resolveEditedMessageContent(editEvent: MatrixEvent): MessageContent | null {
+    // Until it's decrypted, its content is the decryption error: keep showing the message as it was.
+    if (editEvent.isDecryptionFailure()) {
+        return null;
+    }
     const editContent = getMessageContent(editEvent);
     const newContentRaw = editContent["m.new_content"];
     if (newContentRaw && typeof newContentRaw === "object") {
@@ -612,6 +628,17 @@ function getDisplayContentForEvent(
         content: resolveEditedMessageContent(latestEditEvent) ?? baseContent,
         edited: true,
     };
+}
+
+/**
+ * Sent before you joined, and still unreadable as shown: no edit you can read has replaced it. A run
+ * of these shows as one notice.
+ */
+function isUnreadableFromBeforeJoining(event: MatrixEvent, latestEditEventsByTarget: Map<string, MatrixEvent>): boolean {
+    return (
+        isSentBeforeJoining(event) &&
+        getDisplayContentForEvent(event, latestEditEventsByTarget).content.msgtype === UNDECRYPTABLE_MSGTYPE
+    );
 }
 
 function collectLatestEditEventsByTarget(room: Room | null): Map<string, MatrixEvent> {
@@ -899,13 +926,26 @@ function toRenderEvents(
     latestEditEventsByTarget: Map<string, MatrixEvent>,
     now: Date,
 ): RenderEvent[] {
+    let previousWasNotice = false;
     return events.map((event, index) => {
         const previous = events[index - 1];
         const newDay = !previous || localDayKey(previous.getTs()) !== localDayKey(event.getTs());
         const sender = getSenderMetadata(client, room, event, 84);
         const { content, edited } = getDisplayContentForEvent(event, latestEditEventsByTarget);
+        // Still the decryption error, unless an edit that can be read has replaced it.
+        const undecryptable =
+            content.msgtype === UNDECRYPTABLE_MSGTYPE
+                ? isSentBeforeJoining(event)
+                    ? ("before-joining" as const)
+                    : ("message" as const)
+                : null;
         const rawBody = getTextBody(content) ?? "";
-        const body = getReplyEventId(event) ? stripPlainReplyFallback(rawBody) : rawBody;
+        const body =
+            undecryptable !== null
+                ? undecryptableText(event)
+                : getReplyEventId(event)
+                  ? stripPlainReplyFallback(rawBody)
+                  : rawBody;
 
         // A new day starts a new group under its divider.
         let showHeader = true;
@@ -914,9 +954,11 @@ function toRenderEvents(
             const sameWindow = Math.abs(event.getTs() - previous.getTs()) <= 5 * 60 * 1000;
             showHeader = !(sameSender && sameWindow);
         }
-        if (edited) {
+        // Under the notice for messages from before you joined, a message starts its own group.
+        if (edited || previousWasNotice) {
             showHeader = true;
         }
+        previousWasNotice = undecryptable === "before-joining";
 
         return {
             event,
@@ -931,6 +973,7 @@ function toRenderEvents(
             timeLabel: formatMessageTime(event.getTs(), now),
             timeTitle: formatFullTimestamp(event.getTs()),
             dayDivider: newDay ? formatDayDivider(event.getTs(), now) : null,
+            undecryptable,
         };
     });
 }
@@ -2329,9 +2372,19 @@ export function Timeline({
 
     // Renewed at midnight, so "Today" turns into "Yesterday" in a chat left open.
     const currentDay = useCurrentDay();
+    // Messages sent before you joined can't ever be read: each run of them shows as one notice,
+    // and none of them count as new.
+    const shownEvents = useMemo(
+        () => collapseSentBeforeJoining(visibleEvents, (event) => isUnreadableFromBeforeJoining(event, latestEditEventsByTarget)),
+        [visibleEvents, latestEditEventsByTarget],
+    );
+    const readableEvents = useMemo(
+        () => visibleEvents.filter((event) => !isUnreadableFromBeforeJoining(event, latestEditEventsByTarget)),
+        [visibleEvents, latestEditEventsByTarget],
+    );
     const renderEvents = useMemo(
-        () => toRenderEvents(client, room, visibleEvents, latestEditEventsByTarget, currentDay),
-        [client, visibleEvents, latestEditEventsByTarget, room, currentDay],
+        () => toRenderEvents(client, room, shownEvents, latestEditEventsByTarget, currentDay),
+        [client, shownEvents, latestEditEventsByTarget, room, currentDay],
     );
     const ownUserId = client.getUserId() ?? null;
     const newMessages = useMemo(() => {
@@ -2340,9 +2393,9 @@ export function Timeline({
         }
 
         const timeline = room.getLiveTimeline()?.getEvents() ?? room.timeline;
-        const position = locateNewMessages(timeline, visibleEvents, newMessagesLine.readUpTo, ownUserId);
+        const position = locateNewMessages(timeline, readableEvents, newMessagesLine.readUpTo, ownUserId);
         return position.count > 0 ? position : null;
-    }, [newMessagesLine, ownUserId, room, visibleEvents]);
+    }, [newMessagesLine, ownUserId, room, readableEvents]);
     const firstNewEventId = newMessages?.firstNewEventId ?? null;
     // The first new message starts a new group under the line.
     const timelineItems = useMemo(
@@ -2519,8 +2572,24 @@ export function Timeline({
                     ) : null}
                 </div>
                 {paginating ? <div className="timeline-paginating">Loading older messages...</div> : null}
-                {timelineItems.flatMap(({ event, content, edited, showHeader, body, reply, senderName, senderAvatarUrl, senderAvatarSources, timeLabel, timeTitle, dayDivider }) => {
+                {timelineItems.flatMap(({ event, content, edited, showHeader, body, reply, senderName, senderAvatarUrl, senderAvatarSources, timeLabel, timeTitle, dayDivider, undecryptable }) => {
                     const key = eventKey(event);
+                    const dayDividerElement = dayDivider ? (
+                        <div key={`day-${key}`} className="timeline-day-divider" role="separator" aria-label={dayDivider}>
+                            <span className="timeline-day-divider-label">{dayDivider}</span>
+                        </div>
+                    ) : null;
+                    if (undecryptable === "before-joining") {
+                        const notice = (
+                            <div key={key} className="timeline-notice" role="note" data-event-key={key}>
+                                <span className="timeline-notice-icon" aria-hidden="true">
+                                    {"\uD83D\uDD12"}
+                                </span>
+                                <span className="timeline-notice-text">{SENT_BEFORE_JOINING_NOTICE}</span>
+                            </div>
+                        );
+                        return dayDividerElement ? [dayDividerElement, notice] : [notice];
+                    }
                     const eventId = event.getId();
                     const senderId = event.getSender();
                     const mediaMsgType = isMediaMessageType(content.msgtype) ? content.msgtype : null;
@@ -2772,7 +2841,12 @@ export function Timeline({
                                         <div
                                             className={`timeline-body${showHeader ? "" : " timeline-body-grouped"}`}
                                         >
-                                            {hasFormattedBody ? (
+                                            {undecryptable !== null ? (
+                                                <span className="timeline-body-undecryptable">
+                                                    <span aria-hidden="true">{"\uD83D\uDD12"}</span>
+                                                    {body}
+                                                </span>
+                                            ) : hasFormattedBody ? (
                                                 <MessageRenderer
                                                     body={body}
                                                     format={format}
@@ -2891,12 +2965,8 @@ export function Timeline({
                         </div>
                     );
                     const elements: React.ReactElement[] = [];
-                    if (dayDivider) {
-                        elements.push(
-                            <div key={`day-${key}`} className="timeline-day-divider" role="separator" aria-label={dayDivider}>
-                                <span className="timeline-day-divider-label">{dayDivider}</span>
-                            </div>,
-                        );
+                    if (dayDividerElement) {
+                        elements.push(dayDividerElement);
                     }
                     if (firstNewEventId !== null && eventId === firstNewEventId) {
                         elements.push(newMessagesLineElement);

@@ -84,6 +84,7 @@
 }
 
 .app-shell.is-compact .timeline-body,
+.app-shell.is-compact .timeline-notice,
 .app-shell.is-compact .timeline-link-preview,
 .app-shell.is-compact .timeline-image-wrap,
 .app-shell.is-compact .reactions-row-wrap,

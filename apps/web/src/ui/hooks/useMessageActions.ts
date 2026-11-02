@@ -24,6 +24,10 @@ function stripPlainReplyFallback(body: string): string {
 }
 
 function getPlainTextBody(event: MatrixEvent): string | null {
+    // The body of a message that couldn't be decrypted is the error, not text to copy.
+    if (event.isDecryptionFailure()) {
+        return null;
+    }
     const content = event.getContent() as { body?: unknown };
     if (typeof content.body !== "string") {
         return null;
