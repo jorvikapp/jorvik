@@ -19,6 +19,8 @@ interface RightPanelProps {
     searchQuery: string;
     onSearchQueryChange: (value: string) => void;
     onSelectUser: (userId: string) => void;
+    /** Right-click, or a long press on a phone, on a member: their menu. */
+    onUserContextMenu?: (userId: string, point: { x: number; y: number }) => void;
     onBackToRoom: () => void;
     onCloseRoomPanel: () => void;
     onOpenRoomSettings: () => void;
@@ -40,6 +42,7 @@ export function RightPanel({
     searchQuery,
     onSearchQueryChange,
     onSelectUser,
+    onUserContextMenu,
     onBackToRoom,
     onCloseRoomPanel,
     onOpenRoomSettings,
@@ -94,6 +97,7 @@ export function RightPanel({
                             room={room}
                             activeSpaceRoom={activeSpaceRoom}
                             onSelectUser={onSelectUser}
+                            onUserContextMenu={onUserContextMenu}
                         />
                     ) : null}
                     {roomMode === "search" ? (

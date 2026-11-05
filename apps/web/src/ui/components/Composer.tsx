@@ -17,6 +17,7 @@ import { replaceEmoticons } from "../emoji/emoticons";
 import { formatMessage, type FormattedTextMessageContent } from "../formatting/formatMessage";
 import { messagePreviewText } from "../formatting/messagePreviewText";
 import { mentionText } from "../mentions/composerMentions";
+import { useMentionRequests } from "../mentions/mentionRequests";
 import { findLastEditableMessage } from "../messages/editableMessages";
 import { useRoomTyping } from "../hooks/useRoomTyping";
 import { mediaFromMxc } from "../adapters/media";
@@ -1254,6 +1255,34 @@ export function Composer({
         },
         [client, error, handleTypingActivity, mentionQuery, resizeTextarea],
     );
+
+    // "Mention" from the menu on someone's name: in at the cursor, with a space either side as needed.
+    useMentionRequests(room?.roomId, (userId) => {
+        const textarea = textareaRef.current;
+        const mention = `${mentionText(userId, client.getDomain())} `;
+        let nextCaret = 0;
+        let nextText = "";
+        setText((current) => {
+            const at = Math.max(0, Math.min(textarea?.selectionStart ?? current.length, current.length));
+            const before = current.slice(0, at);
+            const lead = before.length > 0 && !/\s$/.test(before) ? " " : "";
+            nextText = `${before}${lead}${mention}${current.slice(at)}`;
+            nextCaret = before.length + lead.length + mention.length;
+            return nextText;
+        });
+        if (nextText) {
+            handleTypingActivity(nextText);
+        }
+        requestAnimationFrame(() => {
+            const target = textareaRef.current;
+            if (!target) {
+                return;
+            }
+            target.focus();
+            target.setSelectionRange(nextCaret, nextCaret);
+            resizeTextarea();
+        });
+    });
 
     const applyEmojiCandidate = useCallback(
         (candidate: EmojiSuggestionCandidate): void => {

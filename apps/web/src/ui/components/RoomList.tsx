@@ -18,6 +18,7 @@ import type { SpaceChildAffordance } from "../adapters/spaceHierarchyAdapter";
 import { fetchVoiceParticipants, isVoiceFeatureEnabled } from "../adapters/voiceAdapter";
 import { relayMicMuted } from "../../core/voice/voiceService";
 import { useMatrix } from "../providers/MatrixProvider";
+import { useLongPress } from "../layout/longPress";
 import { isPresenceEnabledForClient } from "../presence/presenceConfig";
 import { toAvatarPresenceState } from "../presence/buildPresenceVm";
 import { usePresenceMap } from "../presence/usePresence";
@@ -77,6 +78,8 @@ interface RoomListProps {
     liveParticipantsByRoomId?: Map<string, Set<string>>;
     liveParticipantsOverrideRoomId?: string | null;
     onOpenRoomSettings?: (roomId: string) => void;
+    /** Right-click, or a long press on a phone, on a conversation: its menu. */
+    onRoomContextMenu?: (roomId: string, point: { x: number; y: number }) => void;
     voiceDiscoveryReady?: boolean;
 }
 
@@ -228,9 +231,16 @@ export function RoomList({
     liveParticipantsByRoomId = new Map(),
     liveParticipantsOverrideRoomId = null,
     onOpenRoomSettings,
+    onRoomContextMenu,
     voiceDiscoveryReady = false,
 }: RoomListProps): React.ReactElement {
     const { config } = useMatrix();
+    const roomLongPress = useLongPress(".room-item[data-room-id]", (target, point) => {
+        const roomId = (target as HTMLElement).dataset.roomId;
+        if (roomId) {
+            onRoomContextMenu?.(roomId, point);
+        }
+    });
     const manualOrderingEnabled = orderingMode === "manual";
     const orderingControlsEnabled = manualOrderingEnabled && showOrderingControls;
     const ownUserId = client.getUserId() ?? "";
@@ -926,6 +936,15 @@ export function RoomList({
             <div
                 key={room.roomId}
                 role="listitem"
+                data-room-id={onRoomContextMenu ? room.roomId : undefined}
+                onContextMenu={
+                    onRoomContextMenu
+                        ? (event) => {
+                              event.preventDefault();
+                              onRoomContextMenu(room.roomId, { x: event.clientX, y: event.clientY });
+                          }
+                        : undefined
+                }
                 className={`room-item${isActive ? " is-active" : ""}${isMuted ? " is-muted" : ""}${dragClass}`}
                 draggable={orderingControlsEnabled}
                 onDragStart={(event) => {
@@ -1327,7 +1346,7 @@ export function RoomList({
                     </div>
                 </div>
             </div>
-            <div className="room-list-items">
+            <div className="room-list-items" onPointerDown={onRoomContextMenu ? roomLongPress.onPointerDown : undefined}>
                 {uncategorized.map((room, index) =>
                     renderRoomItem(room, { indexInGroup: index, groupSize: uncategorized.length, catId: null }),
                 )}

@@ -51,6 +51,8 @@ interface TimelineProps {
     onReply: (event: MatrixEvent) => void;
     onEdit: (event: MatrixEvent) => void;
     onSelectUser?: (userId: string) => void;
+    /** Right-click, or a long press on a phone, on a message's author: their menu. */
+    onUserContextMenu?: (userId: string, point: { x: number; y: number }) => void;
     activeSpaceId: string | null;
     customReactionImagesEnabled: boolean;
     showReadReceipts: boolean;
@@ -1378,6 +1380,7 @@ export function Timeline({
     onReply,
     onEdit,
     onSelectUser,
+    onUserContextMenu,
     activeSpaceId,
     customReactionImagesEnabled,
     showReadReceipts,
@@ -1393,6 +1396,13 @@ export function Timeline({
     const [lightbox, setLightbox] = useState<LightboxState | null>(null);
     const [contextMenuState, setContextMenuState] = useState<{ eventKey: string; x: number; y: number } | null>(null);
     // Holding a message with a finger opens what a right click does: the menu, or on phones the sheet.
+    // A long press on the author's name or picture is about them; anywhere else in a message, about the message.
+    const authorLongPress = useLongPress(".timeline-user-trigger[data-user-id]", (target, point) => {
+        const userId = (target as HTMLElement).dataset.userId;
+        if (userId) {
+            onUserContextMenu?.(userId, point);
+        }
+    });
     const messageLongPress = useLongPress(".timeline-event[data-event-key]", (target, point) => {
         const element = target as HTMLElement;
         const eventKey = element.dataset.eventId ?? element.dataset.eventKey;
@@ -2550,7 +2560,13 @@ export function Timeline({
                 className="timeline"
                 ref={scrollContainerRef}
                 onScroll={(event) => void handleScroll(event)}
-                onPointerDown={messageLongPress.onPointerDown}
+                onPointerDown={(event) => {
+                    if (onUserContextMenu && (event.target as Element | null)?.closest(".timeline-user-trigger[data-user-id]")) {
+                        authorLongPress.onPointerDown(event);
+                        return;
+                    }
+                    messageLongPress.onPointerDown(event);
+                }}
             >
                 <div className="timeline-new-messages-bar-anchor">
                     {newMessagesBarLabel !== null ? (
@@ -2707,10 +2723,20 @@ export function Timeline({
                                     <button
                                         type="button"
                                         className="timeline-user-trigger"
+                                        data-user-id={senderId || undefined}
                                         onClick={() => {
                                             if (senderId) {
                                                 onSelectUser?.(senderId);
                                             }
+                                        }}
+                                        onContextMenu={(event) => {
+                                            if (!senderId || !onUserContextMenu) {
+                                                return;
+                                            }
+                                            // Theirs, not the message's.
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            onUserContextMenu(senderId, { x: event.clientX, y: event.clientY });
                                         }}
                                         disabled={!senderId || !onSelectUser}
                                     >

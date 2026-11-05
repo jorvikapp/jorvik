@@ -10,6 +10,7 @@ import { useUserActivity } from "../../../activity/useActivity";
 import { usePresenceMap } from "../../../presence/usePresence";
 import { ActivityIcon } from "../../activity/ActivityLine";
 import { Avatar } from "../../Avatar";
+import { useLongPress } from "../../../layout/longPress";
 import { UserBadges } from "../../badges/UserBadges";
 
 interface MembersPanelProps {
@@ -17,6 +18,8 @@ interface MembersPanelProps {
     room: Room;
     activeSpaceRoom: Room | null;
     onSelectUser: (userId: string) => void;
+    /** Right-click, or a long press on a phone, on a member: their menu. */
+    onUserContextMenu?: (userId: string, point: { x: number; y: number }) => void;
 }
 
 function getVisibleMembers(room: Room): RoomMember[] {
@@ -106,9 +109,16 @@ export function MembersPanel({
     client,
     room,
     activeSpaceRoom,
+    onUserContextMenu,
     onSelectUser,
 }: MembersPanelProps): React.ReactElement {
     const { config } = useMatrix();
+    const memberLongPress = useLongPress(".rs-member-row[data-user-id]", (target, point) => {
+        const userId = (target as HTMLElement).dataset.userId;
+        if (userId) {
+            onUserContextMenu?.(userId, point);
+        }
+    });
     const localDomain = useMemo(() => client.getDomain(), [client]);
     const members = useMemo(() => getVisibleMembers(room), [room]);
     const roleSourceRoom = activeSpaceRoom ?? room;
@@ -154,7 +164,7 @@ export function MembersPanel({
             <div className="rs-panel-header">
                 <h2 className="rs-panel-title">Members - {orderedMembers.length}</h2>
             </div>
-            <div className="rs-members-list">
+            <div className="rs-members-list" onPointerDown={onUserContextMenu ? memberLongPress.onPointerDown : undefined}>
                 {orderedMembers.map((member) => {
                     const displayName =
                         member.rawDisplayName || member.name || formatUserIdForDisplay(member.userId, localDomain);
@@ -167,7 +177,16 @@ export function MembersPanel({
                             type="button"
                             className="rs-member-row"
                             key={member.userId}
+                            data-user-id={member.userId}
                             onClick={() => onSelectUser(member.userId)}
+                            onContextMenu={
+                                onUserContextMenu
+                                    ? (event) => {
+                                          event.preventDefault();
+                                          onUserContextMenu(member.userId, { x: event.clientX, y: event.clientY });
+                                      }
+                                    : undefined
+                            }
                             title={member.userId}
                         >
                             <Avatar

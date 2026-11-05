@@ -30,7 +30,7 @@ import {
 import { useActivityPrivacy, useActivityPrivacyMigration } from "../activity/useActivityPrivacy";
 import { useGameDetection } from "../activity/useGameDetection";
 import { StatusMenu } from "./presence/StatusMenu";
-import { ensureDirectRoomMapping, getDirectRoomIds } from "../adapters/dmAdapter";
+import { createOrReuseDirectChat, ensureDirectRoomMapping, getDirectRoomIds } from "../adapters/dmAdapter";
 import { describeJoinError, joinRoomWithRetry } from "../adapters/joinAdapter";
 import { roomAvatarSources } from "../adapters/avatar";
 import { mediaFromMxc, thumbnailFromMxc } from "../adapters/media";
@@ -79,6 +79,22 @@ import { IncomingCallPrompt } from "./calls/IncomingCallPrompt";
 import { useCallController } from "../calls/useCallController";
 import { JoinRoomDialog } from "./rooms/JoinRoomDialog";
 import { RoomModerationDialog } from "./rooms/RoomModerationDialog";
+import { UserContextMenu, type MenuPoint } from "./user/UserContextMenu";
+import { dmMenuEntries, memberMenuEntries, moderationRights, type UserMenuEntry } from "../users/userMenus";
+import {
+    banFromScope,
+    blockUser,
+    closeConversation,
+    copyUserId,
+    describeMenuError,
+    favouritesFirst,
+    isFavourite,
+    isRoomMuted,
+    removeFromScope,
+    toggleFavourite,
+    toggleRoomMute,
+} from "../users/userMenuActions";
+import { requestMention } from "../mentions/mentionRequests";
 import { RoomSettingsDialog } from "./rooms/RoomSettingsDialog";
 import { SettingsOverlay, type SettingsMode } from "../settings/SettingsOverlay";
 import {
@@ -1201,6 +1217,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         client.on(ClientEvent.AccountData, onRoomsChanged);
         client.on(RoomEvent.Timeline, onRoomsChanged);
         client.on(MatrixEventEvent.Decrypted, onRoomsChanged);
+        client.on(RoomEvent.Tags, onRoomsChanged);
 
         onRoomsChanged();
 
@@ -1210,6 +1227,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             client.removeListener(ClientEvent.AccountData, onRoomsChanged);
             client.removeListener(RoomEvent.Timeline, onRoomsChanged);
             client.removeListener(MatrixEventEvent.Decrypted, onRoomsChanged);
+            client.removeListener(RoomEvent.Tags, onRoomsChanged);
 
             for (const room of [...watchedRooms]) {
                 detachRoomListeners(room);
@@ -1361,10 +1379,11 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         }
         return hints;
     }, [refreshedVoiceChannelHintsBySpaceId, spaces]);
+    // Favourites pinned on top, then the rest; each by most recent first.
     const peopleChannels = useMemo(
         () =>
-            sortRoomsByActivity(
-                visibleRooms.filter((room) => !room.isSpaceRoom() && directRoomIds.has(room.roomId)),
+            favouritesFirst(
+                sortRoomsByActivity(visibleRooms.filter((room) => !room.isSpaceRoom() && directRoomIds.has(room.roomId))),
             ),
         [directRoomIds, visibleRooms],
     );
@@ -3023,6 +3042,258 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         [isPhone, selectUser],
     );
 
+    // ---- The menu on right-clicking someone (a long press on a phone) ----
+    // A: a conversation in the DM list. B: a member, or a message's author, in a Space or room.
+    const [userMenu, setUserMenu] = useState<{ key: number; point: MenuPoint; label: string; entries: UserMenuEntry[] } | null>(null);
+    const closeUserMenu = useCallback((): void => setUserMenu(null), []);
+    const showUserMenu = useCallback((point: MenuPoint, label: string, entries: UserMenuEntry[]): void => {
+        setUserMenu((current) => ({ key: (current?.key ?? 0) + 1, point, label, entries }));
+    }, []);
+    const runMenuAction = useCallback(
+        (work: () => Promise<void>, failure: string): void => {
+            void work().catch((error: unknown) => pushToast({ type: "error", message: describeMenuError(error, failure) }));
+        },
+        [pushToast],
+    );
+    const userMenuName = useCallback(
+        (userId: string, room: Room | null): string => {
+            const member = room?.getMember(userId);
+            return (
+                member?.rawDisplayName ||
+                member?.name ||
+                client.getUser(userId)?.displayName ||
+                formatUserIdForDisplay(userId, localDomain) ||
+                userId
+            );
+        },
+        [client, localDomain],
+    );
+    const copyUserIdFromMenu = useCallback(
+        (userId: string): void => {
+            runMenuAction(async () => {
+                await copyUserId(userId);
+                pushToast({ type: "success", message: `Copied ${userId}.` });
+            }, "Couldn't copy the user ID.");
+        },
+        [pushToast, runMenuAction],
+    );
+    const blockFromMenu = useCallback(
+        (userId: string, name: string): void => {
+            runMenuAction(async () => {
+                const confirmed = await confirmAction({
+                    title: `Block ${name}?`,
+                    message: "You won't see their messages or invites any more. They aren't told.",
+                    confirmLabel: "Block",
+                    danger: true,
+                });
+                if (!confirmed) {
+                    return;
+                }
+                await blockUser(client, userId);
+                pushToast({ type: "success", message: `Blocked ${name}.` });
+            }, `Couldn't block ${name}.`);
+        },
+        [client, confirmAction, pushToast, runMenuAction],
+    );
+
+    const openDmMenu = useCallback(
+        (roomId: string, point: MenuPoint): void => {
+            const room = client.getRoom(roomId);
+            const ownUserId = client.getUserId() ?? "";
+            if (!room || !ownUserId) {
+                return;
+            }
+            const partnerId = getOneToOnePartnerId(room, ownUserId);
+            const name = partnerId ? userMenuName(partnerId, room) : getRoomName(room);
+            const entries = dmMenuEntries(
+                { partnerId, ownUserId, muted: isRoomMuted(client, roomId), favourite: isFavourite(room) },
+                {
+                    profile: () => {
+                        if (partnerId) {
+                            selectUserFromChat(partnerId);
+                        }
+                    },
+                    startCall: () => {
+                        if (partnerId) {
+                            void calls.startCall(partnerId);
+                        }
+                    },
+                    markRead: () =>
+                        runMenuAction(async () => {
+                            const { failed } = await markRoomsRead(client, [room]);
+                            if (failed > 0) {
+                                throw new Error("Couldn't mark it as read. Try again.");
+                            }
+                        }, "Couldn't mark it as read."),
+                    toggleMute: () =>
+                        runMenuAction(async () => {
+                            const muted = await toggleRoomMute(client, roomId);
+                            pushToast({ type: "success", message: muted ? `Muted ${name}.` : `Unmuted ${name}.` });
+                        }, "Couldn't change this conversation's notifications."),
+                    toggleFavourite: () =>
+                        runMenuAction(async () => {
+                            const favourite = await toggleFavourite(client, room);
+                            pushToast({
+                                type: "success",
+                                message: favourite ? `${name} is a favourite, pinned to the top.` : `${name} is no longer a favourite.`,
+                            });
+                        }, "Couldn't change your favourites."),
+                    copyUserId: () => {
+                        if (partnerId) {
+                            copyUserIdFromMenu(partnerId);
+                        }
+                    },
+                    close: () =>
+                        runMenuAction(async () => {
+                            const confirmed = await confirmAction({
+                                title: partnerId ? `Close your DM with ${name}?` : `Leave ${name}?`,
+                                message: "You leave the conversation. You can start a new one with them any time.",
+                                confirmLabel: "Close DM",
+                                danger: true,
+                            });
+                            if (!confirmed) {
+                                return;
+                            }
+                            await closeConversation(client, roomId);
+                            if (activeRoom?.roomId === roomId) {
+                                setReplyToEvent(null);
+                                setEditingEvent(null);
+                                setInviteOpen(false);
+                                setRoomSettingsRoomId(null);
+                                setRoomModerationOpen(false);
+                            }
+                            pushToast({ type: "success", message: partnerId ? `Closed your DM with ${name}.` : `Left ${name}.` });
+                        }, "Couldn't close the conversation."),
+                    block: () => {
+                        if (partnerId) {
+                            blockFromMenu(partnerId, name);
+                        }
+                    },
+                },
+            );
+            showUserMenu(point, `Options for ${name}`, entries);
+        },
+        [
+            activeRoom,
+            blockFromMenu,
+            calls,
+            client,
+            confirmAction,
+            copyUserIdFromMenu,
+            pushToast,
+            runMenuAction,
+            selectUserFromChat,
+            showUserMenu,
+            userMenuName,
+        ],
+    );
+
+    const openMemberMenu = useCallback(
+        (userId: string, point: MenuPoint): void => {
+            const ownUserId = client.getUserId() ?? "";
+            if (!ownUserId) {
+                return;
+            }
+            const room = activeRoom;
+            const name = userMenuName(userId, room);
+            const space =
+                selectedSpaceId !== PEOPLE_SPACE_ID && selectedSpaceRoom?.isSpaceRoom() ? selectedSpaceRoom : null;
+            const directHere = Boolean(room && directRoomIds.has(room.roomId));
+            // Removing and banning act on the Space and its channels; outside a Space, on the room; never in a DM.
+            const scope: Room[] = space ? [space, ...getSpaceChannels(space, roomById)] : room && !directHere ? [room] : [];
+            const rights = moderationRights(scope[0] ?? null, ownUserId);
+            const scopeName = scope[0] ? getRoomName(scope[0]) : "";
+            const entries = memberMenuEntries(
+                {
+                    userId,
+                    ownUserId,
+                    canMention: Boolean(room),
+                    canKick: rights.canKick,
+                    canBan: rights.canBan,
+                    scope: space ? "space" : "room",
+                },
+                {
+                    profile: () => selectUserFromChat(userId),
+                    message: () =>
+                        runMenuAction(async () => {
+                            const result = await createOrReuseDirectChat(client, userId);
+                            focusRoom(result.roomId);
+                        }, `Couldn't open a DM with ${name}.`),
+                    mention: () => {
+                        if (room && requestMention(room.roomId, userId)) {
+                            if (isPhone) {
+                                setPhoneDrawerOpen(false);
+                            }
+                            return;
+                        }
+                        pushToast({ type: "info", message: "There's no message box here to mention them in." });
+                    },
+                    copyUserId: () => copyUserIdFromMenu(userId),
+                    block: () => blockFromMenu(userId, name),
+                    remove: () =>
+                        runMenuAction(async () => {
+                            const confirmed = await confirmAction({
+                                title: `Remove ${name} from ${scopeName}?`,
+                                message: space
+                                    ? "They're removed from the space and its channels. They can come back if they're invited, or if it's open to join."
+                                    : "They can come back if they're invited, or if it's open to join.",
+                                confirmLabel: "Remove",
+                                danger: true,
+                            });
+                            if (!confirmed) {
+                                return;
+                            }
+                            const result = await removeFromScope(client, scope, userId, ownUserId);
+                            pushToast(
+                                result.failed > 0
+                                    ? { type: "info", message: `Removed ${name}, but not from ${result.failed} channel${result.failed === 1 ? "" : "s"} where you can't remove people.` }
+                                    : { type: "success", message: `Removed ${name} from ${scopeName}.` },
+                            );
+                        }, `Couldn't remove ${name}.`),
+                    ban: () =>
+                        runMenuAction(async () => {
+                            const confirmed = await confirmAction({
+                                title: `Ban ${name} from ${scopeName}?`,
+                                message: space
+                                    ? "They're removed from the space and its channels, and can't come back until they're unbanned."
+                                    : "They're removed, and can't come back until they're unbanned.",
+                                confirmLabel: "Ban",
+                                danger: true,
+                            });
+                            if (!confirmed) {
+                                return;
+                            }
+                            const result = await banFromScope(client, scope, userId, ownUserId);
+                            pushToast(
+                                result.failed > 0
+                                    ? { type: "info", message: `Banned ${name}, but not from ${result.failed} channel${result.failed === 1 ? "" : "s"} where you can't ban people.` }
+                                    : { type: "success", message: `Banned ${name} from ${scopeName}.` },
+                            );
+                        }, `Couldn't ban ${name}.`),
+                },
+            );
+            showUserMenu(point, `Options for ${name}`, entries);
+        },
+        [
+            activeRoom,
+            blockFromMenu,
+            client,
+            confirmAction,
+            copyUserIdFromMenu,
+            directRoomIds,
+            focusRoom,
+            isPhone,
+            pushToast,
+            roomById,
+            runMenuAction,
+            selectUserFromChat,
+            selectedSpaceId,
+            selectedSpaceRoom,
+            showUserMenu,
+            userMenuName,
+        ],
+    );
+
     // Swipes. Dragging a chat right goes back to the lists and dragging it left brings in the
     // members; dragging the drawer right puts it away; dragging the lists left brings back the
     // last chat. Panels follow the finger directly, outside React, then settle through their CSS.
@@ -3126,6 +3397,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             searchQuery={sidebarSearchQuery}
             onSearchQueryChange={setSidebarSearchQuery}
             onSelectUser={selectUser}
+            onUserContextMenu={openMemberMenu}
             onBackToRoom={clearSelectedUser}
             onCloseRoomPanel={isPhone ? closePhoneDrawer : () => selectSidebarMode("closed")}
             onOpenRoomSettings={() => openRoomSettingsFor(activeRoom?.roomId ?? null)}
@@ -3314,6 +3586,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     liveParticipantsByRoomId={voiceParticipantsByRoomId}
                     liveParticipantsOverrideRoomId={liveVoiceParticipantsOverrideRoomId}
                     onOpenRoomSettings={openRoomSettingsFor}
+                    onRoomContextMenu={selectedSpaceId === PEOPLE_SPACE_ID ? openDmMenu : undefined}
                 />
                 <div className="pane-bottom">
                     {hasActiveVoiceSession && voiceSessionRoomId ? (
@@ -3533,6 +3806,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                             }}
                             onEdit={startEditing}
                             onSelectUser={selectUserFromChat}
+                            onUserContextMenu={openMemberMenu}
                             activeSpaceId={selectedSpaceId === PEOPLE_SPACE_ID ? null : selectedSpaceId}
                             customReactionImagesEnabled={renderReactionImages}
                             showReadReceipts={shouldShowReadReceipts}
@@ -3758,6 +4032,15 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     setRooms((current) => current.filter((candidate) => candidate.roomId !== roomId));
                 }}
             />
+            {userMenu ? (
+                <UserContextMenu
+                    key={userMenu.key}
+                    point={userMenu.point}
+                    label={userMenu.label}
+                    entries={userMenu.entries}
+                    onClose={closeUserMenu}
+                />
+            ) : null}
             <RoomModerationDialog
                 client={client}
                 room={activeRoom}
