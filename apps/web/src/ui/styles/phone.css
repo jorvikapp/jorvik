@@ -106,6 +106,10 @@
     padding: 8px;
 }
 
+.app-shell.is-phone .pane-bottom > .pane-voice-dock {
+    margin: 0;
+}
+
 /* With the user card on the You tab, the bottom of the list only holds a call in progress. */
 .app-shell.is-phone .pane-bottom:not(:has(.pane-voice-dock)) {
     display: none;
