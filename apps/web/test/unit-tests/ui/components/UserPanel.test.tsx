@@ -162,3 +162,195 @@ describe("mic, deafen and settings", () => {
         expect(container.querySelector(".avatar-presence-dot.is-offline")).not.toBeNull();
     });
 });
+
+describe("device pickers next to mic and deafen", () => {
+    const device = (kind: MediaDeviceKind, deviceId: string, label: string): MediaDeviceInfo =>
+        ({ kind, deviceId, label, groupId: "g", toJSON: () => ({}) }) as MediaDeviceInfo;
+    const MICS = [device("audioinput", "default", "Default - Built-in Microphone"), device("audioinput", "usb", "USB Microphone")];
+    const SPEAKERS = [device("audiooutput", "default", "Default - Speakers"), device("audiooutput", "hp", "Headphones")];
+    let onChoose: ReturnType<typeof vi.fn>;
+    let onOpenAudioSettings: ReturnType<typeof vi.fn>;
+
+    function media(list: () => Promise<MediaDeviceInfo[]>, permission?: PermissionState, getUserMedia = vi.fn()): void {
+        Object.defineProperty(navigator, "mediaDevices", {
+            configurable: true,
+            value: { enumerateDevices: list, getUserMedia, addEventListener: vi.fn(), removeEventListener: vi.fn() },
+        });
+        Object.defineProperty(navigator, "permissions", {
+            configurable: true,
+            value: permission ? { query: async () => ({ state: permission }) } : undefined,
+        });
+    }
+
+    beforeEach(() => {
+        media(async () => [...MICS, ...SPEAKERS]);
+        Object.defineProperty(HTMLMediaElement.prototype, "setSinkId", { configurable: true, value: async () => undefined });
+        onChoose = vi.fn();
+        onOpenAudioSettings = vi.fn();
+    });
+
+    afterEach(() => {
+        delete (navigator as { mediaDevices?: unknown }).mediaDevices;
+        delete (navigator as { permissions?: unknown }).permissions;
+        delete (HTMLMediaElement.prototype as { setSinkId?: unknown }).setSinkId;
+    });
+
+    const devices = (over: Partial<NonNullable<UserPanelProps["devices"]>> = {}): UserPanelProps["devices"] => ({
+        inputId: "default",
+        outputId: "default",
+        onChoose,
+        onOpenSettings: onOpenAudioSettings,
+        ...over,
+    });
+    async function settle(): Promise<void> {
+        await act(async () => {
+            for (let tick = 0; tick < 6; tick += 1) {
+                await Promise.resolve();
+            }
+        });
+    }
+    const listed = (): Array<{ label: string; checked: string | null }> =>
+        [...container.querySelectorAll('.device-menu [role="menuitemradio"]')].map((item) => ({
+            label: item.querySelector(".device-menu-label")?.textContent ?? "",
+            checked: item.getAttribute("aria-checked"),
+        }));
+    const item = (label: string): HTMLButtonElement => {
+        const found = [...container.querySelectorAll<HTMLButtonElement>('.device-menu [role^="menuitem"]')].find(
+            (entry) => entry.querySelector(".device-menu-label")?.textContent === label,
+        );
+        if (!found) {
+            throw new Error(`no ${label} in the menu`);
+        }
+        return found;
+    };
+    const note = (): string => container.querySelector(".device-menu-note")?.textContent ?? "";
+
+    it("lists the microphones with the one in use ticked; choosing one changes the device and nothing else", async () => {
+        renderPanel({ devices: devices({ inputId: "usb" }) });
+        click(button("Choose microphone"));
+        await settle();
+        expect(button("Choose microphone").getAttribute("aria-expanded")).toBe("true");
+        expect(listed()).toEqual([
+            { label: "Default - Built-in Microphone", checked: "false" },
+            { label: "USB Microphone", checked: "true" },
+        ]);
+
+        click(item("Default - Built-in Microphone"));
+        expect(onChoose).toHaveBeenCalledWith("audioinput", "default");
+        expect(container.querySelector(".device-menu")).toBeNull();
+        expect(getLocalAvState()).toMatchObject({ micMuted: false, deafened: false });
+    });
+
+    it("keeps you muted and deafened while you change microphone and speaker", async () => {
+        renderPanel({ devices: devices() });
+        click(button("Mute"));
+        click(button("Deafen"));
+        click(button("Choose microphone"));
+        await settle();
+        click(item("USB Microphone"));
+        click(button("Choose speaker"));
+        await settle();
+        expect(listed().map((entry) => entry.label)).toEqual(["Default - Speakers", "Headphones"]);
+        click(item("Headphones"));
+        expect(onChoose.mock.calls).toEqual([
+            ["audioinput", "usb"],
+            ["audiooutput", "hp"],
+        ]);
+        expect(getLocalAvState()).toMatchObject({ micMuted: true, deafened: true });
+        expect(button("Mute").getAttribute("aria-pressed")).toBe("true");
+    });
+
+    it("leaves muting to the mic button itself: the chevron only opens and closes its menu", async () => {
+        renderPanel({ devices: devices() });
+        click(button("Choose microphone"));
+        await settle();
+        click(button("Choose microphone"));
+        expect(container.querySelector(".device-menu")).toBeNull();
+        expect(getLocalAvState().micMuted).toBe(false);
+        click(button("Mute"));
+        expect(getLocalAvState().micMuted).toBe(true);
+    });
+
+    it("says why there's nothing to choose, without failing", async () => {
+        renderPanel({ devices: devices() });
+
+        media(async () => [], "granted");
+        click(button("Choose microphone"));
+        await settle();
+        expect(note()).toBe("No microphones found.");
+        click(button("Choose microphone"));
+
+        media(async () => [device("audioinput", "", "")], "denied");
+        click(button("Choose microphone"));
+        await settle();
+        expect(note()).toContain("Microphone access is blocked");
+        click(button("Choose microphone"));
+
+        delete (navigator as { mediaDevices?: unknown }).mediaDevices;
+        click(button("Choose microphone"));
+        await settle();
+        expect(note()).toBe("This browser can't list your microphones.");
+        click(button("Choose microphone"));
+
+        delete (HTMLMediaElement.prototype as { setSinkId?: unknown }).setSinkId;
+        click(button("Choose speaker"));
+        await settle();
+        expect(note()).toContain("This browser can't choose where sound plays");
+        expect(listed()).toEqual([]);
+    });
+
+    it("asks for the microphone when the names are hidden, then lists them", async () => {
+        let allowed = false;
+        const stop = vi.fn();
+        const getUserMedia = vi.fn(async () => {
+            allowed = true;
+            return { getTracks: () => [{ stop }] };
+        });
+        media(async () => (allowed ? MICS : [device("audioinput", "", "")]), "prompt", getUserMedia);
+        renderPanel({ devices: devices() });
+        click(button("Choose microphone"));
+        await settle();
+        expect(note()).toContain("Allow the microphone");
+        click(item("Allow the microphone"));
+        await settle();
+        expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
+        expect(stop).toHaveBeenCalled();
+        expect(listed().map((entry) => entry.label)).toEqual(["Default - Built-in Microphone", "USB Microphone"]);
+        expect(getLocalAvState().micMuted).toBe(false);
+    });
+
+    it("works from the keyboard: focus starts on the device in use, arrows move, Escape goes back", async () => {
+        renderPanel({ devices: devices({ inputId: "usb" }) });
+        click(button("Choose microphone"));
+        await settle();
+        expect(document.activeElement).toBe(item("USB Microphone"));
+        const key = (name: string): void => {
+            act(() => {
+                document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true }));
+            });
+        };
+        key("ArrowDown");
+        expect(document.activeElement).toBe(item("Voice and video settings"));
+        key("ArrowUp");
+        key("ArrowUp");
+        expect(document.activeElement).toBe(item("Default - Built-in Microphone"));
+        key("Escape");
+        expect(container.querySelector(".device-menu")).toBeNull();
+        expect(document.activeElement).toBe(button("Choose microphone"));
+    });
+
+    it("opens Voice and video settings from the menu", async () => {
+        renderPanel({ devices: devices() });
+        click(button("Choose speaker"));
+        await settle();
+        click(item("Voice and video settings"));
+        expect(onOpenAudioSettings).toHaveBeenCalledTimes(1);
+        expect(container.querySelector(".device-menu")).toBeNull();
+    });
+
+    it("has no chevrons when the app gives no way to choose devices", () => {
+        renderPanel();
+        expect(container.querySelector('button[aria-label="Choose microphone"]')).toBeNull();
+        expect(container.querySelector(".user-panel-split.has-chevron")).toBeNull();
+    });
+});

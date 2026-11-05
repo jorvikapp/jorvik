@@ -2006,6 +2006,13 @@ textarea {
 
 .pane-bottom {
     border-top: 1px solid var(--border);
+    /* Its own strip under the channel list: the hairline above, and a faint tint of the accent. */
+    background: var(--bg-pane);
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--accent) 7%, var(--bg-pane)),
+        color-mix(in srgb, var(--accent) 3%, var(--bg-pane))
+    );
     padding: 10px;
     display: flex;
     flex-direction: column;
@@ -6076,7 +6083,7 @@ select,
     position: relative;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
     min-height: 56px;
     padding: 4px;
     border: 1px solid var(--border);
@@ -6092,8 +6099,8 @@ select,
     border: 0;
     border-radius: 8px;
     background: transparent;
-    padding: 4px 6px;
-    gap: 8px;
+    padding: 4px;
+    gap: 6px;
 }
 
 .pane-user-row.user-panel .pane-user-card:hover {
@@ -6160,11 +6167,15 @@ select,
 .user-panel-controls {
     display: flex;
     flex-shrink: 0;
-    gap: 2px;
+    align-items: center;
+    gap: 1px;
 }
 
-.user-panel-control {
-    width: 32px;
+/* Feedback that every theme can see: the text colour, faintly, behind the icon. Only colours change
+   on hover, press and focus, so nothing moves. */
+.user-panel-control,
+.user-panel-chevron {
+    --panel-feedback: var(--text-main);
     height: 32px;
     display: inline-flex;
     align-items: center;
@@ -6175,25 +6186,46 @@ select,
     background: transparent;
     color: var(--text-muted);
     cursor: pointer;
+    transition:
+        background-color var(--motion-fast) ease,
+        color var(--motion-fast) ease;
 }
 
-.user-panel-control:hover {
+.user-panel-control {
+    width: 28px;
+}
+
+.user-panel-control:hover,
+.user-panel-chevron:hover {
     background: var(--bg-hover);
+    background: color-mix(in srgb, var(--panel-feedback) 10%, transparent);
     color: var(--text-main);
 }
 
-.user-panel-control:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
+.user-panel-control:active,
+.user-panel-chevron:active,
+.user-panel-chevron.is-open {
+    background: var(--bg-active);
+    background: color-mix(in srgb, var(--panel-feedback) 18%, transparent);
+    color: var(--text-main);
 }
 
-.user-panel-control.is-muted,
-.user-panel-control.is-muted:hover {
+.user-panel-control:focus-visible,
+.user-panel-chevron:focus-visible {
+    outline: 2px solid var(--accent);
+    outline: 2px solid color-mix(in srgb, var(--accent) 55%, var(--text-main));
+    outline-offset: -2px;
+}
+
+/* Muted, or deafened: red, and red behind it on hover and press. */
+.user-panel-control.is-muted {
+    --panel-feedback: var(--danger);
     color: var(--danger);
 }
 
-.user-panel-control.is-muted:hover {
-    background: rgba(240, 71, 71, 0.14);
+.user-panel-control.is-muted:hover,
+.user-panel-control.is-muted:active {
+    color: var(--danger);
 }
 
 .user-panel-control-icon {
@@ -6201,10 +6233,119 @@ select,
     height: 20px;
 }
 
-/* The status menu opens above the panel, from its left edge. */
+/* Mic and deafen with their device pickers: one control in two halves. */
+.user-panel-split {
+    display: inline-flex;
+    align-items: center;
+}
+
+.user-panel-split.has-chevron > .user-panel-control {
+    border-radius: 8px 3px 3px 8px;
+}
+
+.user-panel-chevron {
+    width: 12px;
+    border-radius: 3px 8px 8px 3px;
+}
+
+.user-panel-chevron-icon {
+    width: 10px;
+    height: 10px;
+}
+
+/* The microphones or speakers to choose from, above the panel and as wide as it. */
+.user-panel > .device-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    z-index: 40;
+    max-height: 340px;
+    overflow-y: auto;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-panel, var(--bg-input));
+    box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
+}
+
+.device-menu-title {
+    padding: 6px 8px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.device-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 32px;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-main);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.device-menu-item:hover,
+.device-menu-item:focus-visible {
+    background: var(--bg-hover);
+    background: color-mix(in srgb, var(--text-main) 10%, transparent);
+}
+
+.device-menu-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline: 2px solid color-mix(in srgb, var(--accent) 55%, var(--text-main));
+    outline-offset: -2px;
+}
+
+.device-menu-item[aria-checked="true"] {
+    font-weight: 600;
+}
+
+.device-menu-check {
+    width: 14px;
+    flex-shrink: 0;
+    text-align: center;
+    color: var(--status-online);
+}
+
+.device-menu-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.device-menu-note {
+    margin: 2px 8px 4px;
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--text-muted);
+}
+
+.device-menu-separator {
+    height: 1px;
+    margin: 4px 2px;
+    background: var(--border);
+}
+
+/* The status menu opens above the panel, as wide as it: the channel list cuts off anything wider. */
 .user-panel > .status-menu {
     left: 0;
-    right: auto;
+    right: 0;
+    width: auto;
 }
 
 /* The call dock's icon buttons: the camera during a call; on phones, the mic and sound too. */

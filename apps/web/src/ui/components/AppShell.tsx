@@ -3416,6 +3416,19 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                                 : null
                         }
                         onOpenSettings={() => openUserSettings("my-account")}
+                        devices={{
+                            inputId: userSettings.audio.preferredAudioInputId,
+                            outputId: userSettings.audio.preferredAudioOutputId,
+                            onChoose: (kind, deviceId) =>
+                                setUserSettings((current) => ({
+                                    ...current,
+                                    audio:
+                                        kind === "audioinput"
+                                            ? { ...current.audio, preferredAudioInputId: deviceId }
+                                            : { ...current.audio, preferredAudioOutputId: deviceId },
+                                })),
+                            onOpenSettings: () => openUserSettings("audio"),
+                        }}
                     >
                         {presenceEnabled && statusMenuOpen ? (
                             <StatusMenu

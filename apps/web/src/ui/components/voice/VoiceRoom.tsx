@@ -832,21 +832,25 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
         [matrixRoomId],
     );
 
+    // The devices as this call last had them. A device chosen during the call switches live, back to the
+    // system default too; changing a device never mutes, unmutes or deafens anything.
+    const callDevicesRef = useRef<{ input: string; output: string } | null>(null);
     useEffect(() => {
         const room = roomRef.current;
+        const input = audioSettings.preferredAudioInputId || "default";
+        const output = audioSettings.preferredAudioOutputId || "default";
         if (!room || connectionState !== ConnectionState.Connected) {
+            callDevicesRef.current = null;
             return;
         }
-
-        if (audioSettings.preferredAudioInputId && audioSettings.preferredAudioInputId !== "default") {
-            void room.switchActiveDevice("audioinput", audioSettings.preferredAudioInputId).catch(() => undefined);
+        const before = callDevicesRef.current;
+        callDevicesRef.current = { input, output };
+        // As the call starts, it already has the chosen devices; the default needs nothing.
+        if (input !== (before?.input ?? "default")) {
+            void room.switchActiveDevice("audioinput", input).catch(() => undefined);
         }
-        if (
-            supportsAudioOutputSelection &&
-            audioSettings.preferredAudioOutputId &&
-            audioSettings.preferredAudioOutputId !== "default"
-        ) {
-            void room.switchActiveDevice("audiooutput", audioSettings.preferredAudioOutputId).catch(() => undefined);
+        if (supportsAudioOutputSelection && output !== (before?.output ?? "default")) {
+            void room.switchActiveDevice("audiooutput", output).catch(() => undefined);
         }
     }, [audioSettings.preferredAudioInputId, audioSettings.preferredAudioOutputId, connectionState, supportsAudioOutputSelection]);
 

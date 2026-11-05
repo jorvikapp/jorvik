@@ -108,6 +108,7 @@ describe("voice room smoke", () => {
     let cameraCalls: unknown[][];
     let cameraFailure: Error | null;
     let micFailure: Error | null;
+    let deviceSwitches: Array<[string, string]>;
     let localCameraTrack: FakeVideoTrack | null;
     let createdRoomOptions: Array<Record<string, unknown>>;
     let e2eeEnabledCalls: boolean[];
@@ -130,6 +131,7 @@ describe("voice room smoke", () => {
         cameraCalls = [];
         cameraFailure = null;
         micFailure = null;
+        deviceSwitches = [];
         localCameraTrack = null;
         createdRoomOptions = [];
         e2eeEnabledCalls = [];
@@ -306,8 +308,8 @@ describe("voice room smoke", () => {
                     this.canPlaybackAudio = true;
                 }
 
-                public async switchActiveDevice(): Promise<void> {
-                    return;
+                public async switchActiveDevice(kind: string, deviceId: string): Promise<void> {
+                    deviceSwitches.push([kind, deviceId]);
                 }
 
                 public async disconnect(): Promise<void> {
@@ -918,5 +920,110 @@ describe("voice room smoke", () => {
             await ref.current?.leave();
         });
         expect(av.getLocalAvState().cameraOn).toBe(false);
+    });
+
+    // ---- choosing the microphone and speaker: live in a call, kept for the next one, never muting ----
+
+    function callElement(ref: ReturnType<typeof createRef<VoiceRoomHandle>>, audio: Partial<AudioSettings>): React.ReactElement {
+        return React.createElement(VoiceRoom, {
+            ref,
+            client: {
+                getUserId: () => "@self:example.org",
+                getRoom: () => null,
+                on: vi.fn(),
+                removeListener: vi.fn(),
+                off: vi.fn(),
+                encryptAndSendToDevice: vi.fn(async () => undefined),
+                getCrypto: () => ({ prepareToEncrypt: vi.fn() }),
+                getUser: () => ({ rawDisplayName: "Self" }),
+                mxcUrlToHttp: () => null,
+            },
+            matrixRoomId: "!voice:example.org",
+            matrixRoom: null,
+            audioSettings: { ...createAudioSettings(), ...audio },
+            onAudioSettingsChange: () => undefined,
+        });
+    }
+
+    async function callWith(audio: Partial<AudioSettings>, ref = createRef<VoiceRoomHandle>()): Promise<ReturnType<typeof createRef<VoiceRoomHandle>>> {
+        await act(async () => {
+            root.render(callElement(ref, audio));
+        });
+        return ref;
+    }
+
+    it("switches the microphone live during a call, and back to the default, without touching mute", async () => {
+        const av: typeof import("../../../../src/ui/voice/localAvState") = await import(localAvModule);
+        const ref = await callWith({});
+        await act(async () => {
+            await ref.current?.join();
+        });
+        expect(micOpen()).toBe(true);
+        deviceSwitches.length = 0;
+
+        await callWith({ preferredAudioInputId: "usb" }, ref);
+        await settle();
+        expect(deviceSwitches).toEqual([["audioinput", "usb"]]);
+        expect(micOpen()).toBe(true);
+        expect(av.getLocalAvState()).toMatchObject({ micMuted: false, deafened: false });
+
+        await callWith({ preferredAudioInputId: "default" }, ref);
+        await settle();
+        expect(deviceSwitches).toEqual([
+            ["audioinput", "usb"],
+            ["audioinput", "default"],
+        ]);
+        expect(callButton("Mute microphone")).not.toBeNull();
+    });
+
+    it("keeps you muted when you switch microphones while muted", async () => {
+        const av: typeof import("../../../../src/ui/voice/localAvState") = await import(localAvModule);
+        av.setMicMuted(true);
+        const ref = await callWith({});
+        await act(async () => {
+            await ref.current?.join();
+        });
+        await callWith({ preferredAudioInputId: "usb" }, ref);
+        await settle();
+        expect(deviceSwitches).toContainEqual(["audioinput", "usb"]);
+        expect(micOpen()).toBe(false);
+        expect(av.getLocalAvState().micMuted).toBe(true);
+        expect(callButton("Unmute microphone")).not.toBeNull();
+    });
+
+    it("keeps you deafened when you switch speakers while deafened", async () => {
+        Object.defineProperty(HTMLMediaElement.prototype, "setSinkId", { configurable: true, value: async () => undefined });
+        try {
+            const av: typeof import("../../../../src/ui/voice/localAvState") = await import(localAvModule);
+            av.setDeafened(true);
+            const alice = createAudioPublication("aud-alice");
+            seededRemotePublications.push({ participantIdentity: "@alice:example.org::device-a", participantSid: "remote-a", publication: alice });
+            const ref = await callWith({});
+            await act(async () => {
+                await ref.current?.join();
+            });
+            await act(async () => {
+                createdRooms[0].emit(RoomEvent.TrackSubscribed, alice.track, alice);
+            });
+            await callWith({ preferredAudioOutputId: "headphones" }, ref);
+            await settle();
+            expect(deviceSwitches).toContainEqual(["audiooutput", "headphones"]);
+            expect(av.getLocalAvState()).toMatchObject({ deafened: true, micMuted: true });
+            expect(container.querySelector<HTMLAudioElement>('audio[data-lk-track-sid="aud-alice"]')?.muted).toBe(true);
+            expect(callButton("Undeafen")).not.toBeNull();
+        } finally {
+            delete (HTMLMediaElement.prototype as { setSinkId?: unknown }).setSinkId;
+        }
+    });
+
+    it("keeps a microphone chosen outside a call for the next one, and switches nothing until then", async () => {
+        const ref = await callWith({ preferredAudioInputId: "usb" });
+        await settle();
+        expect(deviceSwitches).toEqual([]);
+        await act(async () => {
+            await ref.current?.join();
+        });
+        expect(deviceSwitches).toContainEqual(["audioinput", "usb"]);
+        expect(micOpen()).toBe(true);
     });
 });
