@@ -29,15 +29,25 @@ interface FakeRoomSpec {
     memberships?: Record<string, string>;
     needed?: number;
     tags?: Record<string, object>;
+    /** Like a real sign-in: other people's membership and rank only show once the member list is loaded. */
+    lazy?: boolean;
 }
-const fakeRoom = ({ id, levels = {}, memberships = {}, needed = 50, tags = {} }: FakeRoomSpec): Room =>
-    ({
+const fakeRoom = ({ id, levels = {}, memberships = {}, needed = 50, tags = {}, lazy = false }: FakeRoomSpec): Room => {
+    let loaded = !lazy;
+    return {
         roomId: id,
         tags,
+        loadMembersIfNeeded: vi.fn(async () => {
+            loaded = true;
+            return true;
+        }),
         getMember: (userId: string) =>
-            userId in memberships || userId in levels ? { powerLevel: levels[userId] ?? 0, membership: memberships[userId] ?? "join" } : null,
+            (loaded || userId === ME) && (userId in memberships || userId in levels)
+                ? { powerLevel: levels[userId] ?? 0, membership: memberships[userId] ?? "join" }
+                : null,
         currentState: { hasSufficientPowerLevelFor: (_action: string, level: number) => level >= needed },
-    }) as unknown as Room;
+    } as unknown as Room;
+};
 
 afterEach(() => {
     vi.clearAllMocks();
@@ -97,7 +107,7 @@ describe("removing and banning across a Space", () => {
 
     it("removes them from the Space first, then the channels they're in", async () => {
         const c = client();
-        const space = fakeRoom({ id: "!space", levels: { [ME]: 50 } });
+        const space = fakeRoom({ id: "!space", levels: { [ME]: 50 }, memberships: { [TARGET]: "join" } });
         const general = fakeRoom({ id: "!general", levels: { [ME]: 50 }, memberships: { [TARGET]: "join" } });
         const elsewhere = fakeRoom({ id: "!elsewhere", levels: { [ME]: 50 }, memberships: { [TARGET]: "leave" } });
         const result = await removeFromScope(c, [space, general, elsewhere], TARGET, ME);
@@ -129,7 +139,7 @@ describe("removing and banning across a Space", () => {
     it("stops at the Space when the server refuses there, and counts channels it can't do", async () => {
         const c = client();
         c.kick.mockRejectedValueOnce(Object.assign(new Error("MatrixError: [403] forbidden"), { data: { error: "You don't have permission." } }));
-        const space = fakeRoom({ id: "!space", levels: { [ME]: 50 } });
+        const space = fakeRoom({ id: "!space", levels: { [ME]: 50 }, memberships: { [TARGET]: "join" } });
         const general = fakeRoom({ id: "!general", levels: { [ME]: 50 }, memberships: { [TARGET]: "join" } });
         await expect(removeFromScope(c, [space, general], TARGET, ME)).rejects.toThrow();
         expect(c.kick).toHaveBeenCalledTimes(1);
@@ -144,6 +154,53 @@ describe("removing and banning across a Space", () => {
             return {};
         });
         expect(await removeFromScope(c2, [space, lowRankChannel, failing], TARGET, ME)).toEqual({ done: 1, failed: 2 });
+    });
+
+    it("removes them from the channels when they already left the Space but stayed in them", async () => {
+        // The server refuses to remove someone from a room they aren't in: asking at the Space would stop everything.
+        const c = client();
+        const space = fakeRoom({ id: "!space", levels: { [ME]: 50 }, memberships: { [TARGET]: "leave" } });
+        const general = fakeRoom({ id: "!general", levels: { [ME]: 50 }, memberships: { [TARGET]: "join" } });
+        const random = fakeRoom({ id: "!random", levels: { [ME]: 50 } });
+        expect(await removeFromScope(c, [space, general, random], TARGET, ME)).toEqual({ done: 1, failed: 0 });
+        expect(c.kick.mock.calls.map((call) => call[0])).toEqual(["!general"]);
+    });
+
+    it("says so when they've already left everywhere, and sends nothing", async () => {
+        const c = client();
+        const space = fakeRoom({ id: "!space", levels: { [ME]: 50 }, memberships: { [TARGET]: "leave" } });
+        const general = fakeRoom({ id: "!general", levels: { [ME]: 50 }, memberships: { [TARGET]: "ban" } });
+        await expect(removeFromScope(c, [space, general], TARGET, ME)).rejects.toThrow("They've already left");
+        expect(c.kick).not.toHaveBeenCalled();
+    });
+
+    it("says so when they're only in channels where it can't be done", async () => {
+        const c = client();
+        const space = fakeRoom({ id: "!space", levels: { [ME]: 50 }, memberships: { [TARGET]: "leave" } });
+        const staff = fakeRoom({ id: "!staff", levels: { [ME]: 50 }, memberships: { [TARGET]: "join" }, needed: 100 });
+        await expect(removeFromScope(c, [space, staff], TARGET, ME)).rejects.toThrow("Couldn't remove them from the channels they're in.");
+        expect(c.kick).not.toHaveBeenCalled();
+    });
+
+    it("loads every member list first: someone who never spoke is still found, and so is their rank", async () => {
+        const c = client();
+        const space = fakeRoom({ id: "!space", levels: { [ME]: 50 }, memberships: { [TARGET]: "join" }, lazy: true });
+        const quiet = fakeRoom({ id: "!quiet", levels: { [ME]: 50 }, memberships: { [TARGET]: "join" }, lazy: true });
+        expect(await removeFromScope(c, [space, quiet], TARGET, ME)).toEqual({ done: 2, failed: 0 });
+        expect(c.kick.mock.calls.map((call) => call[0])).toEqual(["!space", "!quiet"]);
+        expect(space.loadMembersIfNeeded).toHaveBeenCalled();
+        expect(quiet.loadMembersIfNeeded).toHaveBeenCalled();
+
+        const admin = fakeRoom({ id: "!space", levels: { [ME]: 50, [TARGET]: 100 }, lazy: true });
+        await expect(banFromScope(c, [admin], TARGET, ME)).rejects.toBeInstanceOf(OutrankedError);
+        expect(c.ban).not.toHaveBeenCalled();
+    });
+
+    it("still tries when a member list can't be loaded", async () => {
+        const c = client();
+        const space = fakeRoom({ id: "!space", levels: { [ME]: 50 }, memberships: { [TARGET]: "join" } });
+        (space.loadMembersIfNeeded as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("offline"));
+        expect(await removeFromScope(c, [space], TARGET, ME)).toEqual({ done: 1, failed: 0 });
     });
 });
 

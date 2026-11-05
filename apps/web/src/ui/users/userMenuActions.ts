@@ -63,7 +63,7 @@ export class OutrankedError extends Error {}
 export interface ScopeResult {
     /** Rooms it worked in, the Space or room itself included. */
     done: number;
-    /** Channels it didn't work in, after it worked in the Space. */
+    /** Channels it didn't work in. */
     failed: number;
 }
 
@@ -73,7 +73,9 @@ const PRESENT = new Set(["join", "invite", "knock"]);
  * Removes or bans someone from a Space: the Space itself first, then its channels (`scope[0]` is the Space, or
  * the room when there's no Space). The Space comes first, and if it fails nothing else is tried: no rank there,
  * or theirs is as high as yours. A channel that fails doesn't stop the rest. Banning covers channels they aren't
- * in too, so they can't join them later; removing only touches the ones they're in.
+ * in too, so they can't join them later; removing only touches the ones they're in, the Space included: someone
+ * who left the Space but stayed in a channel is removed from the channel (the server refuses to remove someone
+ * from a room they aren't in).
  */
 async function actOnScope(
     client: MatrixClient,
@@ -87,17 +89,27 @@ async function actOnScope(
     if (!main) {
         throw new Error("There's nowhere to remove them from.");
     }
+    // At sign-in the server only sends the members needed to show the messages, so who's in a room, and their
+    // rank there, are only known once its member list is loaded.
+    await Promise.allSettled(scope.map((room) => room.loadMembersIfNeeded()));
     if (powerLevelOf(main, userId) >= powerLevelOf(main, ownUserId)) {
         throw new OutrankedError("Their rank is the same as yours or higher, so you can't do that.");
     }
+    const present = (room: Room): boolean => PRESENT.has(room.getMember(userId)?.membership ?? "");
+    if (action === "kick" && !scope.some(present)) {
+        throw new Error("They've already left, so there's nothing to remove them from.");
+    }
     const act = (room: Room): Promise<unknown> =>
         action === "kick" ? client.kick(room.roomId, userId, reason) : client.ban(room.roomId, userId, reason);
-    await act(main);
-    let done = 1;
+    let done = 0;
     let failed = 0;
+    if (action === "ban" || present(main)) {
+        await act(main);
+        done += 1;
+    }
     for (const room of rest) {
         const membership = room.getMember(userId)?.membership;
-        if (action === "kick" && !PRESENT.has(membership ?? "")) {
+        if (action === "kick" && !present(room)) {
             continue;
         }
         if (action === "ban" && membership === "ban") {
@@ -114,6 +126,9 @@ async function actOnScope(
         } catch {
             failed += 1;
         }
+    }
+    if (done === 0) {
+        throw new Error("Couldn't remove them from the channels they're in.");
     }
     return { done, failed };
 }

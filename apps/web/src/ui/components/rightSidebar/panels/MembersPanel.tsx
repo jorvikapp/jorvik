@@ -12,6 +12,7 @@ import { ActivityIcon } from "../../activity/ActivityLine";
 import { Avatar } from "../../Avatar";
 import { useLongPress } from "../../../layout/longPress";
 import { UserBadges } from "../../badges/UserBadges";
+import { useRoomMembers } from "../../../users/useRoomMembers";
 
 interface MembersPanelProps {
     client: MatrixClient;
@@ -20,12 +21,6 @@ interface MembersPanelProps {
     onSelectUser: (userId: string) => void;
     /** Right-click, or a long press on a phone, on a member: their menu. */
     onUserContextMenu?: (userId: string, point: { x: number; y: number }) => void;
-}
-
-function getVisibleMembers(room: Room): RoomMember[] {
-    return room
-        .getMembers()
-        .filter((member) => member.membership === "join" || member.membership === "invite");
 }
 
 function getUserPowerLevel(room: Room | null, userId: string): number {
@@ -120,8 +115,8 @@ export function MembersPanel({
         }
     });
     const localDomain = useMemo(() => client.getDomain(), [client]);
-    const members = useMemo(() => getVisibleMembers(room), [room]);
     const roleSourceRoom = activeSpaceRoom ?? room;
+    const members = useRoomMembers(client, room, activeSpaceRoom);
     const presenceEnabled = useMemo(() => isPresenceEnabledForClient(config, client), [client, config]);
     const presenceByUserId = usePresenceMap(
         client,
