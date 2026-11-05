@@ -926,13 +926,29 @@ textarea {
     cursor: pointer;
     transition:
         color var(--motion-fast) var(--motion-ease-standard),
-        border-color var(--motion-fast) var(--motion-ease-standard);
+        border-color var(--motion-fast) var(--motion-ease-standard),
+        background-color var(--motion-fast) var(--motion-ease-standard);
 }
 
+/* Hover and keyboard focus: the app's green, like the New DM button and the panel's buttons. Only colours
+   change, so nothing moves. */
 .channels-pane-jump:hover,
 .channels-pane-jump:focus-visible {
     color: var(--text-main);
-    border-color: var(--text-muted);
+    border-color: var(--accent-soft);
+    background: var(--bg-hover);
+    background: color-mix(in srgb, var(--accent-soft) 14%, var(--bg-input));
+}
+
+.channels-pane-jump:focus-visible {
+    outline: 2px solid var(--accent);
+    outline: 2px solid color-mix(in srgb, var(--accent) 55%, var(--text-main));
+    outline-offset: 1px;
+}
+
+.channels-pane-jump:active {
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--accent-soft) 26%, var(--bg-input));
 }
 
 .channels-pane-jump-label {
