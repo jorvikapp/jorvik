@@ -138,9 +138,10 @@
     white-space: nowrap;
 }
 
-/* Only leave and the microphone fit; the speaker switch is in the call itself. */
-.app-shell.is-phone .pane-voice-control:last-child:not(.pane-voice-control-leave):not(.pane-voice-control-join) {
-    display: none;
+/* The call bar's mic, sound and camera are icons, so they fit beside Leave. */
+.app-shell.is-phone .pane-voice-control.pane-voice-icon-control {
+    min-width: 40px;
+    padding: 6px 8px;
 }
 
 /* ---------- Tabs ---------- */
@@ -466,6 +467,14 @@ button.phone-notif:active {
 
 .phone-you-status-message {
     color: var(--text-main);
+}
+
+/* The game you share: one line, centred under your name like the rest. */
+.phone-you-activity.activity-line {
+    max-width: 100%;
+    margin: 0;
+    justify-content: center;
+    font-size: 14px;
 }
 
 .phone-you-actions {

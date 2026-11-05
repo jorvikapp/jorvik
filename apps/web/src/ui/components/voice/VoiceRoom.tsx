@@ -22,8 +22,6 @@ import {
 } from "matrix-js-sdk/src/matrix";
 
 import { Avatar } from "../Avatar";
-import micMutedIcon from "../icons/mic-02.svg";
-import volumeMutedIcon from "../icons/volume-mute-02.svg";
 
 import { plainUserDisplayName } from "../../../core/users/userDisplayName";
 import { CallKeyManager, CallKeyProvider } from "../../../core/voice/callEncryption";
@@ -43,6 +41,15 @@ import { useMatrix } from "../../providers/MatrixProvider";
 import type { AudioSettings } from "../../settings/user/settingsStore";
 import { RoomDialog } from "../rooms/RoomDialog";
 import { ParticipantVideo } from "./ParticipantVideo";
+import {
+    getLocalAvState,
+    setCameraOn,
+    setMicMuted as setStoredMicMuted,
+    toggleDeafened,
+    toggleMicMuted,
+    useLocalAvState,
+} from "../../voice/localAvState";
+import { CameraIcon, GearIcon, MicIcon, SoundIcon } from "./AvIcons";
 
 export type VoiceSessionStatus = "disconnected" | "joining" | "connected";
 
@@ -625,8 +632,17 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
     const [joining, setJoining] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
-    const [micMuted, setMicMuted] = useState(true);
-    const [audioMuted, setAudioMuted] = useState(false);
+    // Mute and deafen are the user's own, shared with the panel under the channel list and the phone's
+    // call bar, and kept between calls: this call follows them.
+    const { micMuted, deafened: audioMuted } = useLocalAvState();
+    // The mic as this call last set it: null while joining, until the call has opened it or not, and
+    // when there's no call.
+    const appliedMicMutedRef = useRef<boolean | null>(null);
+    const micSyncRef = useRef<Promise<void>>(Promise.resolve());
+    // What the voice service was last told about deafen during this call (null: nothing yet).
+    const reportedDeafenedRef = useRef<boolean | null>(null);
+    const audioSettingsRef = useRef(audioSettings);
+    audioSettingsRef.current = audioSettings;
     const [participants, setParticipants] = useState<VoiceParticipantState[]>([]);
     const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
     const [audioOutputs, setAudioOutputs] = useState<MediaDeviceInfo[]>([]);
@@ -846,7 +862,8 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
 
     useEffect(() => {
         const room = roomRef.current;
-        if (!room || connectionState !== ConnectionState.Connected || micMuted) {
+        // Only for a mic that's on in the call: turning it on applies the settings anyway.
+        if (!room || connectionState !== ConnectionState.Connected || micMuted || appliedMicMutedRef.current !== false) {
             return;
         }
         if (appliedMicProcessingSignatureRef.current === micProcessingSignature) {
@@ -1329,7 +1346,8 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                         expectedDisconnectReasonByRoomIdRef.current.get(targetRoomId) ?? "network_or_server";
                     expectedDisconnectReasonByRoomIdRef.current.delete(targetRoomId);
                     setConnectionState(ConnectionState.Disconnected);
-                    setMicMuted(true);
+                    appliedMicMutedRef.current = null;
+                    reportedDeafenedRef.current = null;
                     setLocalCameraEnabled(false);
                     setCallEncrypted(null);
                     setKeysReceivedFrom(new Set());
@@ -1427,22 +1445,30 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                 return;
             }
 
-            await withTimeout(
-                room.localParticipant.setMicrophoneEnabled(
-                    true,
-                    buildMicrophoneCaptureOptions(audioSettings),
-                    buildMicrophonePublishOptions(audioSettings),
-                ),
-                VOICE_JOIN_MEDIA_SETUP_TIMEOUT_MS,
-                "Microphone setup timed out.",
-            );
+            // Muted or deafened before the call: join that way, without opening the mic at all.
+            const joinMicMuted = getLocalAvState().micMuted;
+            if (!joinMicMuted) {
+                await withTimeout(
+                    room.localParticipant.setMicrophoneEnabled(
+                        true,
+                        buildMicrophoneCaptureOptions(audioSettings),
+                        buildMicrophonePublishOptions(audioSettings),
+                    ),
+                    VOICE_JOIN_MEDIA_SETUP_TIMEOUT_MS,
+                    "Microphone setup timed out.",
+                );
+            }
             ensureCurrentJoinRequest();
             if (!isCurrentJoinRequest()) {
                 void room.disconnect().catch(() => undefined);
                 return;
             }
-            appliedMicProcessingSignatureRef.current = micProcessingSignature;
-            setMicMuted(false);
+            if (!joinMicMuted) {
+                appliedMicProcessingSignatureRef.current = micProcessingSignature;
+            }
+            appliedMicMutedRef.current = joinMicMuted;
+            // Muted or unmuted while joining: catch up.
+            syncMicToCall();
             syncParticipants();
             refreshAudioDiagnostics(room);
             void playVoiceJoinSound().catch(() => undefined);
@@ -1801,7 +1827,8 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
         clearScreenSharePreview();
         setConnectionState(ConnectionState.Disconnected);
         setParticipants([]);
-        setMicMuted(true);
+        appliedMicMutedRef.current = null;
+        reportedDeafenedRef.current = null;
         setAudioPlaybackBlocked(false);
         setLocalAudioPublished(false);
         setRemoteAudioSubscribedCount(0);
@@ -1839,34 +1866,50 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
         }
     };
 
+    // Through the shared store, like the panel's buttons: the effects below put the change on the call.
     const toggleMute = async (): Promise<void> => {
-        const room = roomRef.current;
-        if (!room) {
-            return;
-        }
-        const nextMuted = !micMuted;
-        if (nextMuted) {
-            await room.localParticipant.setMicrophoneEnabled(false);
-        } else {
-            await room.localParticipant.setMicrophoneEnabled(
-                true,
-                buildMicrophoneCaptureOptions(audioSettings),
-                buildMicrophonePublishOptions(audioSettings),
-            );
-            appliedMicProcessingSignatureRef.current = micProcessingSignature;
-        }
-        setMicMuted(nextMuted);
-        refreshAudioDiagnostics(room);
+        toggleMicMuted();
     };
 
     const toggleAudioMute = async (): Promise<void> => {
-        const nextAudioMuted = !audioMuted;
-        setAudioMuted(nextAudioMuted);
-        const currentRoomId = connectedRoomIdRef.current ?? matrixRoomId;
-        void updateVoiceParticipantState(client, config, {
-            matrixRoomId: currentRoomId,
-            audioMuted: nextAudioMuted,
-        }).catch(() => undefined);
+        toggleDeafened();
+    };
+
+    /** Puts the store's mic on the call, one change at a time and in order. */
+    const syncMicToCall = (): void => {
+        micSyncRef.current = micSyncRef.current.then(async () => {
+            const room = roomRef.current;
+            const applied = appliedMicMutedRef.current;
+            const wanted = getLocalAvState().micMuted;
+            if (!room || applied === null || applied === wanted) {
+                return;
+            }
+            try {
+                if (wanted) {
+                    await room.localParticipant.setMicrophoneEnabled(false);
+                } else {
+                    await room.localParticipant.setMicrophoneEnabled(
+                        true,
+                        buildMicrophoneCaptureOptions(audioSettingsRef.current),
+                        buildMicrophonePublishOptions(audioSettingsRef.current),
+                    );
+                    appliedMicProcessingSignatureRef.current = getMicProcessingSignature(audioSettingsRef.current);
+                }
+                if (roomRef.current === room) {
+                    appliedMicMutedRef.current = wanted;
+                    refreshAudioDiagnostics(room);
+                }
+            } catch (micError) {
+                if (roomRef.current !== room) {
+                    return;
+                }
+                setError(micError instanceof Error ? micError.message : "Unable to change the microphone.");
+                // It couldn't be turned on: show it as off everywhere.
+                if (!wanted) {
+                    setStoredMicMuted(true);
+                }
+            }
+        });
     };
 
     const closeDesktopCaptureDialog = (selected: boolean): void => {
@@ -2101,6 +2144,31 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
             })),
         });
     }, [matrixRoomId, onLiveParticipantsChange, participants]);
+
+    // Mute changes from anywhere go onto the call.
+    useEffect(() => {
+        if (connectionState === ConnectionState.Connected) {
+            syncMicToCall();
+        }
+    }, [micMuted, connectionState]);
+
+    // Others see who's deafened: the voice service is told as the call starts and whenever it changes.
+    useEffect(() => {
+        if (connectionState !== ConnectionState.Connected || reportedDeafenedRef.current === audioMuted) {
+            return;
+        }
+        reportedDeafenedRef.current = audioMuted;
+        void updateVoiceParticipantState(client, config, {
+            matrixRoomId: connectedRoomIdRef.current ?? matrixRoomId,
+            audioMuted,
+        }).catch(() => undefined);
+    }, [audioMuted, client, config, connectionState, matrixRoomId]);
+
+    // The camera button outside the call shows this call's camera.
+    useEffect(() => {
+        setCameraOn(connectionState === ConnectionState.Connected && localCameraEnabled);
+    }, [connectionState, localCameraEnabled]);
+    useEffect(() => () => setCameraOn(false), []);
 
     useEffect(() => {
         if (!onControlsStateChange) {
@@ -2567,14 +2635,7 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                         title={micMuted ? "Unmute microphone" : "Mute microphone"}
                         aria-pressed={!micMuted}
                     >
-                        {micMuted ? (
-                            <img src={micMutedIcon} className="voice-ctrl-icon" alt="" aria-hidden="true" />
-                        ) : (
-                            <svg className="voice-ctrl-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
-                                    d="M12 2a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4ZM4 11a8 8 0 0 0 16 0M12 19v3m0 0h3m-3 0H9" />
-                            </svg>
-                        )}
+                        <MicIcon muted={micMuted} className="voice-ctrl-icon" />
                         <span className="voice-ctrl-label">{micMuted ? "Unmute" : "Mute"}</span>
                     </button>
 
@@ -2586,15 +2647,7 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                         title={localCameraEnabled ? "Turn camera off" : "Turn camera on"}
                         aria-pressed={localCameraEnabled}
                     >
-                        <svg className="voice-ctrl-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                            {localCameraEnabled ? (
-                                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
-                                    d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
-                            ) : (
-                                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
-                                    d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M12 18.75H4.5a2.25 2.25 0 0 1-2.25-2.25V9m12.841 9.091L16.5 19.5m-1.409-1.409c.407-.407.659-.97.659-1.591v-9a2.25 2.25 0 0 0-2.25-2.25h-9c-.621 0-1.184.252-1.591.659m12.182 12.182L2.909 5.909M1.5 4.5l1.409 1.409" />
-                            )}
-                        </svg>
+                        <CameraIcon on={localCameraEnabled} className="voice-ctrl-icon" />
                         <span className="voice-ctrl-label">{localCameraEnabled ? "Stop video" : "Start video"}</span>
                     </button>
 
@@ -2628,14 +2681,7 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                         title={audioMuted ? "Undeafen" : "Deafen"}
                         aria-pressed={audioMuted}
                     >
-                        {audioMuted ? (
-                            <img src={volumeMutedIcon} className="voice-ctrl-icon" alt="" aria-hidden="true" />
-                        ) : (
-                            <svg className="voice-ctrl-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
-                                    d="M11.553 3.064A.75.75 0 0 1 12 3.75v16.5a.75.75 0 0 1-1.255.555L5.46 16H2.75A1.75 1.75 0 0 1 1 14.25v-4.5C1 8.784 1.784 8 2.75 8H5.46l5.285-4.805a.75.75 0 0 1 .808-.13ZM18.5 12a6.5 6.5 0 0 0-1.905-4.628 1 1 0 0 0-1.395 1.437A4.5 4.5 0 0 1 16.5 12a4.5 4.5 0 0 1-1.3 3.192 1 1 0 1 0 1.395 1.436A6.5 6.5 0 0 0 18.5 12Z" />
-                            </svg>
-                        )}
+                        <SoundIcon deafened={audioMuted} className="voice-ctrl-icon" />
                         <span className="voice-ctrl-label">{audioMuted ? "Undeafen" : "Deafen"}</span>
                     </button>
 
@@ -2647,10 +2693,7 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
                         title="Voice settings"
                         aria-pressed={settingsOpen}
                     >
-                        <svg className="voice-ctrl-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                            <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
-                                d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28ZM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                        </svg>
+                        <GearIcon className="voice-ctrl-icon" />
                         <span className="voice-ctrl-label">Settings</span>
                     </button>
 

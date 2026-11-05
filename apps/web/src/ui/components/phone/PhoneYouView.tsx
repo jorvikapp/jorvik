@@ -1,13 +1,17 @@
 import React, { useState } from "react";
+import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import { PRESENCE_CHOICES } from "../../../core/presence/presenceControl";
 import type { PresenceSelectionController } from "../../presence/usePresenceSelection";
 import { useAppVersion } from "../../version/useAppVersion";
+import { ActivityLine } from "../activity/ActivityLine";
 import { Avatar } from "../Avatar";
 import { StatusMenu, type StatusMenuProps } from "../presence/StatusMenu";
 import { BottomSheet } from "./BottomSheet";
 
 interface PhoneYouViewProps {
+    /** For the game's own icon in the activity line. */
+    client?: MatrixClient | null;
     ownUserId: string;
     displayName: string;
     userIdLabel: string;
@@ -35,6 +39,7 @@ const SETTINGS_ROWS: { tab: string; label: string; danger?: boolean }[] = [
 ];
 
 export function PhoneYouView({
+    client,
     ownUserId,
     displayName,
     userIdLabel,
@@ -73,6 +78,8 @@ export function PhoneYouView({
                     {presence.effectiveStatusMessage ? (
                         <p className="phone-you-status-message">{presence.effectiveStatusMessage}</p>
                     ) : null}
+                    {/* The game you share, as under the channel list on a computer. */}
+                    <ActivityLine client={client} userId={ownUserId} className="phone-you-activity" />
                     <div className="phone-you-actions">
                         {presenceEnabled ? (
                             <button type="button" className="phone-button" onClick={() => setStatusOpen(true)}>

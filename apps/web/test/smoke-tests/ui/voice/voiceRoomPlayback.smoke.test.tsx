@@ -107,6 +107,7 @@ describe("voice room smoke", () => {
     let playAttempts: string[];
     let cameraCalls: unknown[][];
     let cameraFailure: Error | null;
+    let micFailure: Error | null;
     let localCameraTrack: FakeVideoTrack | null;
     let createdRoomOptions: Array<Record<string, unknown>>;
     let e2eeEnabledCalls: boolean[];
@@ -115,6 +116,8 @@ describe("voice room smoke", () => {
     let unencryptedCallParticipants: Array<{ identity: string; matrixUserId?: string }>;
 
     beforeEach(async () => {
+        // Mute and deafen are kept on the device: each test starts from a device that never set them.
+        window.localStorage.removeItem("heorot.voice.localAv");
         vi.resetModules();
 
         container = document.createElement("div");
@@ -126,6 +129,7 @@ describe("voice room smoke", () => {
         playAttempts = [];
         cameraCalls = [];
         cameraFailure = null;
+        micFailure = null;
         localCameraTrack = null;
         createdRoomOptions = [];
         e2eeEnabledCalls = [];
@@ -205,6 +209,9 @@ describe("voice room smoke", () => {
                         trackPublications: new Map<string, any>(),
                         getTrackPublication: (source: string) => this.localParticipant.trackPublications.get(source),
                         setMicrophoneEnabled: async (enabled: boolean) => {
+                            if (enabled && micFailure) {
+                                throw micFailure;
+                            }
                             if (!enabled) {
                                 this.localParticipant.trackPublications.delete(Track.Source.Microphone);
                                 return;
@@ -747,5 +754,169 @@ describe("voice room smoke", () => {
         });
         expect(container.querySelector(".voice-room-encryption-note")).toBeNull();
     });
-});
 
+    // ---- your mic and sound, shared with the panel under the channel list and kept between calls ----
+
+    const AV_KEY = "heorot.voice.localAv";
+    const localAvModule = "../../../../src/ui/voice/localAvState";
+    const micOpen = (): boolean => (createdRooms[0] as any).localParticipant.trackPublications.has("microphone");
+    const callButton = (title: string): HTMLButtonElement | null =>
+        container.querySelector<HTMLButtonElement>(`.voice-controls-bar button[title="${title}"]`);
+    // Lets the mic changes, which go to the call one after another, finish.
+    async function settle(): Promise<void> {
+        await act(async () => {
+            for (let tick = 0; tick < 10; tick += 1) {
+                await Promise.resolve();
+            }
+        });
+    }
+
+    it("joins with the mic off when it was muted before a restart, and opens it once unmuted", async () => {
+        // An earlier run muted the mic; the app starts again with what this device kept, then joins a call.
+        window.localStorage.setItem(AV_KEY, JSON.stringify({ micMuted: true, deafened: false, micMutedBeforeDeafen: false }));
+        vi.resetModules();
+        ({ VoiceRoom } = await import("../../../../src/ui/components/voice/VoiceRoom"));
+        ({ RoomEvent } = await import("livekit-client"));
+        const av: typeof import("../../../../src/ui/voice/localAvState") = await import(localAvModule);
+        expect(av.getLocalAvState().micMuted).toBe(true);
+
+        await renderJoined();
+        expect(micOpen()).toBe(false);
+        expect(callButton("Unmute microphone")).not.toBeNull();
+
+        // Unmuted from anywhere (here, the store the panel uses): the call's mic opens.
+        await act(async () => av.toggleMicMuted());
+        await settle();
+        expect(micOpen()).toBe(true);
+        expect(callButton("Mute microphone")).not.toBeNull();
+    });
+
+    it("joins deafened when deafened before the call: others are silent, the mic stays shut, the voice service knows", async () => {
+        const av: typeof import("../../../../src/ui/voice/localAvState") = await import(localAvModule);
+        const adapter = await import("../../../../src/ui/adapters/voiceAdapter");
+        av.setDeafened(true);
+        const alice = createAudioPublication("aud-alice");
+        seededRemotePublications.push({ participantIdentity: "@alice:example.org::device-a", participantSid: "remote-a", publication: alice });
+
+        await renderJoined();
+        await act(async () => {
+            createdRooms[0].emit(RoomEvent.TrackSubscribed, alice.track, alice);
+        });
+        await settle();
+        const audio = container.querySelector<HTMLAudioElement>('audio[data-lk-track-sid="aud-alice"]');
+        expect(audio?.muted).toBe(true);
+        expect(micOpen()).toBe(false);
+        expect(adapter.updateVoiceParticipantState).toHaveBeenCalledWith(expect.anything(), null, {
+            matrixRoomId: "!voice:example.org",
+            audioMuted: true,
+        });
+
+        // Undeafened: hearing again, and the mic back on, as it was before deafening.
+        await act(async () => av.toggleDeafened());
+        await settle();
+        expect(audio?.muted).toBe(false);
+        expect(micOpen()).toBe(true);
+        expect(adapter.updateVoiceParticipantState).toHaveBeenLastCalledWith(expect.anything(), null, {
+            matrixRoomId: "!voice:example.org",
+            audioMuted: false,
+        });
+    });
+
+    it("keeps the panel and the call's own buttons in step, both ways", async () => {
+        const { UserPanel } = await import("../../../../src/ui/components/user/UserPanel");
+        const ref = createRef<VoiceRoomHandle>();
+        await act(async () => {
+            root.render(
+                React.createElement(
+                    React.Fragment,
+                    null,
+                    React.createElement(VoiceRoom, {
+                        ref,
+                        client: {
+                            getUserId: () => "@self:example.org",
+                            getRoom: () => null,
+                            on: vi.fn(),
+                            removeListener: vi.fn(),
+                            off: vi.fn(),
+                            encryptAndSendToDevice: vi.fn(async () => undefined),
+                            getCrypto: () => ({ prepareToEncrypt: vi.fn() }),
+                            getUser: () => ({ rawDisplayName: "Self" }),
+                            mxcUrlToHttp: () => null,
+                        },
+                        matrixRoomId: "!voice:example.org",
+                        matrixRoom: null,
+                        audioSettings: createAudioSettings(),
+                        onAudioSettingsChange: () => undefined,
+                    }),
+                    React.createElement(UserPanel, {
+                        userId: "@self:example.org",
+                        displayName: "Self",
+                        avatarSources: [],
+                        handle: "@self",
+                        presence: null,
+                        onOpenSettings: () => undefined,
+                    }),
+                ),
+            );
+        });
+        await act(async () => {
+            await ref.current?.join();
+        });
+        const panel = (label: string): HTMLButtonElement =>
+            container.querySelector<HTMLButtonElement>(`.user-panel button[aria-label="${label}"]`)!;
+        expect(micOpen()).toBe(true);
+
+        // Muted with the call's button: the panel shows it, and the mic is shut.
+        await act(async () => callButton("Mute microphone")!.click());
+        await settle();
+        expect(panel("Mute").getAttribute("aria-pressed")).toBe("true");
+        expect(micOpen()).toBe(false);
+
+        // Deafened from the panel: the call's buttons follow.
+        await act(async () => panel("Deafen").click());
+        await settle();
+        expect(callButton("Undeafen")).not.toBeNull();
+        expect(callButton("Unmute microphone")).not.toBeNull();
+
+        // Undeafened with the call's button: the mic stays muted, as it was before deafening.
+        await act(async () => callButton("Undeafen")!.click());
+        await settle();
+        expect(panel("Deafen").getAttribute("aria-pressed")).toBe("false");
+        expect(panel("Mute").getAttribute("aria-pressed")).toBe("true");
+        expect(micOpen()).toBe(false);
+
+        // Unmuted from the panel: the call's mic opens.
+        await act(async () => panel("Mute").click());
+        await settle();
+        expect(callButton("Mute microphone")).not.toBeNull();
+        expect(micOpen()).toBe(true);
+    });
+
+    it("shows the mic as muted again, and says why, when it can't be turned on", async () => {
+        const av: typeof import("../../../../src/ui/voice/localAvState") = await import(localAvModule);
+        av.setMicMuted(true);
+        await renderJoined();
+        expect(micOpen()).toBe(false);
+
+        micFailure = new Error("Permission denied");
+        await act(async () => av.toggleMicMuted());
+        await settle();
+        expect(av.getLocalAvState().micMuted).toBe(true);
+        expect(micOpen()).toBe(false);
+        expect(container.textContent).toContain("Permission denied");
+    });
+
+    it("tells the camera button outside the call when the call's camera goes on and off", async () => {
+        const av: typeof import("../../../../src/ui/voice/localAvState") = await import(localAvModule);
+        const ref = await renderJoined();
+        expect(av.getLocalAvState().cameraOn).toBe(false);
+        await act(async () => {
+            await ref.current?.toggleCamera();
+        });
+        expect(av.getLocalAvState().cameraOn).toBe(true);
+        await act(async () => {
+            await ref.current?.leave();
+        });
+        expect(av.getLocalAvState().cameraOn).toBe(false);
+    });
+});

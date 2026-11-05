@@ -120,6 +120,9 @@ import { useClearedMentions } from "../notifications/clearedMentions";
 import { PhoneNotificationsView } from "./phone/PhoneNotificationsView";
 import { PhoneTabBar, type PhoneTab } from "./phone/PhoneTabBar";
 import { PhoneYouView } from "./phone/PhoneYouView";
+import { UserPanel } from "./user/UserPanel";
+import { CameraIcon, MicIcon, SoundIcon } from "./voice/AvIcons";
+import { toggleDeafened, toggleMicMuted, useLocalAvState } from "../voice/localAvState";
 import { nameThisDevice } from "../../core/devices/deviceName";
 
 interface AppShellProps {
@@ -2347,20 +2350,14 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         runVoiceRoomAction((voiceRoom) => voiceRoom.leave(), "Unable to leave voice channel.");
     }, [runVoiceRoomAction, voiceSessionRoomId, voiceSessionStatus]);
 
-    const toggleVoiceMicFromDock = useCallback((): void => {
+    // Your mic, sound and camera, shared with the panel and the call's own buttons.
+    const localAv = useLocalAvState();
+    const toggleVoiceCameraFromDock = useCallback((): void => {
         if (!voiceSessionRoomId || voiceSessionStatus !== "connected") {
             return;
         }
 
-        runVoiceRoomAction((voiceRoom) => voiceRoom.toggleMute(), "Unable to update microphone state.");
-    }, [runVoiceRoomAction, voiceSessionRoomId, voiceSessionStatus]);
-
-    const toggleVoiceAudioFromDock = useCallback((): void => {
-        if (!voiceSessionRoomId || voiceSessionStatus !== "connected") {
-            return;
-        }
-
-        runVoiceRoomAction((voiceRoom) => voiceRoom.toggleAudioMute(), "Unable to update audio output state.");
+        runVoiceRoomAction((voiceRoom) => voiceRoom.toggleCamera(), "Unable to turn the camera on or off.");
     }, [runVoiceRoomAction, voiceSessionRoomId, voiceSessionStatus]);
 
     const selectSidebarMode = useCallback(
@@ -3364,93 +3361,75 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                                         {voiceSessionStatus === "joining" ? "Cancel" : "Leave"}
                                     </button>
                                 )}
+                                {voiceSessionStatus === "connected" ? (
+                                    <button
+                                        type="button"
+                                        className={`pane-voice-control pane-voice-icon-control${localAv.cameraOn ? " is-on" : ""}`}
+                                        onClick={toggleVoiceCameraFromDock}
+                                        aria-label="Camera"
+                                        aria-pressed={localAv.cameraOn}
+                                        title={localAv.cameraOn ? "Turn camera off" : "Turn camera on"}
+                                    >
+                                        <CameraIcon on={localAv.cameraOn} className="pane-voice-control-icon" />
+                                    </button>
+                                ) : null}
                                 <button
                                     type="button"
-                                    className={`pane-voice-control${voiceControlState.micMuted ? " is-muted" : ""}`}
-                                    onClick={toggleVoiceMicFromDock}
-                                    aria-pressed={!voiceControlState.micMuted}
-                                    disabled={voiceSessionStatus !== "connected"}
+                                    className={`pane-voice-control pane-voice-icon-control pane-voice-phone-only${localAv.micMuted ? " is-muted" : ""}`}
+                                    onClick={toggleMicMuted}
+                                    aria-label="Mute"
+                                    aria-pressed={localAv.micMuted}
+                                    title={localAv.micMuted ? "Unmute" : "Mute"}
                                 >
-                                    {voiceControlState.micMuted ? "Unmute mic" : "Mute mic"}
+                                    <MicIcon muted={localAv.micMuted} className="pane-voice-control-icon" />
                                 </button>
                                 <button
                                     type="button"
-                                    className={`pane-voice-control${voiceControlState.audioMuted ? " is-muted" : ""}`}
-                                    onClick={toggleVoiceAudioFromDock}
-                                    aria-pressed={!voiceControlState.audioMuted}
-                                    disabled={voiceSessionStatus !== "connected"}
+                                    className={`pane-voice-control pane-voice-icon-control pane-voice-phone-only${localAv.deafened ? " is-muted" : ""}`}
+                                    onClick={toggleDeafened}
+                                    aria-label="Deafen"
+                                    aria-pressed={localAv.deafened}
+                                    title={localAv.deafened ? "Undeafen" : "Deafen"}
                                 >
-                                    {voiceControlState.audioMuted ? "Unmute audio" : "Mute audio"}
+                                    <SoundIcon deafened={localAv.deafened} className="pane-voice-control-icon" />
                                 </button>
-                            </div>
-                            <div className="pane-voice-indicators">
-                                <span className={`pane-voice-indicator${voiceControlState.micMuted ? " is-muted" : " is-live"}`}>
-                                    Mic {voiceControlState.micMuted ? "muted" : "live"}
-                                </span>
-                                <span className={`pane-voice-indicator${voiceControlState.audioMuted ? " is-muted" : " is-live"}`}>
-                                    Audio {voiceControlState.audioMuted ? "muted" : "live"}
-                                </span>
                             </div>
                         </div>
                     ) : null}
-                    <div className="pane-user-row">
-                        <button
-                            type="button"
-                            className="pane-user-card"
-                            onClick={() => openUserSettings("my-account")}
-                            title="Open user settings"
-                        >
-                            <Avatar
-                                className="pane-user-avatar"
-                                name={ownDisplayName}
-                                src={ownAvatarSources[0] ?? null}
-                                sources={ownAvatarSources}
-                                seed={ownUserId || undefined}
-                                userId={ownUserId || undefined}
+                    <UserPanel
+                        client={client}
+                        userId={ownUserId}
+                        displayName={ownDisplayName}
+                        avatarSources={ownAvatarSources}
+                        handle={formatUserIdForDisplay(ownUserId, localDomain) || "Unknown user"}
+                        statusMessage={presenceControl.effectiveStatusMessage}
+                        presence={
+                            presenceEnabled
+                                ? {
+                                      choice: presenceControl.effectiveChoice,
+                                      title: presenceControl.autoIdle
+                                          ? "Idle while you're away. Set your status"
+                                          : "Set your status",
+                                      menuOpen: statusMenuOpen,
+                                      onToggleMenu: () => setStatusMenuOpen((open) => !open),
+                                  }
+                                : null
+                        }
+                        onOpenSettings={() => openUserSettings("my-account")}
+                    >
+                        {presenceEnabled && statusMenuOpen ? (
+                            <StatusMenu
+                                choice={presenceControl.selection.choice}
+                                statusMessage={presenceControl.selection.statusMessage}
+                                error={presenceControl.error}
+                                autoIdleOn={autoIdleOn}
+                                activitySharing={activitySharingControl}
+                                onChoose={presenceControl.setChoice}
+                                onStatusMessage={presenceControl.setStatusMessage}
+                                onClose={() => setStatusMenuOpen(false)}
                             />
-                            <span className="pane-user-meta">
-                                <span className="pane-user-name">{ownDisplayName}</span>
-                                <span className="pane-user-id">
-                                    {presenceControl.effectiveStatusMessage ||
-                                        formatUserIdForDisplay(ownUserId, localDomain) ||
-                                        "Unknown user"}
-                                </span>
-                            </span>
-                        </button>
-                        {presenceEnabled ? (
-                            <div className="pane-status-anchor">
-                                <button
-                                    type="button"
-                                    className="pane-status-button"
-                                    aria-haspopup="menu"
-                                    aria-expanded={statusMenuOpen}
-                                    onClick={() => setStatusMenuOpen((open) => !open)}
-                                    title={
-                                        presenceControl.autoIdle
-                                            ? "Idle while you're away. Set your status"
-                                            : "Set your status"
-                                    }
-                                >
-                                    <span
-                                        className={`status-menu-dot is-${presenceControl.effectiveChoice}`}
-                                        aria-hidden="true"
-                                    />
-                                </button>
-                                {statusMenuOpen ? (
-                                    <StatusMenu
-                                        choice={presenceControl.selection.choice}
-                                        statusMessage={presenceControl.selection.statusMessage}
-                                        error={presenceControl.error}
-                                        autoIdleOn={autoIdleOn}
-                                        activitySharing={activitySharingControl}
-                                        onChoose={presenceControl.setChoice}
-                                        onStatusMessage={presenceControl.setStatusMessage}
-                                        onClose={() => setStatusMenuOpen(false)}
-                                    />
-                                ) : null}
-                            </div>
                         ) : null}
-                    </div>
+                    </UserPanel>
                 </div>
                 <div className="channels-pane-header-drag" aria-hidden="true" />
             </section>
@@ -3597,6 +3576,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             {isPhone && phoneTab === "you" ? (
                 <div className="phone-tab-page" inert={phoneHomeInert}>
                     <PhoneYouView
+                        client={client}
                         ownUserId={ownUserId}
                         displayName={ownDisplayName}
                         userIdLabel={formatUserIdForDisplay(ownUserId, localDomain) || ownUserId}

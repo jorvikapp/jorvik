@@ -16,6 +16,7 @@ import { plainUserDisplayName } from "../../core/users/userDisplayName";
 import { mediaFromMxc, thumbnailFromMxc } from "../adapters/media";
 import type { SpaceChildAffordance } from "../adapters/spaceHierarchyAdapter";
 import { fetchVoiceParticipants, isVoiceFeatureEnabled } from "../adapters/voiceAdapter";
+import { relayMicMuted } from "../../core/voice/voiceService";
 import { useMatrix } from "../providers/MatrixProvider";
 import { isPresenceEnabledForClient } from "../presence/presenceConfig";
 import { toAvatarPresenceState } from "../presence/buildPresenceVm";
@@ -553,15 +554,14 @@ export function RoomList({
                             const key = memberLookupId;
                             const existing = participantsByMatrixUserId.get(key);
 
+                            const micMuted = relayMicMuted(participant);
                             participantsByMatrixUserId.set(key, {
                                 identity: key,
                                 matrixUserId: participant.matrixUserId,
                                 displayName: existing?.displayName || displayName,
                                 avatarMxc: existing?.avatarMxc || avatarMxc,
                                 micMuted:
-                                    participant.micMuted === true || existing?.micMuted === true
-                                        ? true
-                                        : participant.micMuted ?? existing?.micMuted,
+                                    micMuted === true || existing?.micMuted === true ? true : micMuted ?? existing?.micMuted,
                                 audioMuted:
                                     participant.audioMuted === true || existing?.audioMuted === true
                                         ? true

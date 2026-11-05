@@ -26,6 +26,17 @@ export interface VoiceParticipantsResponse {
     count: number;
 }
 
+/**
+ * Whether someone in a call has their mic off, from the relay's list. Someone who joined muted never
+ * published a mic at all: that's off too, though the relay leaves micMuted out for them.
+ */
+export function relayMicMuted(participant: { micPublished?: boolean; micMuted?: boolean }): boolean | undefined {
+    if (typeof participant.micMuted === "boolean") {
+        return participant.micMuted;
+    }
+    return participant.micPublished === false ? true : undefined;
+}
+
 export interface VoiceParticipantStateUpdateBody {
     matrixRoomId: string;
     audioMuted: boolean;

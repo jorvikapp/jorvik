@@ -6070,6 +6070,166 @@ select,
     flex: 0 0 auto;
 }
 
+/* ---------- the panel under the channel list: you, then your mic, sound and settings ---------- */
+
+.pane-user-row.user-panel {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 56px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-input);
+}
+
+.pane-user-row.user-panel .pane-user-card {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+    align-self: stretch;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    padding: 4px 6px;
+    gap: 8px;
+}
+
+.pane-user-row.user-panel .pane-user-card:hover {
+    background: var(--bg-hover);
+}
+
+.pane-user-row.user-panel .pane-user-avatar {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+}
+
+.pane-user-row.user-panel .pane-user-avatar.avatar {
+    --avatar-presence-size: 10px;
+    --avatar-presence-ring-color: var(--bg-input);
+}
+
+.pane-user-row.user-panel .pane-user-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 2px;
+}
+
+.pane-user-row.user-panel .pane-user-name {
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+/* One line, always: a long game name or status ends in "...", and never pushes the buttons. */
+.pane-user-context {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    font-size: 12px;
+    line-height: 1.2;
+    color: var(--text-muted);
+}
+
+.pane-user-context-icon {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    font-size: 11px;
+}
+
+.pane-user-context-icon .activity-game-icon {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+}
+
+.pane-user-context-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-panel-controls {
+    display: flex;
+    flex-shrink: 0;
+    gap: 2px;
+}
+
+.user-panel-control {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.user-panel-control:hover {
+    background: var(--bg-hover);
+    color: var(--text-main);
+}
+
+.user-panel-control:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.user-panel-control.is-muted,
+.user-panel-control.is-muted:hover {
+    color: var(--danger);
+}
+
+.user-panel-control.is-muted:hover {
+    background: rgba(240, 71, 71, 0.14);
+}
+
+.user-panel-control-icon {
+    width: 20px;
+    height: 20px;
+}
+
+/* The status menu opens above the panel, from its left edge. */
+.user-panel > .status-menu {
+    left: 0;
+    right: auto;
+}
+
+/* The call dock's icon buttons: the camera during a call; on phones, the mic and sound too. */
+.pane-voice-control.pane-voice-icon-control {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    padding: 4px 6px;
+}
+
+.pane-voice-control-icon {
+    width: 18px;
+    height: 18px;
+}
+
+.pane-voice-control.pane-voice-icon-control.is-on {
+    color: var(--status-online);
+}
+
+/* On a computer, the panel under the dock has the mic and sound already. */
+.app-shell:not(.is-phone) .pane-voice-phone-only {
+    display: none;
+}
+
 .pane-status-button {
     height: 100%;
     min-width: 34px;
