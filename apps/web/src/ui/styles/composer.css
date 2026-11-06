@@ -1,55 +1,33 @@
-/* The message box is a panel of its own, the same height as your panel beside it while it holds one
-   line (a 32px row and 12px around it), growing upward as the message wraps. The panel is the field: its
-   outline lights on hover and while you type, drawn inside so nothing moves. */
 .composer-wrap {
-    position: relative;
-    min-height: var(--dock-height);
-    padding: calc((var(--dock-height) - 32px) / 2) 12px;
-    border-radius: var(--panel-radius);
-    background: var(--panel-surface);
-    transition: box-shadow var(--motion-fast) ease;
+    border-top: 2px solid var(--border);
+    padding: 12px;
+    background: var(--bg-input);
 }
 
-.composer-wrap:hover {
-    box-shadow: inset 0 0 0 1px var(--accent-soft);
-}
-
-.composer-wrap:focus-within {
-    box-shadow: inset 0 0 0 1px var(--primary);
-}
-
-/* At the bottom of the chat above, in the room kept there for it: the box doesn't change size when
-   someone starts or stops typing. */
 .typing-indicator {
-    position: absolute;
-    left: 12px;
-    bottom: calc(100% + var(--panel-gap) + 6px);
-    max-width: calc(100% - 24px);
-    margin: 0;
-    padding: 0 4px;
+    margin: 0 0 8px 50px;
     color: var(--text-muted);
     font-size: 12px;
-    line-height: 18px;
+    line-height: 1.3;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    pointer-events: none;
 }
 
 .composer-bar {
     display: flex;
     align-items: flex-end;
-    gap: 8px;
+    gap: 10px;
 }
 
 .composer-plus-button {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    border: 0;
-    background: transparent;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-input);
     color: var(--text-main);
-    font-size: 22px;
+    font-size: 24px;
     line-height: 1;
     display: grid;
     place-items: center;
@@ -58,6 +36,7 @@
 }
 
 .composer-plus-button:hover:not(:disabled) {
+    border-color: var(--accent-soft);
     background: var(--bg-hover);
 }
 
@@ -67,23 +46,32 @@
 }
 
 .composer-input-shell {
+    position: relative;
     flex: 1;
     min-width: 0;
     display: flex;
     align-items: flex-end;
-    gap: 8px;
-    border: 0;
-    border-radius: 8px;
-    background: transparent;
-    padding: 0;
+    gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--bg-input);
+    padding: 8px 10px 8px 12px;
+    transition: border-color 120ms ease;
+}
+
+.composer-input-shell:hover {
+    border-color: var(--accent-soft);
+}
+
+.composer-input-shell:focus-within {
+    border-color: var(--primary);
 }
 
 .composer-input-shell.is-drag-active {
+    border-color: var(--accent-soft);
     background: var(--bg-hover);
-    box-shadow: inset 0 0 0 1px var(--accent-soft);
 }
 
-/* One line is as tall as the buttons beside it (32px), so the text sits level with them. */
 .composer-textarea {
     width: 100%;
     min-width: 0;
@@ -95,7 +83,7 @@
     min-height: 24px;
     max-height: 220px;
     line-height: 1.35;
-    padding: 5px 0;
+    padding: 4px 0;
 }
 
 .composer-textarea::placeholder {
@@ -142,15 +130,15 @@
 }
 
 .composer-emoji-anchor {
+    position: relative;
     display: inline-flex;
     align-items: center;
 }
 
-/* Over the chat, the gap clear of the message box whatever its height, its right edge over the buttons'. */
 .composer-emoji-picker-popover {
     position: absolute;
-    right: 12px;
-    bottom: calc(100% + var(--panel-gap));
+    right: 0;
+    bottom: calc(100% + 10px);
     width: min(360px, calc(100vw - 120px));
     /* Without a cap the picker grows with its contents and runs off the top
        of the window. Keep it inside the viewport and scroll the grid instead. */
@@ -182,7 +170,7 @@
 .composer-gif-attribution { color: var(--text-muted); font-size: 10px; margin-top: 8px; text-align: right; }
 
 .composer-mentions-popover {
-    margin: 8px 0 2px 40px;
+    margin: 8px 0 2px 50px;
     border: 1px solid var(--border);
     border-radius: 10px;
     background: var(--bg-pane);
@@ -190,7 +178,7 @@
 }
 
 .composer-emojis-popover {
-    margin: 8px 0 2px 40px;
+    margin: 8px 0 2px 50px;
     border: 1px solid var(--border);
     border-radius: 10px;
     background: var(--bg-pane);
@@ -307,7 +295,7 @@
 }
 
 .composer-live-preview {
-    margin: 8px 0 2px 40px;
+    margin: 8px 0 2px 50px;
     border: 1px solid var(--border);
     border-radius: 10px;
     background: color-mix(in srgb, var(--bg-pane) 88%, transparent);

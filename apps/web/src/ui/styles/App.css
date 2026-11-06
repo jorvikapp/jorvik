@@ -35,14 +35,6 @@
     --badge-tester: #5cb8ff;
     --badge-contributor: #f08c4a;
     --badge-early-supporter: #f07c9a;
-    /* The app's layout: each region is a panel with the same surface, corners and gap, floating on a
-       base one shade darker than the panels. Both are theme colours (light sets its own base). */
-    --shell-base: var(--bg-app);
-    --panel-surface: var(--bg-main);
-    --panel-radius: 12px;
-    --panel-gap: 8px;
-    /* Your panel under the channel list and the message box beside it: one height, side by side. */
-    --dock-height: 56px;
 }
 
 *,
@@ -719,9 +711,7 @@ textarea {
     width: 100%;
     display: grid;
     grid-template-columns: 72px 280px minmax(0, 1fr) 280px;
-    gap: var(--panel-gap);
-    padding: var(--panel-gap);
-    background: var(--shell-base);
+    background: var(--bg-app);
     overflow: hidden;
     min-width: 0;
     min-height: 0;
@@ -740,15 +730,6 @@ textarea {
         env(titlebar-area-height, 0px),
         calc((100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)) * 1000)
     );
-    /* Those buttons sit on the base, in a strip above the panels as tall as they are, rather than over
-       a panel's corner; the strip also moves the window. Where there are none, it's the usual gap. */
-    padding-top: max(var(--panel-gap), var(--desktop-titlebar-overlay-height));
-}
-
-/* Below that strip no panel is under the window's buttons, so the right panel keeps no room for them at
-   its top (its drag strip and headers read this height). */
-.app-shell.is-desktop-runtime .right-panel {
-    --desktop-titlebar-overlay-height: 0px;
 }
 
 .app-shell.right-panel-collapsed {
@@ -767,23 +748,13 @@ textarea {
 
 .left-rail {
     container-type: inline-size;
-    /* Its own surface, and its tiles' (phones set the rail on the base, tiles in the panels' colour). */
-    --rail-surface: var(--panel-surface);
-    --rail-tile-bg: var(--shell-base);
-    background: var(--rail-surface);
-    border-radius: var(--panel-radius);
+    background: var(--bg-rail);
+    border-right: 2px solid var(--border);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 12px;
-    padding: 12px 0;
-    /* More Spaces than fit scroll inside the panel instead of running out of it. */
-    overflow-y: auto;
-    scrollbar-width: none;
-}
-
-.left-rail::-webkit-scrollbar {
-    display: none;
+    padding: 14px 0;
 }
 
 .rail-logo,
@@ -798,8 +769,6 @@ textarea {
     place-items: center;
     font-weight: 700;
     border: 0;
-    /* Full size even when the rail runs out of room: it scrolls instead. */
-    flex-shrink: 0;
 }
 
 .rail-logo {
@@ -814,8 +783,7 @@ textarea {
        the image keeps the avatar edge to edge. */
     width: 38px;
     height: 38px;
-    /* Set into the rail in the base's shade, so the tiles show on the panel in either theme. */
-    background: var(--rail-tile-bg);
+    background: var(--bg-pane);
     color: var(--text-muted);
     transition:
         background-color var(--motion-fast) var(--motion-ease-standard),
@@ -856,7 +824,7 @@ textarea {
     font-weight: 700;
     line-height: 18px;
     text-align: center;
-    box-shadow: 0 0 0 3px var(--rail-surface);
+    box-shadow: 0 0 0 3px var(--bg-rail);
     pointer-events: none;
 }
 
@@ -868,7 +836,7 @@ textarea {
 }
 
 .rail-icon.is-active {
-    background: color-mix(in srgb, var(--primary) 20%, transparent);
+    background: rgba(16, 99, 40, 0.2);
     color: var(--text-main);
 }
 
@@ -890,7 +858,7 @@ textarea {
 
 .rail-create-space:hover:not(:disabled) {
     border-color: var(--primary);
-    background: color-mix(in srgb, var(--primary) 20%, transparent);
+    background: rgba(16, 99, 40, 0.2);
     color: var(--text-main);
 }
 
@@ -899,35 +867,23 @@ textarea {
     cursor: default;
 }
 
-/* The column beside the rail: the channel list as one panel, then your panel under it (and a call in
-   progress), each on its own with the gap between them. The column itself has no surface. */
 .channels-pane {
     position: relative;
+    background: var(--bg-pane);
+    border-right: 2px solid var(--border);
     display: flex;
     flex-direction: column;
-    gap: var(--panel-gap);
     min-width: 0;
     min-height: 0;
-}
-
-.channels-pane-list {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    background: var(--panel-surface);
-    border-radius: var(--panel-radius);
     overflow: hidden;
 }
 
-/* In the gap to the right of the column, where it doesn't cover anything. */
 .channels-pane-resize-handle {
     position: absolute;
     top: 0;
-    right: calc((var(--panel-gap) + 6px) / -2);
+    right: -3px;
     width: 6px;
     height: 100%;
-    border-radius: 3px;
     cursor: col-resize;
     z-index: 10;
 }
@@ -1651,7 +1607,7 @@ textarea {
 
 .room-item-discoverable {
     border: 1px dashed color-mix(in srgb, var(--border) 70%, transparent);
-    background: color-mix(in srgb, var(--panel-surface) 78%, transparent);
+    background: color-mix(in srgb, var(--bg-pane) 78%, transparent);
 }
 
 .room-item-discoverable .room-item-row {
@@ -2064,13 +2020,24 @@ textarea {
     opacity: 0.55;
 }
 
-/* Under the channel list: a call in progress, then you, each a panel of its own. */
+/* The bottom of the channel list: a bar flush with its edges, seated in a shade between the list and the
+   server rail beside it, under a hairline. Theme colours only, so it follows light and dark. */
 .pane-bottom {
+    --pane-bar-bg: color-mix(in srgb, var(--bg-pane) 45%, var(--bg-rail));
+    border-top: 1px solid var(--border);
+    background: var(--bg-rail);
+    background: var(--pane-bar-bg);
+    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--panel-gap);
+    gap: 0;
     margin-top: auto;
     flex-shrink: 0;
+}
+
+/* A call in progress sits on the bar as a card of its own, above you. */
+.pane-bottom > .pane-voice-dock {
+    margin: 8px 8px 0;
 }
 .pane-user-card {
     width: 100%;
@@ -2128,11 +2095,10 @@ textarea {
     white-space: nowrap;
 }
 
-/* The outline only shows the call's state (green connected, amber connecting): the panel itself has none. */
 .pane-voice-dock {
-    border: 1px solid transparent;
-    background: var(--panel-surface);
-    border-radius: var(--panel-radius);
+    border: 1px solid var(--border);
+    background: var(--bg-pane);
+    border-radius: 10px;
     padding: 8px;
     display: flex;
     flex-direction: column;
@@ -2140,14 +2106,14 @@ textarea {
 }
 
 .pane-voice-dock.is-connected {
-    border-color: color-mix(in srgb, var(--status-online) 45%, transparent);
+    border-color: rgba(67, 181, 129, 0.45);
     background:
-        radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--status-online) 14%, transparent) 0%, transparent 65%),
-        var(--panel-surface);
+        radial-gradient(circle at 50% 0%, rgba(67, 181, 129, 0.14) 0%, rgba(67, 181, 129, 0) 65%),
+        var(--bg-pane);
 }
 
 .pane-voice-dock.is-connecting {
-    border-color: color-mix(in srgb, var(--status-idle) 55%, transparent);
+    border-color: rgba(250, 166, 26, 0.55);
 }
 
 .pane-voice-pill {
@@ -2209,24 +2175,22 @@ textarea {
     opacity: 0.55;
 }
 
-/* Tinted by the theme's red and green, the text mixed toward the theme's own: pale on dark, deep on light
-   (fixed pale text vanished on the light theme's pale tint). */
 .pane-voice-control.is-muted {
-    border-color: color-mix(in srgb, var(--danger) 65%, transparent);
-    background: color-mix(in srgb, var(--danger) 18%, transparent);
-    color: color-mix(in srgb, var(--danger) 45%, var(--text-main));
+    border-color: rgba(240, 71, 71, 0.65);
+    background: rgba(240, 71, 71, 0.18);
+    color: #ffdede;
 }
 
 .pane-voice-control-join {
-    border-color: color-mix(in srgb, var(--status-online) 62%, transparent);
-    background: color-mix(in srgb, var(--status-online) 20%, transparent);
-    color: color-mix(in srgb, var(--status-online) 45%, var(--text-main));
+    border-color: rgba(67, 181, 129, 0.62);
+    background: rgba(67, 181, 129, 0.2);
+    color: #dcffe9;
 }
 
 .pane-voice-control-leave {
-    border-color: color-mix(in srgb, var(--danger) 62%, transparent);
-    background: color-mix(in srgb, var(--danger) 20%, transparent);
-    color: color-mix(in srgb, var(--danger) 45%, var(--text-main));
+    border-color: rgba(240, 71, 71, 0.62);
+    background: rgba(240, 71, 71, 0.2);
+    color: #ffdede;
 }
 
 .pane-voice-indicators {
@@ -2277,26 +2241,14 @@ textarea {
     cursor: pointer;
 }
 
-/* The chat column: the chat (its header, a call, the messages) as one panel, and under it the message box
-   as a panel of its own, the gap between them. The column itself has no surface. */
 .main-pane {
     min-width: 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--panel-gap);
+    background: var(--bg-main);
     overflow: hidden;
     width: 100%;
-}
-
-.main-panel {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    background: var(--panel-surface);
-    border-radius: var(--panel-radius);
-    overflow: hidden;
 }
 
 .main-voice-slot {
@@ -2513,11 +2465,9 @@ textarea {
     flex-direction: column;
 }
 
-/* Room at the bottom for "... is typing", which shows there without covering the last message. */
 .main-chat-stack .timeline {
     flex: 1;
     min-height: 0;
-    padding-bottom: 30px;
 }
 
 .main-chat-composer {
@@ -4733,6 +4683,11 @@ textarea {
     padding: 7px 8px;
 }
 
+.composer-wrap {
+    border-top: 1px solid var(--border);
+    padding: 12px;
+}
+
 .voice-room-panel {
     min-height: 0;
     display: flex;
@@ -5546,9 +5501,8 @@ img.voice-ctrl-icon {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    border: 1px solid transparent;
-    /* Set into the message box in the base's shade, so it shows on the panel in either theme. */
-    background: var(--shell-base);
+    border: 1px solid var(--bg-pane);
+    background: var(--bg-pane);
     border-radius: 10px;
     padding: 7px 9px;
     margin-bottom: 10px;
@@ -5608,7 +5562,7 @@ img.voice-ctrl-icon {
     justify-content: space-between;
     gap: 10px;
     border: 1px solid var(--border);
-    background: var(--shell-base);
+    background: var(--bg-pane);
     border-radius: 10px;
     padding: 7px 9px;
     margin-bottom: 10px;
@@ -6046,12 +6000,9 @@ select,
 [contenteditable="true"],
 .timeline,
 .room-list-items,
-.channels-pane-resize-handle,
-.user-panel,
-.pane-voice-dock,
+.pane-bottom,
 .right-panel,
 .channel-header-actions,
-.composer-wrap,
 .composer-bar,
 .composer-input-shell,
 .settings-sidebar,
@@ -6104,11 +6055,11 @@ select,
 
 /* The same for the top of the channel list: rooms scrolled up out of view in
    a long list sit over it. */
-.channels-pane-list > .pane-top {
+.channels-pane > .pane-top {
     anchor-name: --channels-pane-top;
 }
 
-.channels-pane-list > .pane-top .pane-top-actions {
+.channels-pane > .pane-top .pane-top-actions {
     anchor-name: --channels-pane-top-actions;
 }
 
@@ -6152,11 +6103,11 @@ select,
     display: flex;
     align-items: center;
     gap: 2px;
-    min-height: var(--dock-height);
+    min-height: 56px;
     padding: 6px 8px 6px 6px;
     border: 0;
-    border-radius: var(--panel-radius);
-    background: var(--panel-surface);
+    border-radius: 0;
+    background: transparent;
 }
 
 .pane-user-row.user-panel .pane-user-card {
@@ -6183,28 +6134,19 @@ select,
 
 .pane-user-row.user-panel .pane-user-avatar.avatar {
     --avatar-presence-size: 10px;
-    --avatar-presence-ring-color: var(--panel-surface);
+    --avatar-presence-ring-color: var(--pane-bar-bg, var(--bg-rail));
 }
 
 .pane-user-row.user-panel .pane-user-meta {
     flex: 1 1 auto;
     min-width: 0;
-    gap: 1px;
+    gap: 2px;
 }
 
-/* Two lines beside the avatar, each tall enough for the fonts that set their glyphs deepest (Noto Sans,
-   the usual Linux font, needs about 1.36 times its size). Each line is cut short sideways with "...";
-   the padding, taken back by the margin, keeps the cut from catching the tails of g, y and p or accents. */
 .pane-user-row.user-panel .pane-user-name {
     font-size: 14px;
     font-weight: 700;
-    line-height: 18px;
-}
-
-.pane-user-row.user-panel .pane-user-name,
-.pane-user-context-text {
-    padding-block: 2px;
-    margin-block: -2px;
+    line-height: 1.2;
 }
 
 /* One line, always: a long game name or status ends in "...", and never pushes the buttons. */
@@ -6214,18 +6156,8 @@ select,
     gap: 4px;
     min-width: 0;
     font-size: 12px;
-    line-height: 16px;
+    line-height: 1.2;
     color: var(--text-muted);
-}
-
-/* "Playing" is for screen readers: the controller or the game's own icon says it on screen. */
-.pane-user-context-verb {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
 }
 
 .pane-user-context-icon {

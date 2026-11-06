@@ -58,12 +58,10 @@ const SYSTEM_AUDIO_CAPTURE_MODE: "loopback" | "loopbackWithMute" =
     SYSTEM_AUDIO_CAPTURE_MODE_ENV === "loopbackwithmute" ? "loopbackWithMute" : "loopback";
 // The window's own colours: what shows wherever the page hasn't painted, and the strip
 // behind the window controls. They follow the app's theme, or light mode gets dark edges
-// and dark flashes whenever the window is redrawn. The controls sit on the base the
-// page's panels float on, so `overlay` is that base's colour in each theme (--shell-base:
-// --bg-app in dark, --bg-rail in light); dark's background is the same colour.
+// and dark flashes whenever the window is redrawn.
 const WINDOW_COLORS: Record<AppearanceTheme, { background: string; overlay: string; symbol: string }> = {
-    dark: { background: "#0e0e10", overlay: "#0e0e10", symbol: "#e6edf3" },
-    light: { background: "#ffffff", overlay: "#f2f3f5", symbol: "#060607" },
+    dark: { background: "#0e141b", overlay: "#121a23", symbol: "#e6edf3" },
+    light: { background: "#ffffff", overlay: "#ffffff", symbol: "#060607" },
 };
 const TITLEBAR_OVERLAY_HEIGHT = 32;
 let appearanceTheme: AppearanceTheme = "dark";
