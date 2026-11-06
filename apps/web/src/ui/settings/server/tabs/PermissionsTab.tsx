@@ -4,6 +4,21 @@ import { EventType, type MatrixClient, type Room } from "matrix-js-sdk/src/matri
 import type { ToastState } from "../../../components/Toast";
 import { getUserPowerLevel } from "../../../components/rooms/roomAdminUtils";
 
+/** A user ID that can wrap before its server name: on a narrow screen it breaks at the colon, not mid-name. */
+function breakableUserId(userId: string): React.ReactNode {
+    const colon = userId.indexOf(":");
+    if (colon <= 0) {
+        return userId;
+    }
+    return (
+        <>
+            {userId.slice(0, colon)}
+            <wbr />
+            {userId.slice(colon)}
+        </>
+    );
+}
+
 interface PermissionsTabProps {
     client: MatrixClient;
     spaceRoom: Room;
@@ -525,7 +540,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
 
                             return (
                                 <tr key={userId}>
-                                    <td>{userId}</td>
+                                    <td>{breakableUserId(userId)}</td>
                                     <td>{level}</td>
                                     <td>
                                         <div className="settings-user-override-actions">

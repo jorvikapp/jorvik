@@ -1041,3 +1041,13 @@ button.phone-notif:active {
 .settings-overlay.is-phone .settings-content {
     padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
 }
+
+/* Tables fit the screen instead of scrolling sideways: long words such as user IDs break, and the
+   rank controls in a row wrap under each other. */
+.settings-overlay.is-phone .settings-table {
+    min-width: 0;
+}
+
+.settings-overlay.is-phone .settings-table td {
+    overflow-wrap: anywhere;
+}

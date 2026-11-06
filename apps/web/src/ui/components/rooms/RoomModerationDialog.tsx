@@ -4,6 +4,7 @@ import { EventType, KnownMembership, type MatrixClient, type Room } from "matrix
 import { formatUserIdForDisplay } from "../../../core/users/formatUserId";
 import { useConfirm, type ConfirmOptions } from "../confirm/ConfirmProvider";
 import { RoomDialog } from "./RoomDialog";
+import { describeMenuError } from "../../users/userMenuActions";
 import {
     getActionPowerLevel,
     getBannedMembers,
@@ -94,8 +95,7 @@ export function RoomModerationDialog({
                 [targetUserId]: String(value),
             }));
         } catch (powerError) {
-            const message = powerError instanceof Error ? powerError.message : "Failed to set power level.";
-            setError(message);
+            setError(describeMenuError(powerError, "Couldn't change their rank."));
         } finally {
             setPendingAction(null);
         }
@@ -115,8 +115,7 @@ export function RoomModerationDialog({
         try {
             await action();
         } catch (moderationError) {
-            const message = moderationError instanceof Error ? moderationError.message : "Moderation action failed.";
-            setError(message);
+            setError(describeMenuError(moderationError, "Couldn't do that."));
         } finally {
             setPendingAction(null);
         }
@@ -144,7 +143,7 @@ export function RoomModerationDialog({
                 />
             </label>
 
-            <h3 className="room-dialog-section-title">Members and roles</h3>
+            <h3 className="room-dialog-section-title">Members and ranks</h3>
             <div className="room-moderation-list">
                 {members.map((member) => {
                     const targetPowerLevel = room ? getUserPowerLevel(room, member.userId) : 0;
@@ -159,7 +158,7 @@ export function RoomModerationDialog({
                             <div className="room-moderation-item-main">
                                 <span className="room-moderation-item-name">{displayName}</span>
                                 <span className="room-moderation-item-meta">
-                                    {member.userId} . {isInvited ? "Invited" : "Joined"} . PL {targetPowerLevel}
+                                    {member.userId} . {isInvited ? "Invited" : "Joined"} . Rank {targetPowerLevel}
                                 </span>
                             </div>
                             <div className="room-moderation-item-actions">
@@ -168,6 +167,7 @@ export function RoomModerationDialog({
                                         <input
                                             className="room-moderation-pl-input"
                                             type="number"
+                                            aria-label={`Rank for ${displayName}`}
                                             value={powerInputByUserId[member.userId] ?? String(targetPowerLevel)}
                                             onChange={(event) =>
                                                 setPowerInputByUserId((current) => ({
@@ -183,7 +183,7 @@ export function RoomModerationDialog({
                                             onClick={() => {
                                                 const parsed = Number(powerInputByUserId[member.userId]);
                                                 if (!Number.isInteger(parsed)) {
-                                                    setError("Power level must be an integer.");
+                                                    setError("The rank has to be a whole number.");
                                                     return;
                                                 }
 
@@ -207,7 +207,7 @@ export function RoomModerationDialog({
                                             onClick={() => void applyPowerLevel(member.userId, 0)}
                                             disabled={pendingAction !== null}
                                         >
-                                            User
+                                            Member
                                         </button>
                                     </>
                                 ) : null}
@@ -296,7 +296,7 @@ export function RoomModerationDialog({
             </div>
 
             {!canManagePowerLevels ? (
-                <p className="room-dialog-warning">You do not have permission to manage room power levels.</p>
+                <p className="room-dialog-warning">Your rank doesn't let you change other people's ranks.</p>
             ) : null}
             {error ? <p className="room-dialog-error">{error}</p> : null}
         </RoomDialog>
