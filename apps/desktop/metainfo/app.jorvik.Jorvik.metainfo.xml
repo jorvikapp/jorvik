@@ -75,6 +75,17 @@
   </branding>
 
   <releases>
+    <release version="1.0.31" date="2026-11-06">
+      <description>
+        <p>Your panel and the message box as matching cards.</p>
+        <ul>
+          <li>Your panel under the channel list and the message box are matching rounded cards, the same height and lined up at the bottom. During a call, the call gets a matching card above your panel</li>
+          <li>The line under your name shows the game you're playing by its name, with the full text when you hover over it, and the tails of letters such as g and y are no longer cut off</li>
+          <li>The Join and Leave buttons of a call are readable in the light theme</li>
+          <li>When you have more Spaces than fit above your panel, the Spaces column scrolls</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.30" date="2026-11-06">
       <description>
         <p>Your microphone and sound in the panel, a menu on people, and Spaces made from a Discord server.</p>
