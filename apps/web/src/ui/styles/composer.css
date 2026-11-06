@@ -1,11 +1,10 @@
+/* Around the message box: the chat's own background, with the gap at the sides and below. */
 .composer-wrap {
-    border-top: 2px solid var(--border);
-    padding: 12px;
-    background: var(--bg-input);
+    padding: 0 var(--dock-gap) var(--dock-gap);
 }
 
 .typing-indicator {
-    margin: 0 0 8px 50px;
+    margin: 0 0 6px 61px;
     color: var(--text-muted);
     font-size: 12px;
     line-height: 1.3;
@@ -14,20 +13,37 @@
     text-overflow: ellipsis;
 }
 
+/* The message box: a card as tall as your panel beside it while it holds one line (a 32px row, its
+   outline and padding make 56px), with the same bottom edge; it grows upward as the message wraps. The
+   + is inside it. Its outline lights on hover and while you type. */
 .composer-bar {
     display: flex;
     align-items: flex-end;
-    gap: 10px;
+    gap: 8px;
+    min-height: var(--dock-height);
+    padding: calc((var(--dock-height) - 34px) / 2) 12px;
+    border: 1px solid var(--dock-card-border);
+    border-radius: var(--dock-card-radius);
+    background: var(--dock-card-bg);
+    transition: border-color var(--motion-fast) ease;
+}
+
+.composer-bar:hover {
+    border-color: var(--accent-soft);
+}
+
+.composer-bar:focus-within {
+    border-color: var(--primary);
 }
 
 .composer-plus-button {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    background: var(--bg-input);
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 0;
+    background: transparent;
     color: var(--text-main);
-    font-size: 24px;
+    font-size: 22px;
     line-height: 1;
     display: grid;
     place-items: center;
@@ -36,8 +52,7 @@
 }
 
 .composer-plus-button:hover:not(:disabled) {
-    border-color: var(--accent-soft);
-    background: var(--bg-hover);
+    background: var(--bg-active);
 }
 
 .composer-plus-button:disabled {
@@ -51,27 +66,19 @@
     min-width: 0;
     display: flex;
     align-items: flex-end;
-    gap: 10px;
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    background: var(--bg-input);
-    padding: 8px 10px 8px 12px;
-    transition: border-color 120ms ease;
-}
-
-.composer-input-shell:hover {
-    border-color: var(--accent-soft);
-}
-
-.composer-input-shell:focus-within {
-    border-color: var(--primary);
+    gap: 8px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    padding: 0;
 }
 
 .composer-input-shell.is-drag-active {
-    border-color: var(--accent-soft);
-    background: var(--bg-hover);
+    background: var(--bg-active);
+    box-shadow: inset 0 0 0 1px var(--accent-soft);
 }
 
+/* One line is as tall as the buttons beside it (32px), so the text sits level with them. */
 .composer-textarea {
     width: 100%;
     min-width: 0;
@@ -83,7 +90,7 @@
     min-height: 24px;
     max-height: 220px;
     line-height: 1.35;
-    padding: 4px 0;
+    padding: 5px 0;
 }
 
 .composer-textarea::placeholder {
@@ -120,7 +127,7 @@
 }
 
 .composer-action-button:hover:not(:disabled) {
-    background: var(--bg-hover);
+    background: var(--bg-active);
     color: var(--text-main);
 }
 
@@ -135,10 +142,11 @@
     align-items: center;
 }
 
+/* Clear of the message box's top edge (its row sits 12px inside it), with the gap above. */
 .composer-emoji-picker-popover {
     position: absolute;
     right: 0;
-    bottom: calc(100% + 10px);
+    bottom: calc(100% + 12px + var(--dock-gap));
     width: min(360px, calc(100vw - 120px));
     /* Without a cap the picker grows with its contents and runs off the top
        of the window. Keep it inside the viewport and scroll the grid instead. */

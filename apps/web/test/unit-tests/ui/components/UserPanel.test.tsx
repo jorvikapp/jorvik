@@ -63,6 +63,7 @@ const click = (element: HTMLElement): void => {
     });
 };
 const contextLine = (): HTMLElement => container.querySelector<HTMLElement>(".pane-user-context")!;
+const shownText = (): string | null | undefined => contextLine().querySelector(".pane-user-context-text")?.textContent;
 
 describe("the line under your name", () => {
     it("shows the game you share in place of your handle, and your handle again once the game closes", () => {
@@ -77,12 +78,29 @@ describe("the line under your name", () => {
         expect(contextLine().className).toContain("is-handle");
     });
 
+    it("shows the game's name alone, its icon saying it's a game; \"Playing\" is for screen readers and the tooltip", () => {
+        setOwnActivity(ME, { game: STARDEW, startedAt: Date.now() });
+        renderPanel();
+        expect(shownText()).toBe("Stardew Valley");
+        expect(contextLine().querySelector(".pane-user-context-icon")?.getAttribute("aria-hidden")).toBe("true");
+        expect(contextLine().querySelector(".pane-user-context-verb")?.textContent).toBe("Playing ");
+        expect(contextLine().getAttribute("title")).toBe("Playing Stardew Valley");
+        // What a screen reader reads out for the card, the icon left out.
+        const spoken = [...contextLine().children]
+            .filter((child) => child.getAttribute("aria-hidden") !== "true")
+            .map((child) => child.textContent)
+            .join("");
+        expect(spoken).toBe("Playing Stardew Valley");
+    });
+
     it("shows your status message when you're not sharing a game, and the game over it when you are", () => {
         renderPanel({ statusMessage: "Brewing coffee" });
         expect(contextLine().textContent).toBe("Brewing coffee");
+        expect(shownText()).toBe("Brewing coffee");
 
         act(() => setOwnActivity(ME, { game: STARDEW, startedAt: Date.now() }));
-        expect(contextLine().textContent).toContain("Playing Stardew Valley");
+        expect(shownText()).toBe("Stardew Valley");
+        expect(contextLine().getAttribute("title")).toBe("Playing Stardew Valley");
     });
 
     it("keeps a long name and line whole in their tooltips (the panel cuts them short with ...)", () => {

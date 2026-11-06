@@ -35,6 +35,13 @@
     --badge-tester: #5cb8ff;
     --badge-contributor: #f08c4a;
     --badge-early-supporter: #f07c9a;
+    /* Your panel and the message box: matched cards, one height, the same bottom edge, floating with the
+       gap around them. Theme colours, so light and dark each have their own. */
+    --dock-height: 56px;
+    --dock-gap: 8px;
+    --dock-card-radius: 8px;
+    --dock-card-bg: var(--bg-hover);
+    --dock-card-border: var(--border);
 }
 
 *,
@@ -711,6 +718,8 @@ textarea {
     width: 100%;
     display: grid;
     grid-template-columns: 72px 280px minmax(0, 1fr) 280px;
+    grid-template-rows: minmax(0, 1fr) auto;
+    --shell-rail-width: 72px;
     background: var(--bg-app);
     overflow: hidden;
     min-width: 0;
@@ -746,6 +755,23 @@ textarea {
     min-height: 0;
 }
 
+/* The rail and the channel list stop above the bottom row, where your panel (and a call in progress)
+   floats across both of their columns; the chat and the right panel run the full height. */
+.app-shell > .left-rail,
+.app-shell > .channels-pane {
+    grid-row: 1;
+}
+
+.app-shell > .main-pane,
+.app-shell > .right-panel {
+    grid-row: 1 / -1;
+}
+
+.app-shell > .pane-bottom {
+    grid-row: 2;
+    grid-column: 1 / span 2;
+}
+
 .left-rail {
     container-type: inline-size;
     background: var(--bg-rail);
@@ -755,6 +781,13 @@ textarea {
     align-items: center;
     gap: 12px;
     padding: 14px 0;
+    /* More Spaces than fit above your panel scroll, rather than run under it. */
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+.left-rail::-webkit-scrollbar {
+    display: none;
 }
 
 .rail-logo,
@@ -769,6 +802,8 @@ textarea {
     place-items: center;
     font-weight: 700;
     border: 0;
+    /* Full size when the rail runs out of room: it scrolls instead. */
+    flex-shrink: 0;
 }
 
 .rail-logo {
@@ -2020,24 +2055,21 @@ textarea {
     opacity: 0.55;
 }
 
-/* The bottom of the channel list: a bar flush with its edges, seated in a shade between the list and the
-   server rail beside it, under a hairline. Theme colours only, so it follows light and dark. */
+/* Under the rail and the channel list: your panel, and a call in progress above it, as cards floating
+   across both columns with the gap around them. Behind the cards the two columns carry on down: the
+   rail's colour and its edge, then the list's colour and its edge. */
 .pane-bottom {
-    --pane-bar-bg: color-mix(in srgb, var(--bg-pane) 45%, var(--bg-rail));
-    border-top: 1px solid var(--border);
-    background: var(--bg-rail);
-    background: var(--pane-bar-bg);
-    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0;
-    margin-top: auto;
-    flex-shrink: 0;
-}
-
-/* A call in progress sits on the bar as a card of its own, above you. */
-.pane-bottom > .pane-voice-dock {
-    margin: 8px 8px 0;
+    gap: var(--dock-gap);
+    padding: var(--dock-gap);
+    background: linear-gradient(
+        to right,
+        var(--bg-rail) calc(var(--shell-rail-width) - 2px),
+        var(--border) 0 var(--shell-rail-width),
+        var(--bg-pane) 0
+    );
+    border-right: 2px solid var(--border);
 }
 .pane-user-card {
     width: 100%;
@@ -2096,9 +2128,9 @@ textarea {
 }
 
 .pane-voice-dock {
-    border: 1px solid var(--border);
-    background: var(--bg-pane);
-    border-radius: 10px;
+    border: 1px solid var(--dock-card-border);
+    background: var(--dock-card-bg);
+    border-radius: var(--dock-card-radius);
     padding: 8px;
     display: flex;
     flex-direction: column;
@@ -2106,14 +2138,14 @@ textarea {
 }
 
 .pane-voice-dock.is-connected {
-    border-color: rgba(67, 181, 129, 0.45);
+    border-color: color-mix(in srgb, var(--status-online) 45%, transparent);
     background:
-        radial-gradient(circle at 50% 0%, rgba(67, 181, 129, 0.14) 0%, rgba(67, 181, 129, 0) 65%),
-        var(--bg-pane);
+        radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--status-online) 14%, transparent) 0%, transparent 65%),
+        var(--dock-card-bg);
 }
 
 .pane-voice-dock.is-connecting {
-    border-color: rgba(250, 166, 26, 0.55);
+    border-color: color-mix(in srgb, var(--status-idle) 55%, transparent);
 }
 
 .pane-voice-pill {
@@ -2175,22 +2207,24 @@ textarea {
     opacity: 0.55;
 }
 
+/* Tinted by the theme's red and green, the text mixed toward the theme's own: pale on dark, deep on light
+   (fixed pale text vanished on the light theme's pale tint). */
 .pane-voice-control.is-muted {
-    border-color: rgba(240, 71, 71, 0.65);
-    background: rgba(240, 71, 71, 0.18);
-    color: #ffdede;
+    border-color: color-mix(in srgb, var(--danger) 65%, transparent);
+    background: color-mix(in srgb, var(--danger) 18%, transparent);
+    color: color-mix(in srgb, var(--danger) 45%, var(--text-main));
 }
 
 .pane-voice-control-join {
-    border-color: rgba(67, 181, 129, 0.62);
-    background: rgba(67, 181, 129, 0.2);
-    color: #dcffe9;
+    border-color: color-mix(in srgb, var(--status-online) 62%, transparent);
+    background: color-mix(in srgb, var(--status-online) 20%, transparent);
+    color: color-mix(in srgb, var(--status-online) 45%, var(--text-main));
 }
 
 .pane-voice-control-leave {
-    border-color: rgba(240, 71, 71, 0.62);
-    background: rgba(240, 71, 71, 0.2);
-    color: #ffdede;
+    border-color: color-mix(in srgb, var(--danger) 62%, transparent);
+    background: color-mix(in srgb, var(--danger) 20%, transparent);
+    color: color-mix(in srgb, var(--danger) 45%, var(--text-main));
 }
 
 .pane-voice-indicators {
@@ -4683,11 +4717,6 @@ textarea {
     padding: 7px 8px;
 }
 
-.composer-wrap {
-    border-top: 1px solid var(--border);
-    padding: 12px;
-}
-
 .voice-room-panel {
     min-height: 0;
     display: flex;
@@ -5501,11 +5530,11 @@ img.voice-ctrl-icon {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    border: 1px solid var(--bg-pane);
-    background: var(--bg-pane);
-    border-radius: 10px;
+    border: 1px solid var(--dock-card-border);
+    background: var(--dock-card-bg);
+    border-radius: var(--dock-card-radius);
     padding: 7px 9px;
-    margin-bottom: 10px;
+    margin-bottom: var(--dock-gap);
 }
 
 .composer-reply-content {
@@ -5561,11 +5590,11 @@ img.voice-ctrl-icon {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    border: 1px solid var(--border);
-    background: var(--bg-pane);
-    border-radius: 10px;
+    border: 1px solid var(--dock-card-border);
+    background: var(--dock-card-bg);
+    border-radius: var(--dock-card-radius);
     padding: 7px 9px;
-    margin-bottom: 10px;
+    margin-bottom: var(--dock-gap);
 }
 
 .composer-editing-content {
@@ -5755,6 +5784,7 @@ img.voice-ctrl-icon {
 @media (max-width: 1200px) {
     .app-shell {
         grid-template-columns: 64px 240px minmax(0, 1fr) 240px !important;
+        --shell-rail-width: 64px;
 }
 
     .app-shell.right-panel-collapsed {
@@ -5776,6 +5806,11 @@ img.voice-ctrl-icon {
 }
 
     .channels-pane {
+        display: none;
+}
+
+    /* With the channel list, your panel under it (phones have their own layout, and show it). */
+    .app-shell > .pane-bottom {
         display: none;
 }
 
@@ -6103,11 +6138,12 @@ select,
     display: flex;
     align-items: center;
     gap: 2px;
-    min-height: 56px;
-    padding: 6px 8px 6px 6px;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
+    min-height: var(--dock-height);
+    /* With the 1px outline, 56px in all, like the message box. */
+    padding: 5px 7px 5px 5px;
+    border: 1px solid var(--dock-card-border);
+    border-radius: var(--dock-card-radius);
+    background: var(--dock-card-bg);
 }
 
 .pane-user-row.user-panel .pane-user-card {
@@ -6123,7 +6159,7 @@ select,
 }
 
 .pane-user-row.user-panel .pane-user-card:hover {
-    background: var(--bg-hover);
+    background: var(--bg-active);
 }
 
 .pane-user-row.user-panel .pane-user-avatar {
@@ -6134,19 +6170,28 @@ select,
 
 .pane-user-row.user-panel .pane-user-avatar.avatar {
     --avatar-presence-size: 10px;
-    --avatar-presence-ring-color: var(--pane-bar-bg, var(--bg-rail));
+    --avatar-presence-ring-color: var(--dock-card-bg);
 }
 
 .pane-user-row.user-panel .pane-user-meta {
     flex: 1 1 auto;
     min-width: 0;
-    gap: 2px;
+    gap: 1px;
 }
 
+/* Two lines beside the avatar, each tall enough for the fonts that set their glyphs deepest (Noto Sans,
+   the usual Linux font, needs about 1.36 times its size). Each line is cut short sideways with "...";
+   the padding, taken back by the margin, keeps the cut from catching the tails of g, y and p or accents. */
 .pane-user-row.user-panel .pane-user-name {
     font-size: 14px;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 18px;
+}
+
+.pane-user-row.user-panel .pane-user-name,
+.pane-user-context-text {
+    padding-block: 2px;
+    margin-block: -2px;
 }
 
 /* One line, always: a long game name or status ends in "...", and never pushes the buttons. */
@@ -6156,8 +6201,18 @@ select,
     gap: 4px;
     min-width: 0;
     font-size: 12px;
-    line-height: 1.2;
+    line-height: 16px;
     color: var(--text-muted);
+}
+
+/* "Playing" is for screen readers: the controller or the game's own icon says it on screen. */
+.pane-user-context-verb {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
 }
 
 .pane-user-context-icon {

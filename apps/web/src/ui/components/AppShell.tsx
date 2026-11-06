@@ -3588,137 +3588,138 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     onOpenRoomSettings={openRoomSettingsFor}
                     onRoomContextMenu={selectedSpaceId === PEOPLE_SPACE_ID ? openDmMenu : undefined}
                 />
-                <div className="pane-bottom">
-                    {hasActiveVoiceSession && voiceSessionRoomId ? (
-                        <div
-                            className={`pane-voice-dock${
-                                voiceSessionStatus === "connected"
-                                    ? " is-connected"
-                                    : voiceSessionStatus === "joining"
-                                      ? " is-connecting"
-                                      : ""
-                            }`}
-                        >
-                            <button
-                                type="button"
-                                className="pane-voice-pill"
-                                onClick={() => showRoom(voiceSessionRoomId)}
-                                title="Open voice channel"
-                            >
-                                <span className="pane-voice-pill-title">
-                                    Voice: {activeVoiceSessionRoom ? getRoomName(activeVoiceSessionRoom) : "Voice channel"}
-                                </span>
-                                <span className="pane-voice-pill-subtitle">
-                                    {voiceSessionStatus === "joining"
-                                        ? "Connecting..."
-                                        : voiceSessionStatus === "connected"
-                                          ? "Connected"
-                                          : "Not connected"}
-                                </span>
-                            </button>
-                            <div className="pane-voice-controls">
-                                {voiceSessionStatus === "disconnected" ? (
-                                    <button
-                                        type="button"
-                                        className="pane-voice-control pane-voice-control-join"
-                                        onClick={joinVoiceFromDock}
-                                    >
-                                        Join
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        className="pane-voice-control pane-voice-control-leave"
-                                        onClick={leaveVoiceFromDock}
-                                    >
-                                        {voiceSessionStatus === "joining" ? "Cancel" : "Leave"}
-                                    </button>
-                                )}
-                                {voiceSessionStatus === "connected" ? (
-                                    <button
-                                        type="button"
-                                        className={`pane-voice-control pane-voice-icon-control${localAv.cameraOn ? " is-on" : ""}`}
-                                        onClick={toggleVoiceCameraFromDock}
-                                        aria-label="Camera"
-                                        aria-pressed={localAv.cameraOn}
-                                        title={localAv.cameraOn ? "Turn camera off" : "Turn camera on"}
-                                    >
-                                        <CameraIcon on={localAv.cameraOn} className="pane-voice-control-icon" />
-                                    </button>
-                                ) : null}
-                                <button
-                                    type="button"
-                                    className={`pane-voice-control pane-voice-icon-control pane-voice-phone-only${localAv.micMuted ? " is-muted" : ""}`}
-                                    onClick={toggleMicMuted}
-                                    aria-label="Mute"
-                                    aria-pressed={localAv.micMuted}
-                                    title={localAv.micMuted ? "Unmute" : "Mute"}
-                                >
-                                    <MicIcon muted={localAv.micMuted} className="pane-voice-control-icon" />
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`pane-voice-control pane-voice-icon-control pane-voice-phone-only${localAv.deafened ? " is-muted" : ""}`}
-                                    onClick={toggleDeafened}
-                                    aria-label="Deafen"
-                                    aria-pressed={localAv.deafened}
-                                    title={localAv.deafened ? "Undeafen" : "Deafen"}
-                                >
-                                    <SoundIcon deafened={localAv.deafened} className="pane-voice-control-icon" />
-                                </button>
-                            </div>
-                        </div>
-                    ) : null}
-                    <UserPanel
-                        client={client}
-                        userId={ownUserId}
-                        displayName={ownDisplayName}
-                        avatarSources={ownAvatarSources}
-                        handle={formatUserIdForDisplay(ownUserId, localDomain) || "Unknown user"}
-                        statusMessage={presenceControl.effectiveStatusMessage}
-                        presence={
-                            presenceEnabled
-                                ? {
-                                      choice: presenceControl.effectiveChoice,
-                                      title: presenceControl.autoIdle
-                                          ? "Idle while you're away. Set your status"
-                                          : "Set your status",
-                                      menuOpen: statusMenuOpen,
-                                      onToggleMenu: () => setStatusMenuOpen((open) => !open),
-                                  }
-                                : null
-                        }
-                        onOpenSettings={() => openUserSettings("my-account")}
-                        devices={{
-                            inputId: userSettings.audio.preferredAudioInputId,
-                            outputId: userSettings.audio.preferredAudioOutputId,
-                            onChoose: (kind, deviceId) =>
-                                setUserSettings((current) => ({
-                                    ...current,
-                                    audio:
-                                        kind === "audioinput"
-                                            ? { ...current.audio, preferredAudioInputId: deviceId }
-                                            : { ...current.audio, preferredAudioOutputId: deviceId },
-                                })),
-                            onOpenSettings: () => openUserSettings("audio"),
-                        }}
-                    >
-                        {presenceEnabled && statusMenuOpen ? (
-                            <StatusMenu
-                                choice={presenceControl.selection.choice}
-                                statusMessage={presenceControl.selection.statusMessage}
-                                error={presenceControl.error}
-                                autoIdleOn={autoIdleOn}
-                                activitySharing={activitySharingControl}
-                                onChoose={presenceControl.setChoice}
-                                onStatusMessage={presenceControl.setStatusMessage}
-                                onClose={() => setStatusMenuOpen(false)}
-                            />
-                        ) : null}
-                    </UserPanel>
-                </div>
                 <div className="channels-pane-header-drag" aria-hidden="true" />
             </section>
+
+            <div className="pane-bottom" inert={phoneHomeInert}>
+                {hasActiveVoiceSession && voiceSessionRoomId ? (
+                    <div
+                        className={`pane-voice-dock${
+                            voiceSessionStatus === "connected"
+                                ? " is-connected"
+                                : voiceSessionStatus === "joining"
+                                  ? " is-connecting"
+                                  : ""
+                        }`}
+                    >
+                        <button
+                            type="button"
+                            className="pane-voice-pill"
+                            onClick={() => showRoom(voiceSessionRoomId)}
+                            title="Open voice channel"
+                        >
+                            <span className="pane-voice-pill-title">
+                                Voice: {activeVoiceSessionRoom ? getRoomName(activeVoiceSessionRoom) : "Voice channel"}
+                            </span>
+                            <span className="pane-voice-pill-subtitle">
+                                {voiceSessionStatus === "joining"
+                                    ? "Connecting..."
+                                    : voiceSessionStatus === "connected"
+                                      ? "Connected"
+                                      : "Not connected"}
+                            </span>
+                        </button>
+                        <div className="pane-voice-controls">
+                            {voiceSessionStatus === "disconnected" ? (
+                                <button
+                                    type="button"
+                                    className="pane-voice-control pane-voice-control-join"
+                                    onClick={joinVoiceFromDock}
+                                >
+                                    Join
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    className="pane-voice-control pane-voice-control-leave"
+                                    onClick={leaveVoiceFromDock}
+                                >
+                                    {voiceSessionStatus === "joining" ? "Cancel" : "Leave"}
+                                </button>
+                            )}
+                            {voiceSessionStatus === "connected" ? (
+                                <button
+                                    type="button"
+                                    className={`pane-voice-control pane-voice-icon-control${localAv.cameraOn ? " is-on" : ""}`}
+                                    onClick={toggleVoiceCameraFromDock}
+                                    aria-label="Camera"
+                                    aria-pressed={localAv.cameraOn}
+                                    title={localAv.cameraOn ? "Turn camera off" : "Turn camera on"}
+                                >
+                                    <CameraIcon on={localAv.cameraOn} className="pane-voice-control-icon" />
+                                </button>
+                            ) : null}
+                            <button
+                                type="button"
+                                className={`pane-voice-control pane-voice-icon-control pane-voice-phone-only${localAv.micMuted ? " is-muted" : ""}`}
+                                onClick={toggleMicMuted}
+                                aria-label="Mute"
+                                aria-pressed={localAv.micMuted}
+                                title={localAv.micMuted ? "Unmute" : "Mute"}
+                            >
+                                <MicIcon muted={localAv.micMuted} className="pane-voice-control-icon" />
+                            </button>
+                            <button
+                                type="button"
+                                className={`pane-voice-control pane-voice-icon-control pane-voice-phone-only${localAv.deafened ? " is-muted" : ""}`}
+                                onClick={toggleDeafened}
+                                aria-label="Deafen"
+                                aria-pressed={localAv.deafened}
+                                title={localAv.deafened ? "Undeafen" : "Deafen"}
+                            >
+                                <SoundIcon deafened={localAv.deafened} className="pane-voice-control-icon" />
+                            </button>
+                        </div>
+                    </div>
+                ) : null}
+                <UserPanel
+                    client={client}
+                    userId={ownUserId}
+                    displayName={ownDisplayName}
+                    avatarSources={ownAvatarSources}
+                    handle={formatUserIdForDisplay(ownUserId, localDomain) || "Unknown user"}
+                    statusMessage={presenceControl.effectiveStatusMessage}
+                    presence={
+                        presenceEnabled
+                            ? {
+                                  choice: presenceControl.effectiveChoice,
+                                  title: presenceControl.autoIdle
+                                      ? "Idle while you're away. Set your status"
+                                      : "Set your status",
+                                  menuOpen: statusMenuOpen,
+                                  onToggleMenu: () => setStatusMenuOpen((open) => !open),
+                              }
+                            : null
+                    }
+                    onOpenSettings={() => openUserSettings("my-account")}
+                    devices={{
+                        inputId: userSettings.audio.preferredAudioInputId,
+                        outputId: userSettings.audio.preferredAudioOutputId,
+                        onChoose: (kind, deviceId) =>
+                            setUserSettings((current) => ({
+                                ...current,
+                                audio:
+                                    kind === "audioinput"
+                                        ? { ...current.audio, preferredAudioInputId: deviceId }
+                                        : { ...current.audio, preferredAudioOutputId: deviceId },
+                            })),
+                        onOpenSettings: () => openUserSettings("audio"),
+                    }}
+                >
+                    {presenceEnabled && statusMenuOpen ? (
+                        <StatusMenu
+                            choice={presenceControl.selection.choice}
+                            statusMessage={presenceControl.selection.statusMessage}
+                            error={presenceControl.error}
+                            autoIdleOn={autoIdleOn}
+                            activitySharing={activitySharingControl}
+                            onChoose={presenceControl.setChoice}
+                            onStatusMessage={presenceControl.setStatusMessage}
+                            onClose={() => setStatusMenuOpen(false)}
+                        />
+                    ) : null}
+                </UserPanel>
+            </div>
 
             <section className="main-pane" ref={mainPaneRef} inert={isPhone && !phoneChatOpen ? true : undefined}>
                 <ChannelHeader
