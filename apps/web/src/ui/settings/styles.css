@@ -21,6 +21,8 @@
     --badge-tester: #0f6cbd;
     --badge-contributor: #b4541a;
     --badge-early-supporter: #b4325a;
+    /* The panels are white here, as is --bg-app, so the base they float on is the rail's grey. */
+    --shell-base: var(--bg-rail);
 }
 
 /* The right panel's cards, buttons and hovers have fixed dark colours of their own. In light

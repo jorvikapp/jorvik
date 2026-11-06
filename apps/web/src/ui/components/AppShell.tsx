@@ -3459,135 +3459,137 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
 
             <section className="channels-pane" ref={channelsPaneRef} inert={phoneHomeInert}>
                 <div className="channels-pane-resize-handle" onPointerDown={handleResizePointerDown} />
-                <div className="pane-top pane-top-row">
-                    <span>{selectedSpaceName}</span>
-                    <div className="pane-top-actions">
-                        {selectedSpaceId === PEOPLE_SPACE_ID ? (
-                            <button
-                                type="button"
-                                className="pane-top-action"
-                                onClick={() => setCreateDirectChatOpen(true)}
-                                title="Start direct chat"
-                            >
-                                New DM
-                            </button>
-                        ) : null}
-                        {selectedSpaceRoom && canCreateChannelInSpace ? (
-                            <button
-                                type="button"
-                                className="pane-top-action"
-                                onClick={() => openCreateRoomDialog(selectedSpaceRoom.roomId)}
-                                title="Create channel"
-                                aria-label="Create channel"
-                            >
-                                +
-                            </button>
-                        ) : null}
-                        {selectedSpaceRoom ? (
-                            <button
-                                type="button"
-                                className="pane-top-action"
-                                onClick={() => openServerSettings("overview")}
-                                title="Open server settings"
-                            >
-                                Server
-                            </button>
-                        ) : null}
+                <div className="channels-pane-list">
+                    <div className="pane-top pane-top-row">
+                        <span>{selectedSpaceName}</span>
+                        <div className="pane-top-actions">
+                            {selectedSpaceId === PEOPLE_SPACE_ID ? (
+                                <button
+                                    type="button"
+                                    className="pane-top-action"
+                                    onClick={() => setCreateDirectChatOpen(true)}
+                                    title="Start direct chat"
+                                >
+                                    New DM
+                                </button>
+                            ) : null}
+                            {selectedSpaceRoom && canCreateChannelInSpace ? (
+                                <button
+                                    type="button"
+                                    className="pane-top-action"
+                                    onClick={() => openCreateRoomDialog(selectedSpaceRoom.roomId)}
+                                    title="Create channel"
+                                    aria-label="Create channel"
+                                >
+                                    +
+                                </button>
+                            ) : null}
+                            {selectedSpaceRoom ? (
+                                <button
+                                    type="button"
+                                    className="pane-top-action"
+                                    onClick={() => openServerSettings("overview")}
+                                    title="Open server settings"
+                                >
+                                    Server
+                                </button>
+                            ) : null}
+                        </div>
                     </div>
+                    <button
+                        type="button"
+                        className="channels-pane-jump"
+                        onClick={() => setQuickSwitcherOpen(true)}
+                        title="Jump to a channel, DM or space"
+                        aria-keyshortcuts={usesCommandKey() ? "Meta+K" : "Control+K"}
+                    >
+                        <span className="channels-pane-jump-label">Jump to…</span>
+                        <kbd className="channels-pane-jump-key">{commandShortcutLabel("K")}</kbd>
+                    </button>
+                    {showSpaceOnboarding ? (
+                        <div className="space-onboarding-card">
+                            <div className="space-onboarding-header">
+                                <h3 className="space-onboarding-title">Space is ready</h3>
+                                <button
+                                    type="button"
+                                    className="space-onboarding-dismiss"
+                                    aria-label="Dismiss onboarding"
+                                    onClick={() => setSpaceOnboardingSpaceId(null)}
+                                >
+                                    x
+                                </button>
+                            </div>
+                            <p className="space-onboarding-text">Create your first channel or configure the server.</p>
+                            <div className="space-onboarding-actions">
+                                <button
+                                    type="button"
+                                    className="room-dialog-button room-dialog-button-primary"
+                                    onClick={() => openCreateRoomDialog(selectedSpaceRoom?.roomId ?? null)}
+                                >
+                                    Create channel
+                                </button>
+                                <button
+                                    type="button"
+                                    className="room-dialog-button room-dialog-button-secondary"
+                                    onClick={() => openServerSettings("overview")}
+                                >
+                                    Open server settings
+                                </button>
+                                <button
+                                    type="button"
+                                    className="room-dialog-button room-dialog-button-secondary"
+                                    onClick={() => openInviteDialogFor(selectedSpaceRoom?.roomId ?? null)}
+                                >
+                                    Invite members
+                                </button>
+                            </div>
+                        </div>
+                    ) : null}
+                    <RoomList
+                        client={client}
+                        spaceId={selectedSpaceId}
+                        rooms={channels}
+                        voiceChannelHintRoomIds={voiceChannelHintRoomIds}
+                        voiceDiscoveryReady={voiceDiscoveryReady}
+                        showRoomAvatars={selectedSpaceId === PEOPLE_SPACE_ID || userSettings.appearance.showSpaceChannelAvatars}
+                        discoverableRooms={selectedSpaceId === PEOPLE_SPACE_ID ? [] : discoverableSpaceChannels}
+                        discoverableJoiningRoomId={joiningDiscoverableRoomId}
+                        contentsPending={selectedSpaceId === PEOPLE_SPACE_ID ? false : spaceContentsPending}
+                        activeRoomId={isPhone ? (phoneOpenedRoomId === activeRoomId ? activeRoomId : null) : activeRoomId}
+                        orderingMode={selectedSpaceId === PEOPLE_SPACE_ID ? "dynamic" : "manual"}
+                        showOrderingControls={selectedSpaceId !== PEOPLE_SPACE_ID}
+                        showHashPrefix={selectedSpaceId !== PEOPLE_SPACE_ID}
+                        onSelectRoom={selectChannel}
+                        onJoinDiscoverableRoom={(roomId) => {
+                            void joinDiscoverableSpaceChannel(roomId);
+                        }}
+                        onKnockDiscoverableRoom={(roomId) => {
+                            void knockDiscoverableSpaceChannel(roomId);
+                        }}
+                        subspaceGroups={selectedSpaceId === PEOPLE_SPACE_ID ? [] : subspaceGroupViews}
+                        onToggleSubspace={handleToggleSubspace}
+                        contentsTruncated={selectedSpaceId === PEOPLE_SPACE_ID ? false : spaceContentsTruncated}
+                        localVoiceSession={
+                            voiceSessionRoomId
+                                ? {
+                                      roomId: voiceSessionRoomId,
+                                      status: voiceSessionStatus,
+                                      userId: ownUserId || null,
+                                      displayName: ownDisplayName,
+                                      avatarMxc: ownAvatarMxc || null,
+                                      micMuted: voiceSessionStatus === "connected" ? voiceControlState.micMuted : false,
+                                      audioMuted: voiceSessionStatus === "connected" ? voiceControlState.audioMuted : false,
+                                  }
+                                : null
+                        }
+                        liveSpeakingByRoomId={voiceSpeakingByRoomId}
+                        liveScreenShareByRoomId={voiceScreenShareByRoomId}
+                        liveParticipantsByRoomId={voiceParticipantsByRoomId}
+                        liveParticipantsOverrideRoomId={liveVoiceParticipantsOverrideRoomId}
+                        onOpenRoomSettings={openRoomSettingsFor}
+                        onRoomContextMenu={selectedSpaceId === PEOPLE_SPACE_ID ? openDmMenu : undefined}
+                    />
                 </div>
-                <button
-                    type="button"
-                    className="channels-pane-jump"
-                    onClick={() => setQuickSwitcherOpen(true)}
-                    title="Jump to a channel, DM or space"
-                    aria-keyshortcuts={usesCommandKey() ? "Meta+K" : "Control+K"}
-                >
-                    <span className="channels-pane-jump-label">Jump to…</span>
-                    <kbd className="channels-pane-jump-key">{commandShortcutLabel("K")}</kbd>
-                </button>
-                {showSpaceOnboarding ? (
-                    <div className="space-onboarding-card">
-                        <div className="space-onboarding-header">
-                            <h3 className="space-onboarding-title">Space is ready</h3>
-                            <button
-                                type="button"
-                                className="space-onboarding-dismiss"
-                                aria-label="Dismiss onboarding"
-                                onClick={() => setSpaceOnboardingSpaceId(null)}
-                            >
-                                x
-                            </button>
-                        </div>
-                        <p className="space-onboarding-text">Create your first channel or configure the server.</p>
-                        <div className="space-onboarding-actions">
-                            <button
-                                type="button"
-                                className="room-dialog-button room-dialog-button-primary"
-                                onClick={() => openCreateRoomDialog(selectedSpaceRoom?.roomId ?? null)}
-                            >
-                                Create channel
-                            </button>
-                            <button
-                                type="button"
-                                className="room-dialog-button room-dialog-button-secondary"
-                                onClick={() => openServerSettings("overview")}
-                            >
-                                Open server settings
-                            </button>
-                            <button
-                                type="button"
-                                className="room-dialog-button room-dialog-button-secondary"
-                                onClick={() => openInviteDialogFor(selectedSpaceRoom?.roomId ?? null)}
-                            >
-                                Invite members
-                            </button>
-                        </div>
-                    </div>
-                ) : null}
-                <RoomList
-                    client={client}
-                    spaceId={selectedSpaceId}
-                    rooms={channels}
-                    voiceChannelHintRoomIds={voiceChannelHintRoomIds}
-                    voiceDiscoveryReady={voiceDiscoveryReady}
-                    showRoomAvatars={selectedSpaceId === PEOPLE_SPACE_ID || userSettings.appearance.showSpaceChannelAvatars}
-                    discoverableRooms={selectedSpaceId === PEOPLE_SPACE_ID ? [] : discoverableSpaceChannels}
-                    discoverableJoiningRoomId={joiningDiscoverableRoomId}
-                    contentsPending={selectedSpaceId === PEOPLE_SPACE_ID ? false : spaceContentsPending}
-                    activeRoomId={isPhone ? (phoneOpenedRoomId === activeRoomId ? activeRoomId : null) : activeRoomId}
-                    orderingMode={selectedSpaceId === PEOPLE_SPACE_ID ? "dynamic" : "manual"}
-                    showOrderingControls={selectedSpaceId !== PEOPLE_SPACE_ID}
-                    showHashPrefix={selectedSpaceId !== PEOPLE_SPACE_ID}
-                    onSelectRoom={selectChannel}
-                    onJoinDiscoverableRoom={(roomId) => {
-                        void joinDiscoverableSpaceChannel(roomId);
-                    }}
-                    onKnockDiscoverableRoom={(roomId) => {
-                        void knockDiscoverableSpaceChannel(roomId);
-                    }}
-                    subspaceGroups={selectedSpaceId === PEOPLE_SPACE_ID ? [] : subspaceGroupViews}
-                    onToggleSubspace={handleToggleSubspace}
-                    contentsTruncated={selectedSpaceId === PEOPLE_SPACE_ID ? false : spaceContentsTruncated}
-                    localVoiceSession={
-                        voiceSessionRoomId
-                            ? {
-                                  roomId: voiceSessionRoomId,
-                                  status: voiceSessionStatus,
-                                  userId: ownUserId || null,
-                                  displayName: ownDisplayName,
-                                  avatarMxc: ownAvatarMxc || null,
-                                  micMuted: voiceSessionStatus === "connected" ? voiceControlState.micMuted : false,
-                                  audioMuted: voiceSessionStatus === "connected" ? voiceControlState.audioMuted : false,
-                              }
-                            : null
-                    }
-                    liveSpeakingByRoomId={voiceSpeakingByRoomId}
-                    liveScreenShareByRoomId={voiceScreenShareByRoomId}
-                    liveParticipantsByRoomId={voiceParticipantsByRoomId}
-                    liveParticipantsOverrideRoomId={liveVoiceParticipantsOverrideRoomId}
-                    onOpenRoomSettings={openRoomSettingsFor}
-                    onRoomContextMenu={selectedSpaceId === PEOPLE_SPACE_ID ? openDmMenu : undefined}
-                />
                 <div className="pane-bottom">
                     {hasActiveVoiceSession && voiceSessionRoomId ? (
                         <div
@@ -3721,111 +3723,115 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             </section>
 
             <section className="main-pane" ref={mainPaneRef} inert={isPhone && !phoneChatOpen ? true : undefined}>
-                <ChannelHeader
-                    room={activeRoom}
-                    client={client}
-                    directName={activeDirectName}
-                    directUserId={activeDirectPartnerId}
-                    isDirectMessage={isActiveRoomDirect}
-                    isOneToOneDirect={activeDirectPartnerId !== null}
-                    showHashPrefix={shouldPrefixRoomWithHash}
-                    sidebarMode={phoneHeaderSidebarMode}
-                    searchQuery={sidebarSearchQuery}
-                    canInviteInRoom={canInviteInActiveRoom}
-                    onSearchQueryChange={setSidebarSearchQuery}
-                    onSelectSidebarMode={selectSidebarModeFromHeader}
-                    onOpenDirectChat={() => setCreateDirectChatOpen(true)}
-                    createRoomLabel={selectedSpaceId === PEOPLE_SPACE_ID ? "Create room" : "Create channel"}
-                    onOpenCreateRoom={() =>
-                        openCreateRoomDialog(selectedSpaceId === PEOPLE_SPACE_ID ? null : selectedSpaceRoom?.roomId ?? null)
-                    }
-                    onOpenJoinRoom={() => setJoinRoomOpen(true)}
-                    onOpenInviteUsers={() => openInviteDialogFor(activeRoom?.roomId ?? null)}
-                    onOpenRoomSettings={() => openRoomSettingsFor(activeRoom?.roomId ?? null)}
-                    onOpenModeration={() => setRoomModerationOpen(true)}
-                    onCopyRoomLink={copyActiveRoomLink}
-                    onLeaveRoom={leaveActiveRoom}
-                    onBack={isPhone ? closePhoneChat : undefined}
-                />
-                {calls.outgoingCall && !calls.outgoingCall.answered && activeRoom?.roomId === calls.outgoingCall.roomId ? (
-                    <div className="call-status-bar" role="status">
-                        <span>
-                            Calling {plainUserDisplayName(client.getUser(calls.outgoingCall.calleeId)) || calls.outgoingCall.calleeId}...
-                        </span>
-                        <button type="button" className="call-status-cancel" onClick={leaveVoiceSession}>
-                            Cancel
-                        </button>
-                    </div>
-                ) : null}
-                {hasActiveVoiceSession && voiceSessionRoomId ? (
-                    <div
-                        className={`main-voice-slot${shouldShowVoicePanel ? "" : shouldShowCallPanel ? " is-call" : " voice-room-hidden"}`}
-                        aria-hidden={!shouldShowVoicePanel && !shouldShowCallPanel}
-                    >
-                        <VoiceRoom
-                            ref={voiceRoomRef}
-                            client={client}
-                            matrixRoomId={voiceSessionRoomId}
-                            matrixRoom={
-                                activeRoom?.roomId === voiceSessionRoomId ? activeRoom : client.getRoom(voiceSessionRoomId) ?? undefined
-                            }
-                            audioSettings={userSettings.audio}
-                            autoJoinNonce={voiceAutoJoinNonce}
-                            onAudioSettingsChange={(audio) =>
-                                setUserSettings({
-                                    ...userSettings,
-                                    audio,
-                                })
-                            }
-                            onSessionStateChange={(state) => {
-                                setVoiceSessionRoomId(state.roomId);
-                                setVoiceSessionStatus(state.status);
-                                if (state.status === "joining") {
-                                    setVoiceParticipantsByRoomId((current) => {
-                                        const next = new Map(current);
-                                        next.set(state.roomId, new Set<string>());
-                                        return next;
-                                    });
-                                }
-                            }}
-                            onControlsStateChange={setVoiceControlState}
-                            onLiveParticipantsChange={handleLiveParticipantsChange}
-                        />
-                    </div>
-                ) : null}
-                {!shouldShowVoicePanel ? (
-                    <div className="main-chat-stack">
-                        <Timeline
-                            client={client}
-                            room={activeRoom}
-                            focusBottomNonce={timelineFocusBottomNonce}
-                            replyToEventId={replyToEvent?.getId() ?? null}
-                            onReply={(event) => {
-                                setEditingEvent(null);
-                                setReplyToEvent(event);
-                            }}
-                            onEdit={startEditing}
-                            onSelectUser={selectUserFromChat}
-                            onUserContextMenu={openMemberMenu}
-                            activeSpaceId={selectedSpaceId === PEOPLE_SPACE_ID ? null : selectedSpaceId}
-                            customReactionImagesEnabled={renderReactionImages}
-                            showReadReceipts={shouldShowReadReceipts}
-                            // On a phone showing the lists, the chat isn't on screen, so it isn't being read.
-                            userAway={userAway || (isPhone && !phoneChatOpen)}
-                            linkPreviewsInEncrypted={userSettings.privacy.linkPreviewsInEncrypted}
-                        />
-                        <div className="main-chat-composer">
-                            <Composer
+                <div className="main-panel">
+                    <ChannelHeader
+                        room={activeRoom}
+                        client={client}
+                        directName={activeDirectName}
+                        directUserId={activeDirectPartnerId}
+                        isDirectMessage={isActiveRoomDirect}
+                        isOneToOneDirect={activeDirectPartnerId !== null}
+                        showHashPrefix={shouldPrefixRoomWithHash}
+                        sidebarMode={phoneHeaderSidebarMode}
+                        searchQuery={sidebarSearchQuery}
+                        canInviteInRoom={canInviteInActiveRoom}
+                        onSearchQueryChange={setSidebarSearchQuery}
+                        onSelectSidebarMode={selectSidebarModeFromHeader}
+                        onOpenDirectChat={() => setCreateDirectChatOpen(true)}
+                        createRoomLabel={selectedSpaceId === PEOPLE_SPACE_ID ? "Create room" : "Create channel"}
+                        onOpenCreateRoom={() =>
+                            openCreateRoomDialog(selectedSpaceId === PEOPLE_SPACE_ID ? null : selectedSpaceRoom?.roomId ?? null)
+                        }
+                        onOpenJoinRoom={() => setJoinRoomOpen(true)}
+                        onOpenInviteUsers={() => openInviteDialogFor(activeRoom?.roomId ?? null)}
+                        onOpenRoomSettings={() => openRoomSettingsFor(activeRoom?.roomId ?? null)}
+                        onOpenModeration={() => setRoomModerationOpen(true)}
+                        onCopyRoomLink={copyActiveRoomLink}
+                        onLeaveRoom={leaveActiveRoom}
+                        onBack={isPhone ? closePhoneChat : undefined}
+                    />
+                    {calls.outgoingCall && !calls.outgoingCall.answered && activeRoom?.roomId === calls.outgoingCall.roomId ? (
+                        <div className="call-status-bar" role="status">
+                            <span>
+                                Calling {plainUserDisplayName(client.getUser(calls.outgoingCall.calleeId)) || calls.outgoingCall.calleeId}...
+                            </span>
+                            <button type="button" className="call-status-cancel" onClick={leaveVoiceSession}>
+                                Cancel
+                            </button>
+                        </div>
+                    ) : null}
+                    {hasActiveVoiceSession && voiceSessionRoomId ? (
+                        <div
+                            className={`main-voice-slot${shouldShowVoicePanel ? "" : shouldShowCallPanel ? " is-call" : " voice-room-hidden"}`}
+                            aria-hidden={!shouldShowVoicePanel && !shouldShowCallPanel}
+                        >
+                            <VoiceRoom
+                                ref={voiceRoomRef}
                                 client={client}
-                                room={activeRoom}
-                                activeSpaceId={selectedSpaceId === PEOPLE_SPACE_ID ? null : selectedSpaceId}
-                                editingEvent={editingEvent}
-                                onCancelEdit={() => setEditingEvent(null)}
-                                onEditMessage={startEditing}
-                                replyToEvent={replyToEvent}
-                                onCancelReply={() => setReplyToEvent(null)}
+                                matrixRoomId={voiceSessionRoomId}
+                                matrixRoom={
+                                    activeRoom?.roomId === voiceSessionRoomId ? activeRoom : client.getRoom(voiceSessionRoomId) ?? undefined
+                                }
+                                audioSettings={userSettings.audio}
+                                autoJoinNonce={voiceAutoJoinNonce}
+                                onAudioSettingsChange={(audio) =>
+                                    setUserSettings({
+                                        ...userSettings,
+                                        audio,
+                                    })
+                                }
+                                onSessionStateChange={(state) => {
+                                    setVoiceSessionRoomId(state.roomId);
+                                    setVoiceSessionStatus(state.status);
+                                    if (state.status === "joining") {
+                                        setVoiceParticipantsByRoomId((current) => {
+                                            const next = new Map(current);
+                                            next.set(state.roomId, new Set<string>());
+                                            return next;
+                                        });
+                                    }
+                                }}
+                                onControlsStateChange={setVoiceControlState}
+                                onLiveParticipantsChange={handleLiveParticipantsChange}
                             />
                         </div>
+                    ) : null}
+                    {!shouldShowVoicePanel ? (
+                        <div className="main-chat-stack">
+                            <Timeline
+                                client={client}
+                                room={activeRoom}
+                                focusBottomNonce={timelineFocusBottomNonce}
+                                replyToEventId={replyToEvent?.getId() ?? null}
+                                onReply={(event) => {
+                                    setEditingEvent(null);
+                                    setReplyToEvent(event);
+                                }}
+                                onEdit={startEditing}
+                                onSelectUser={selectUserFromChat}
+                                onUserContextMenu={openMemberMenu}
+                                activeSpaceId={selectedSpaceId === PEOPLE_SPACE_ID ? null : selectedSpaceId}
+                                customReactionImagesEnabled={renderReactionImages}
+                                showReadReceipts={shouldShowReadReceipts}
+                                // On a phone showing the lists, the chat isn't on screen, so it isn't being read.
+                                userAway={userAway || (isPhone && !phoneChatOpen)}
+                                linkPreviewsInEncrypted={userSettings.privacy.linkPreviewsInEncrypted}
+                            />
+                        </div>
+                    ) : null}
+                </div>
+                {!shouldShowVoicePanel ? (
+                    <div className="main-chat-composer">
+                        <Composer
+                            client={client}
+                            room={activeRoom}
+                            activeSpaceId={selectedSpaceId === PEOPLE_SPACE_ID ? null : selectedSpaceId}
+                            editingEvent={editingEvent}
+                            onCancelEdit={() => setEditingEvent(null)}
+                            onEditMessage={startEditing}
+                            replyToEvent={replyToEvent}
+                            onCancelReply={() => setReplyToEvent(null)}
+                        />
                     </div>
                 ) : null}
                 <div className="main-pane-header-drag" aria-hidden="true" />

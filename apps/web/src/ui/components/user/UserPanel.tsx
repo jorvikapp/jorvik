@@ -12,7 +12,10 @@ import { Avatar } from "../Avatar";
 import { GearIcon, MicIcon, SoundIcon } from "../voice/AvIcons";
 import { DeviceMenu } from "./DeviceMenu";
 
-/** The panel's second line: the game you share, else your status message, else your handle. */
+/**
+ * The panel's second line: the game you share, else your status message, else your handle. `text` is the
+ * whole of it, for the tooltip; for a game the line itself shows only the name, after the game's icon.
+ */
 export type UserPanelContext =
     | { kind: "game"; game: ActivityGame; text: string }
     | { kind: "status"; text: string }
@@ -167,11 +170,16 @@ export function UserPanel({
                     </span>
                     <span className={`pane-user-context is-${context.kind}`} title={context.text}>
                         {context.kind === "game" ? (
-                            <span className="pane-user-context-icon" aria-hidden="true">
-                                <GameIcon client={client} game={context.game} />
-                            </span>
-                        ) : null}
-                        <span className="pane-user-context-text">{context.text}</span>
+                            <>
+                                <span className="pane-user-context-icon" aria-hidden="true">
+                                    <GameIcon client={client} game={context.game} />
+                                </span>
+                                <span className="pane-user-context-verb">Playing </span>
+                                <span className="pane-user-context-text">{context.game.name}</span>
+                            </>
+                        ) : (
+                            <span className="pane-user-context-text">{context.text}</span>
+                        )}
                     </span>
                 </span>
             </button>

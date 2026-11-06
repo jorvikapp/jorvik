@@ -1,7 +1,7 @@
 .right-panel {
     position: relative;
-    border-left: 2px solid var(--border);
-    background: var(--bg-main);
+    background: var(--panel-surface);
+    border-radius: var(--panel-radius);
     min-width: 0;
     display: flex;
     flex-direction: column;
