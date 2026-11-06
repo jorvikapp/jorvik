@@ -77,7 +77,7 @@
   <releases>
     <release version="1.0.31" date="2026-11-06">
       <description>
-        <p>Your panel and the message box as matching cards.</p>
+        <p>A new look for your panel and the message box.</p>
         <ul>
           <li>Your panel under the channel list and the message box are matching rounded cards, the same height and lined up at the bottom. During a call, the call gets a matching card above your panel</li>
           <li>The line under your name shows the game you're playing by its name, with the full text when you hover over it, and the tails of letters such as g and y are no longer cut off</li>
@@ -88,13 +88,13 @@
     </release>
     <release version="1.0.30" date="2026-11-06">
       <description>
-        <p>Your microphone and sound in the panel, a menu on people, and Spaces made from a Discord server.</p>
+        <p>New microphone and sound controls, a right-click menu for people, and a quicker way to set up a Space.</p>
         <ul>
           <li>The panel under the channel list has your microphone, sound and settings buttons. Mute and deafen stay as you left them, even after a restart, and you can join a call already muted</li>
           <li>Choose your microphone and speaker from the arrows beside them, during a call or before one</li>
           <li>Right-click someone for their menu: profile, message, mention, copy their user ID or block them. Moderators can remove or ban them from a whole Space at once</li>
           <li>Right-click a direct message to mark it as read, mute it, pin it to the top as a favourite, or close it</li>
-          <li>Make a Space from a Discord server's template link: Create Space, then Import, copies its categories, channels, topics and who can see and post in each channel</li>
+          <li>Start a Space from a server template link: in Create Space, choose Import and paste the link. Its categories, channels and topics come along, with who can see and post in each channel</li>
           <li>Importing a Space from a JSON file no longer fails on channels where only moderators or admins can post, and both imports make channels one at a time, with a countdown, so the server doesn't turn them away</li>
           <li>Messages sent before you joined an encrypted channel show as one line saying so, instead of a row of errors, and other messages that can't be read say why</li>
           <li>Member lists keep up as people join and leave, and show everyone in the room, including people who haven't spoken lately</li>
