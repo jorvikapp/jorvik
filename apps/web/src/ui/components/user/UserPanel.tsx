@@ -142,10 +142,11 @@ export function UserPanel({
     const nameplateSrc = useProfileImageSrc(client, userId, NAMEPLATE_FIELD);
 
     return (
-        <div className="pane-user-row user-panel">
+        <div className={`pane-user-row user-panel${nameplateSrc ? " has-nameplate" : ""}`}>
+            {nameplateSrc ? <ProfileBanner className="pane-user-nameplate" src={nameplateSrc} /> : null}
             <button
                 type="button"
-                className={`pane-user-card${nameplateSrc ? " has-nameplate" : ""}`}
+                className="pane-user-card"
                 onClick={presence ? presence.onToggleMenu : onOpenSettings}
                 // The open menu closes on any press outside it, and the click would open it again: this
                 // press is the menu's own button, so leave closing to the click.
@@ -158,7 +159,6 @@ export function UserPanel({
                 aria-haspopup={presence ? "menu" : undefined}
                 aria-expanded={presence ? presence.menuOpen : undefined}
             >
-                {nameplateSrc ? <ProfileBanner className="pane-user-nameplate" src={nameplateSrc} /> : null}
                 <Avatar
                     className="pane-user-avatar"
                     name={displayName}

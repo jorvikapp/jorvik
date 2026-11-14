@@ -192,7 +192,7 @@ describe("nameplate", () => {
         expect(container.querySelector(".settings-nameplate-preview .pane-user-nameplate")).toBeNull();
 
         await choose(fileInput(NAMEPLATE_FIELD), new File(["GIF89a"], "plate.gif", { type: "image/gif" }));
-        expect(container.querySelector(".settings-nameplate-preview .pane-user-card.has-nameplate img")?.getAttribute("src")).toBe(http(PLATE));
+        expect(container.querySelector(".settings-nameplate-preview.has-nameplate > .pane-user-nameplate img")?.getAttribute("src")).toBe(http(PLATE));
         // The banner keeps its colours.
         expect(container.querySelector(".profile-preview-banner img")).toBeNull();
 
@@ -212,21 +212,22 @@ describe("nameplate", () => {
         expect(client.uploadContent).not.toHaveBeenCalled();
     });
 
-    it("sits behind your name in the panel, and goes when it's removed", async () => {
+    it("fills the whole panel behind your name and the buttons, and goes when it's removed", async () => {
         const client = fakeClient({ [NAMEPLATE_FIELD]: PLATE });
         await act(async () =>
             root.render(
                 <UserPanel client={client as never} userId="@alice:test.local" displayName="alice" avatarSources={[]} handle="@alice" presence={null} onOpenSettings={() => undefined} />,
             ),
         );
-        const card = container.querySelector(".pane-user-card")!;
-        expect(card.classList.contains("has-nameplate")).toBe(true);
-        expect(card.querySelector(".pane-user-nameplate img")?.getAttribute("src")).toBe(http(PLATE));
-        // Behind the avatar and the name: it comes first.
-        expect(card.firstElementChild?.classList.contains("pane-user-nameplate")).toBe(true);
+        const panel = container.querySelector(".user-panel")!;
+        expect(panel.classList.contains("has-nameplate")).toBe(true);
+        // The panel's first child, under the name card and the buttons; not inside the name card.
+        expect(panel.firstElementChild?.classList.contains("pane-user-nameplate")).toBe(true);
+        expect(panel.querySelector(".pane-user-nameplate img")?.getAttribute("src")).toBe(http(PLATE));
+        expect(panel.querySelector(".pane-user-card .pane-user-nameplate")).toBeNull();
         act(() => rememberProfileImage("@alice:test.local", NAMEPLATE_FIELD, null));
-        expect(card.classList.contains("has-nameplate")).toBe(false);
-        expect(card.querySelector(".pane-user-nameplate")).toBeNull();
+        expect(panel.classList.contains("has-nameplate")).toBe(false);
+        expect(panel.querySelector(".pane-user-nameplate")).toBeNull();
     });
 
     it("is not there without one", async () => {

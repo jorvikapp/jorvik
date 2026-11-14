@@ -6204,19 +6204,14 @@ select,
     background: var(--bg-active);
 }
 
-/* A nameplate: your picture behind your name, cropped to fill the name area, under a shade of the panel's own
-   colour that's deepest where the text is, so the name stays readable in both themes. The card's own hover
-   colour would sit under the picture, so hovering deepens the shade instead. */
-.pane-user-row.user-panel .pane-user-card.has-nameplate {
-    position: relative;
-    isolation: isolate;
-}
-
+/* A nameplate: your picture behind the whole panel, cropped to fill it, under a shade of the panel's own colour,
+   deepest behind your name and again behind the buttons, so text and icons stay readable in both themes. The
+   name and the buttons sit above it; their hover colours are see-through, so the picture shows through them. */
 .pane-user-nameplate {
     position: absolute;
     inset: 0;
-    z-index: -1;
-    border-radius: inherit;
+    z-index: 0;
+    border-radius: calc(var(--dock-card-radius) - 1px);
     overflow: hidden;
     pointer-events: none;
 }
@@ -6227,23 +6222,30 @@ select,
     inset: 0;
     background: linear-gradient(
         90deg,
-        color-mix(in srgb, var(--dock-card-bg) 70%, transparent),
-        color-mix(in srgb, var(--dock-card-bg) 25%, transparent)
+        color-mix(in srgb, var(--dock-card-bg) 70%, transparent) 0%,
+        color-mix(in srgb, var(--dock-card-bg) 30%, transparent) 55%,
+        color-mix(in srgb, var(--dock-card-bg) 55%, transparent) 100%
     );
-    transition: background-color var(--motion-fast) var(--motion-ease-standard);
 }
 
-.pane-user-row.user-panel .pane-user-card.has-nameplate:hover {
-    background: transparent;
+.pane-user-row.user-panel.has-nameplate > .pane-user-card,
+.pane-user-row.user-panel.has-nameplate > .user-panel-controls {
+    position: relative;
+    z-index: 1;
 }
 
-.pane-user-card.has-nameplate:hover .pane-user-nameplate::after {
-    background-color: color-mix(in srgb, var(--bg-active) 45%, transparent);
+.pane-user-row.user-panel.has-nameplate .pane-user-card:hover {
+    background: color-mix(in srgb, var(--bg-active) 55%, transparent);
 }
 
-.pane-user-card.has-nameplate .pane-user-name,
-.pane-user-card.has-nameplate .pane-user-context {
+.user-panel.has-nameplate .pane-user-name,
+.user-panel.has-nameplate .pane-user-context {
     text-shadow: 0 1px 2px color-mix(in srgb, var(--dock-card-bg) 85%, transparent);
+}
+
+.user-panel.has-nameplate .user-panel-control-icon,
+.user-panel.has-nameplate .user-panel-chevron-icon {
+    filter: drop-shadow(0 1px 1.5px color-mix(in srgb, var(--dock-card-bg) 85%, transparent));
 }
 
 .pane-user-row.user-panel .pane-user-avatar {

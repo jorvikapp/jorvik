@@ -329,17 +329,19 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
                         disabled={saving || !profileLoaded}
                         note={
                             <>
-                                The picture behind your name in your panel at the bottom left: {PROFILE_IMAGE_RULES}. The
-                                name area is 208 x 44, so 416 x 88 stays sharp; it's cropped to fit a narrower window, and
-                                GIFs and animated WebPs move.
+                                The picture behind your panel at the bottom left, under your name and your mic, sound and
+                                settings buttons: {PROFILE_IMAGE_RULES}. The panel is 334 x 56, so 668 x 112 stays sharp;
+                                it's cropped to fit a narrower window, and GIFs and animated WebPs move.
                             </>
                         }
                     >
-                        <div className="pane-user-row user-panel settings-nameplate-preview" aria-label="Your panel, with this nameplate" role="img">
-                            <span className={`pane-user-card${nameplate.previewSrc ? " has-nameplate" : ""}`}>
-                                {nameplate.previewSrc ? (
-                                    <ProfileBanner className="pane-user-nameplate" src={nameplate.previewSrc} />
-                                ) : null}
+                        <div
+                            className={`pane-user-row user-panel settings-nameplate-preview${nameplate.previewSrc ? " has-nameplate" : ""}`}
+                            aria-label="Your panel, with this nameplate"
+                            role="img"
+                        >
+                            {nameplate.previewSrc ? <ProfileBanner className="pane-user-nameplate" src={nameplate.previewSrc} /> : null}
+                            <span className="pane-user-card">
                                 <Avatar
                                     className="pane-user-avatar"
                                     name={previewName}
