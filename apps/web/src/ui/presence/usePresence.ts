@@ -3,6 +3,21 @@ import { UserEvent, type MatrixClient, type User } from "matrix-js-sdk/src/matri
 
 import { buildPresenceVm, type PresenceVm } from "./buildPresenceVm";
 
+/**
+ * Someone's status message from their latest presence. The SDK keeps the old one after it's cleared (it only
+ * stores a status_msg that isn't empty), so the presence event itself is the truth; without one, the SDK's copy.
+ */
+export function presenceStatusMessage(user: User | null | undefined): string | null {
+    const event = user?.events?.presence;
+    const message = event ? event.getContent()?.status_msg : user?.presenceStatusMsg;
+    return typeof message === "string" && message.trim().length > 0 ? message : null;
+}
+
+/** What a presence row shows of someone; an update that changes none of it has nothing to redraw. */
+function shownPresence(user: User): string {
+    return [user.presence, String(user.currentlyActive), presenceStatusMessage(user) ?? ""].join("\u0000");
+}
+
 function sanitizeUserIds(userIds: string[]): string[] {
     const unique = new Set<string>();
     const out: string[] = [];
@@ -51,19 +66,36 @@ export function usePresenceMap(
         }
 
         const trackedUsers = new Set(normalizedUserIds);
+        const shown = new Map<string, string>();
+        for (const userId of normalizedUserIds) {
+            const user = client.getUser(userId);
+            if (user) {
+                shown.set(userId, shownPresence(user));
+            }
+        }
         const onPresenceUpdate = (_event: unknown, user: User): void => {
             if (!user?.userId || !trackedUsers.has(user.userId)) {
                 return;
             }
-
+            const next = shownPresence(user);
+            if (shown.get(user.userId) === next) {
+                return;
+            }
+            shown.set(user.userId, next);
             setRevision((value) => value + 1);
         };
 
-        client.on(UserEvent.Presence, onPresenceUpdate as any);
-        client.on(UserEvent.CurrentlyActive, onPresenceUpdate as any);
+        // Presence and CurrentlyActive fire only when those two change. A status message set, changed or
+        // cleared by someone who stays online fires LastPresenceTs alone (every presence update fires it), so
+        // without it a new status waited for a reload.
+        const events = [UserEvent.Presence, UserEvent.CurrentlyActive, UserEvent.LastPresenceTs] as const;
+        for (const event of events) {
+            client.on(event, onPresenceUpdate as any);
+        }
         return () => {
-            client.removeListener(UserEvent.Presence, onPresenceUpdate as any);
-            client.removeListener(UserEvent.CurrentlyActive, onPresenceUpdate as any);
+            for (const event of events) {
+                client.removeListener(event, onPresenceUpdate as any);
+            }
         };
     }, [client, enabled, normalizedIdsKey, normalizedUserIds]);
 
@@ -83,7 +115,7 @@ export function usePresenceMap(
                         currentlyActive: user?.currentlyActive,
                         lastActiveAgo: user?.lastActiveAgo,
                         receivedAt: user?.lastPresenceTs,
-                        statusMessage: user?.presenceStatusMsg,
+                        statusMessage: presenceStatusMessage(user),
                     },
                     now ?? Date.now(),
                 ),
