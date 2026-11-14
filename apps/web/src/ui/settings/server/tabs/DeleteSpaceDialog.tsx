@@ -89,8 +89,8 @@ export function DeleteSpaceDialog({ client, spaceRoom, spaceName, open, onClose,
                         This removes everyone from {spaceName}
                         {channelCount > 0 ? ` and its ${channelCount} channel${channelCount === 1 ? "" : "s"}` : ""}, closes
                         {channelCount > 0 ? " them" : " it"} so nobody can rejoin, and takes {channelCount > 0 ? "them" : "it"} off
-                        the room directory. Then you leave. Messages stay on servers that already have them. This cannot be
-                        undone.
+                        the room directory. Then you leave. Messages stay on homeservers that already have them. This
+                        cannot be undone.
                     </p>
                     {unremovable.length > 0 ? (
                         <div className="room-dialog-warning">

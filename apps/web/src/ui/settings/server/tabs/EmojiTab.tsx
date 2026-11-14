@@ -103,7 +103,7 @@ export function EmojiTab({ client, spaceRoom, onOpenUploadDialog, onToast }: Emo
         }
 
         const confirmed = await confirmAction({
-            title: `Remove ${shortcode} from this space pack?`,
+            title: `Remove ${shortcode} from this server's pack?`,
             confirmLabel: "Remove",
             danger: true,
         });
@@ -144,7 +144,7 @@ export function EmojiTab({ client, spaceRoom, onOpenUploadDialog, onToast }: Emo
         }
 
         if (pack.emojis[normalized]) {
-            setError(`This Space already has ${normalized}.`);
+            setError(`This server already has ${normalized}.`);
             return;
         }
 
@@ -178,7 +178,7 @@ export function EmojiTab({ client, spaceRoom, onOpenUploadDialog, onToast }: Emo
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Emoji</h2>
-            <p className="settings-tab-description">Custom emoji that everyone in this Space can use.</p>
+            <p className="settings-tab-description">Custom emoji that everyone in this server can use.</p>
 
             <div className="settings-actions-row">
                 <input
@@ -192,7 +192,7 @@ export function EmojiTab({ client, spaceRoom, onOpenUploadDialog, onToast }: Emo
                     type="button"
                     className="settings-button"
                     disabled={!permissions.canEditEmojiPack}
-                    title={!permissions.canEditEmojiPack ? "Your rank doesn't let you change this Space's emoji." : "Upload emoji"}
+                    title={!permissions.canEditEmojiPack ? "Your rank doesn't let you change this server's emoji." : "Upload emoji"}
                     onClick={onOpenUploadDialog}
                 >
                     Upload emoji
@@ -204,7 +204,7 @@ export function EmojiTab({ client, spaceRoom, onOpenUploadDialog, onToast }: Emo
 
             {!permissions.canEditEmojiPack ? (
                 <p className="settings-inline-note">
-                    Your rank doesn't let you change this Space's emoji.
+                    Your rank doesn't let you change this server's emoji.
                 </p>
             ) : null}
 

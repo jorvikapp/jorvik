@@ -53,7 +53,7 @@ async function createSpace(client: ReturnType<typeof makeClient>, beforeCreate?:
     });
     beforeCreate?.();
     await act(async () => {
-        buttonNamed("Create Space").click();
+        buttonNamed("Create server").click();
     });
 }
 

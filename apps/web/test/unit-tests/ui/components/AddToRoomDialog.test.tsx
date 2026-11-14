@@ -61,7 +61,7 @@ describe("AddToRoomDialog", () => {
     it("lists only places you can invite them to, spaces first, never the badges room", () => {
         act(() => root.render(<AddToRoomDialog client={client as never} userId={THEM} onClose={vi.fn()} onInvited={vi.fn()} />));
         const labels = [...document.querySelectorAll(".add-to-room-item")].map((item) => item.textContent);
-        expect(labels).toEqual(["Test SpaceSpaceInvite", "# generalTest SpaceInvite"]);
+        expect(labels).toEqual(["Test SpaceServerInvite", "# generalTest SpaceInvite"]);
     });
 
     it("invites and reports it", async () => {

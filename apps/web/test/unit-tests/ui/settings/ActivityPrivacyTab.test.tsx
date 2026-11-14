@@ -105,7 +105,7 @@ describe("ActivityPrivacyTab", () => {
         expect(spaceSwitch("Book Club").checked).toBe(true);
         expect(spaceSwitch("Great Hall").checked).toBe(false);
         expect(container.textContent).toContain("900 members");
-        expect(container.textContent).toContain("Activity visible to: friends and 1 space.");
+        expect(container.textContent).toContain("Activity visible to: friends and 1 server.");
     });
 
     it("saves a space's own switch only where it differs from the default", async () => {
@@ -129,14 +129,14 @@ describe("ActivityPrivacyTab", () => {
     it("picks the default for spaces", async () => {
         const client = fakeClient({ enabled: true });
         await render(client);
-        await act(async () => labelled("No spaces").click());
+        await act(async () => labelled("No servers").click());
         expect(lastSaved(client).space_scope).toBe("none");
         expect(spaceSwitch("Book Club").checked).toBe(false);
     });
 
     it("finds spaces by name", async () => {
         await render(fakeClient({ enabled: true }));
-        const search = container.querySelector<HTMLInputElement>('input[aria-label="Search spaces"]')!;
+        const search = container.querySelector<HTMLInputElement>('input[aria-label="Search servers"]')!;
         await act(async () => {
             Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(search, "book");
             search.dispatchEvent(new Event("input", { bubbles: true }));

@@ -61,11 +61,11 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
     [EventType.RoomHistoryVisibility]: "Change who can read its history",
     [EventType.RoomGuestAccess]: "Change guest access",
     [EventType.RoomEncryption]: "Turn on encryption",
-    [EventType.RoomServerAcl]: "Change which servers can take part",
-    [EventType.RoomTombstone]: "Upgrade the Space",
+    [EventType.RoomServerAcl]: "Change which homeservers can take part",
+    [EventType.RoomTombstone]: "Upgrade the server",
     [EventType.RoomPinnedEvents]: "Pin messages",
     [EventType.SpaceChild]: "Add or remove channels",
-    [EventType.SpaceParent]: "Put it inside another Space",
+    [EventType.SpaceParent]: "Put it inside another server",
     [EventType.RoomThirdPartyInvite]: "Invite people by email",
     [EventType.RoomMessage]: "Send messages",
     [EventType.Sticker]: "Send stickers",
@@ -331,7 +331,7 @@ export function PermissionsTab({ client, spaceRoom, onToast }: PermissionsTabPro
         <div className="settings-tab">
             <h2 className="settings-tab-title">Permissions</h2>
             <p className="settings-tab-description">
-                Who can do what in this Space. Everyone has a rank, a number: the higher it is, the more they can do.
+                Who can do what in this server. Everyone has a rank, a number: the higher it is, the more they can do.
             </p>
 
             <div className="settings-permissions-summary">

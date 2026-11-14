@@ -196,7 +196,7 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
             // refusal here is not something the user can fix in this dialog.
             setError(
                 status === 403
-                    ? `${message} Your server only lets some people list Spaces publicly.`
+                    ? `${message} Your homeserver only lets some people list servers publicly.`
                     : message,
             );
         } finally {
@@ -211,9 +211,9 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
             await client.sendStateEvent(spaceRoom.roomId, EventType.RoomEncryption, { algorithm: "m.megolm.v1.aes-sha2" }, "");
             setEncrypted(true);
             setEncryptDialogOpen(false);
-            onToast({ type: "success", message: "This Space is now end-to-end encrypted." });
+            onToast({ type: "success", message: "This server is now end-to-end encrypted." });
         } catch (encryptFailure) {
-            setEncryptError(encryptFailure instanceof Error ? encryptFailure.message : "Failed to encrypt this Space.");
+            setEncryptError(encryptFailure instanceof Error ? encryptFailure.message : "Failed to encrypt this server.");
         } finally {
             setEncrypting(false);
         }
@@ -223,8 +223,8 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
         <div className="settings-tab">
             <h2 className="settings-tab-title">Visibility</h2>
             <p className="settings-tab-description">
-                Who can join this Space, who can read its history, and whether people can find it in your server's
-                public Spaces.
+                Who can join this server, who can read its history, and whether people can find it in your
+                homeserver's public directory.
             </p>
 
             <div className="settings-section-card">
@@ -237,10 +237,10 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
                     >
                         <option value={JoinRule.Invite}>Only people who are invited</option>
                         <option value={JoinRule.Public}>Anyone</option>
-                        {/* Only kept, never offered: the Spaces or channels it lets in can't be picked here, so
+                        {/* Only kept, never offered: the servers or channels it lets in can't be picked here, so
                             choosing it would quietly let nobody in without an invite. */}
                         {readJoinRule(spaceRoom) === JoinRule.Restricted ? (
-                            <option value={JoinRule.Restricted}>Members of certain Spaces or channels</option>
+                            <option value={JoinRule.Restricted}>Members of certain servers or channels</option>
                         ) : null}
                         <option value={JoinRule.Knock}>Anyone can ask to join</option>
                     </select>
@@ -278,7 +278,7 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
                             onChange={(event) => setPublished(event.target.checked)}
                             disabled={saving || directoryStatus !== "ready"}
                         />
-                        List this Space in your server's public Spaces
+                        List this server in your homeserver's public directory
                     </label>
                 )}
 
@@ -306,8 +306,8 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
                 <h3>End-to-end encryption</h3>
                 <p className="settings-inline-note">
                     {encrypted
-                        ? "This Space is end-to-end encrypted."
-                        : "This Space isn't end-to-end encrypted. Its channels are encrypted separately, and new ones are by default."}
+                        ? "This server is end-to-end encrypted."
+                        : "This server isn't end-to-end encrypted. Its channels are encrypted separately, and new ones are by default."}
                 </p>
                 {!encrypted && canEncrypt ? (
                     <div className="settings-actions-row">
@@ -316,7 +316,7 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
                             className="settings-button settings-button-secondary"
                             onClick={() => setEncryptDialogOpen(true)}
                         >
-                            Encrypt this Space
+                            Encrypt this server
                         </button>
                     </div>
                 ) : null}
@@ -324,7 +324,7 @@ export function VisibilityTab({ client, spaceRoom, onToast }: VisibilityTabProps
 
             <RoomDialog
                 open={encryptDialogOpen}
-                title="Encrypt this Space?"
+                title="Encrypt this server?"
                 onClose={() => {
                     if (!encrypting) setEncryptDialogOpen(false);
                 }}

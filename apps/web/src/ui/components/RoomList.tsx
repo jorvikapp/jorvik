@@ -1477,7 +1477,7 @@ export function RoomList({
                 ))}
                 {subspaceGroups.length > 0 ? (
                     <div className="room-list-discoverable">
-                        <div className="room-list-discoverable-title">Subspaces</div>
+                        <div className="room-list-discoverable-title">Sub-servers</div>
                         {subspaceGroups.map((group) => renderSubspaceGroup(group, 0))}
                     </div>
                 ) : null}
@@ -1489,7 +1489,7 @@ export function RoomList({
                 ) : null}
                 {contentsTruncated ? (
                     <div className="room-list-empty">
-                        This space is too large to list in full, so some channels and subspaces are not
+                        This server is too large to list in full, so some channels and sub-servers are not
                         shown here.
                     </div>
                 ) : null}
@@ -1499,12 +1499,12 @@ export function RoomList({
                 subspaceGroups.length === 0 ? (
                     contentsPending ? (
                         <div className="room-list-empty">
-                            Your server has not been able to list this space's contents yet. Large spaces can
-                            take a while to fetch from the other servers in them, and it keeps trying in the
-                            background.
+                            Your homeserver has not been able to list this server's contents yet. Large servers
+                            can take a while to fetch from the other homeservers in them, and it keeps trying in
+                            the background.
                         </div>
                     ) : (
-                        <div className="room-list-empty">No channels in this space.</div>
+                        <div className="room-list-empty">No channels in this server.</div>
                     )
                 ) : null}
             </div>

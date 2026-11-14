@@ -113,7 +113,7 @@ export function memberMenuEntries(facts: MemberMenuFacts, actions: MemberMenuAct
     if (facts.userId === facts.ownUserId) {
         return selfEntries(actions);
     }
-    const where = facts.scope === "space" ? "space" : "room";
+    const where = facts.scope === "space" ? "server" : "room";
     const moderation = facts.canKick || facts.canBan;
     return tidy([
         item("profile", "Profile", actions.profile),

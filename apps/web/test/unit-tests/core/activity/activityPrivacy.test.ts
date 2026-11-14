@@ -122,9 +122,9 @@ describe("who is told", () => {
             { roomId: "!c:s", joinedCount: 3 },
         ];
         const summary = (picked: ActivityPrivacySettings): string => describeActivityAudience(picked, activityAudience(picked, spaces));
-        expect(summary(settings())).toBe("Activity visible to: friends and 2 spaces.");
+        expect(summary(settings())).toBe("Activity visible to: friends and 2 servers.");
         expect(summary(settings({ share_with_friends: false, space_scope: "none", space_overrides: { "!a:s": true } }))).toBe(
-            "Activity visible to: 1 space.",
+            "Activity visible to: 1 server.",
         );
         expect(summary(settings({ share_with_friends: false, space_scope: "none" }))).toBe("Activity visible to: nobody yet.");
         expect(summary(defaultActivityPrivacy())).toBe("Your activity isn't shared.");

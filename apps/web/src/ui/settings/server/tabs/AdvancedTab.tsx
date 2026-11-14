@@ -61,11 +61,11 @@ export function AdvancedTab({ spaceRoom, onToast }: AdvancedTabProps): React.Rea
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Advanced</h2>
-            <p className="settings-tab-description">Technical details about this Space, for troubleshooting.</p>
+            <p className="settings-tab-description">Technical details about this server, for troubleshooting.</p>
 
             <div className="settings-info-grid">
                 <div className="settings-info-item">
-                    <span className="settings-info-label">Space ID</span>
+                    <span className="settings-info-label">Server ID</span>
                     <code>{spaceRoom.roomId}</code>
                 </div>
                 <div className="settings-info-item">
@@ -90,9 +90,9 @@ export function AdvancedTab({ spaceRoom, onToast }: AdvancedTabProps): React.Rea
                 <button
                     type="button"
                     className="settings-button settings-button-secondary"
-                    onClick={() => handleCopy(spaceRoom.roomId, "Space ID")}
+                    onClick={() => handleCopy(spaceRoom.roomId, "server ID")}
                 >
-                    Copy Space ID
+                    Copy server ID
                 </button>
                 <button
                     type="button"

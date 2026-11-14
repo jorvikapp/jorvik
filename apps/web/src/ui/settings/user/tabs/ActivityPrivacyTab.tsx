@@ -88,9 +88,9 @@ export function ActivityPrivacyTab({
     }, [query, spaces]);
 
     const scopes: { scope: SpaceScope; label: string }[] = [
-        { scope: "all", label: "All spaces" },
-        { scope: "small", label: `Spaces with ${settings.small_space_limit} or fewer members` },
-        { scope: "none", label: "No spaces" },
+        { scope: "all", label: "All servers" },
+        { scope: "small", label: `Servers with ${settings.small_space_limit} or fewer members` },
+        { scope: "none", label: "No servers" },
     ];
 
     const hideGame = (game: ActivityGame): void =>
@@ -166,7 +166,7 @@ export function ActivityPrivacyTab({
                 </label>
 
                 <fieldset className="activity-privacy-scope">
-                    <legend className="activity-privacy-heading">Spaces</legend>
+                    <legend className="activity-privacy-heading">Servers</legend>
                     {scopes.map(({ scope, label }) => (
                         <label key={scope} className="settings-toggle">
                             <input
@@ -181,15 +181,15 @@ export function ActivityPrivacyTab({
                 </fieldset>
 
                 {spaces.length === 0 ? (
-                    <p className="settings-inline-note">You're not in any spaces.</p>
+                    <p className="settings-inline-note">You're not in any servers.</p>
                 ) : (
                     <>
                         <div className="activity-privacy-spaces-head">
                             <input
                                 type="search"
                                 className="settings-search"
-                                placeholder="Search spaces"
-                                aria-label="Search spaces"
+                                placeholder="Search servers"
+                                aria-label="Search servers"
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
                             />
@@ -234,7 +234,7 @@ export function ActivityPrivacyTab({
                                 );
                             })}
                             {shownSpaces.length === 0 ? (
-                                <li className="settings-inline-note">No spaces match.</li>
+                                <li className="settings-inline-note">No servers match.</li>
                             ) : null}
                         </ul>
                     </>

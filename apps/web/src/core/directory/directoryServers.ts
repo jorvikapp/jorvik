@@ -108,7 +108,7 @@ export function describeDirectoryError(error: unknown, server: string): string {
         const errcode = typeof error.errcode === "string" ? error.errcode : "";
 
         if (errcode === "M_FORBIDDEN") {
-            return `${where} does not allow browsing its directory from other servers.`;
+            return `${where} does not allow browsing its directory from other homeservers.`;
         }
 
         if (errcode === "M_LIMIT_EXCEEDED") {

@@ -138,7 +138,7 @@ describe("CreateRoomDialog", () => {
 
         expect(createButton().disabled).toBe(true);
         expect(container.querySelector(".room-dialog-warning")?.textContent).toBe(
-            "You don't have permission to add channels to this Space.",
+            "You don't have permission to add channels to this server.",
         );
     });
 });

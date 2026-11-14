@@ -226,7 +226,7 @@ export async function runJsonImport(
         `Your server asked Jorvik to slow down. Carrying on in ${Math.ceil(waitMs / 1000)} s.`;
 
     // 1. Create main space
-    onProgress({ stage: "space", current: 0, total: 1, message: `Creating Space "${exportData.guild.name}"...` });
+    onProgress({ stage: "space", current: 0, total: 1, message: `Creating server "${exportData.guild.name}"...` });
     rateLimitState.onWait = (waitMs) =>
         emitProgress({ stage: "space", current: 0, total: 1, message: waitMessage(waitMs) }, true);
     const spaceResponse = await withRateLimit(() =>
@@ -252,7 +252,7 @@ export async function runJsonImport(
         rateLimitState,
     );
     const spaceId = spaceResponse.room_id;
-    emitProgress({ stage: "space", current: 1, total: 1, message: "Space created." }, true);
+    emitProgress({ stage: "space", current: 1, total: 1, message: "Server created." }, true);
 
     // 2. Create channels, one at a time. Servers limit how fast an account can make rooms (Synapse: 10 at once, then
     // about one a minute), and channels made side by side would only take turns being refused until they gave up.

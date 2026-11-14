@@ -147,7 +147,7 @@ export function OverviewTab({ client, spaceRoom, onToast }: OverviewTabProps): R
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Overview</h2>
-            <p className="settings-tab-description">The name, picture and description everyone sees for this Space.</p>
+            <p className="settings-tab-description">The name, picture and description everyone sees for this server.</p>
 
             <div className="settings-overview-avatar-row">
                 <div className="settings-overview-avatar-preview">
@@ -222,19 +222,19 @@ export function OverviewTab({ client, spaceRoom, onToast }: OverviewTabProps): R
                     className="settings-button settings-button-secondary"
                     onClick={() =>
                         void copyText(spaceRoom.roomId)
-                            .then(() => onToast({ type: "success", message: "Copied Space ID." }))
+                            .then(() => onToast({ type: "success", message: "Copied server ID." }))
                             .catch((copyError: unknown) =>
                                 onToast({
                                     type: "error",
                                     message:
                                         copyError instanceof Error
                                             ? copyError.message
-                                            : "Failed to copy Space ID.",
+                                            : "Failed to copy server ID.",
                                 }),
                             )
                     }
                 >
-                    Copy Space ID
+                    Copy server ID
                 </button>
                 <button
                     type="button"

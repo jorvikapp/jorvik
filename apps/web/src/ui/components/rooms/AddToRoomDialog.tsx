@@ -67,7 +67,7 @@ export function AddToRoomDialog({ client, userId, onClose, onInvited }: AddToRoo
             .map((room) => ({
                 room,
                 label: room.isSpaceRoom() ? getRoomDisplayName(room) : `# ${getRoomDisplayName(room)}`,
-                detail: room.isSpaceRoom() ? "Space" : spaceNameByChildId.get(room.roomId) ?? null,
+                detail: room.isSpaceRoom() ? "Server" : spaceNameByChildId.get(room.roomId) ?? null,
             }))
             .sort((left, right) => {
                 const bySpace = Number(right.room.isSpaceRoom()) - Number(left.room.isSpaceRoom());
@@ -115,7 +115,7 @@ export function AddToRoomDialog({ client, userId, onClose, onInvited }: AddToRoo
             }
         >
             {candidates.length === 0 ? (
-                <p className="room-dialog-muted">There are no spaces or channels you can invite {name} to.</p>
+                <p className="room-dialog-muted">There are no servers or channels you can invite {name} to.</p>
             ) : (
                 <>
                     <input
@@ -123,7 +123,7 @@ export function AddToRoomDialog({ client, userId, onClose, onInvited }: AddToRoo
                         type="text"
                         value={filter}
                         onChange={(event) => setFilter(event.target.value)}
-                        placeholder="Search spaces and channels"
+                        placeholder="Search servers and channels"
                         autoFocus
                     />
                     <div className="add-to-room-list">

@@ -94,7 +94,7 @@ export function EmojiUploadDialog({
     }, [client, open]);
 
     const dialogTitle = useMemo(
-        () => (target.kind === "space" ? "Upload space emoji" : "Upload personal emoji"),
+        () => (target.kind === "space" ? "Upload server emoji" : "Upload personal emoji"),
         [target.kind],
     );
 
@@ -171,7 +171,7 @@ export function EmojiUploadDialog({
                 <h2>{dialogTitle}</h2>
                 <p className="emoji-upload-subtitle">
                     Upload limit: {formatBytes(uploadLimitBytes)}. Emoji is stored in{" "}
-                    {target.kind === "space" ? "this Space pack" : "your personal pack"}.
+                    {target.kind === "space" ? "this server's pack" : "your personal pack"}.
                 </p>
                 <label className="emoji-upload-label">
                     Image

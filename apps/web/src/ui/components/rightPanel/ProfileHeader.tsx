@@ -139,7 +139,7 @@ export function ProfileHeader({
                     </button>
                 ) : null}
                 {onAdd ? (
-                    <button type="button" className="rp-icon-btn" onClick={onAdd} title="Invite to a space or channel">
+                    <button type="button" className="rp-icon-btn" onClick={onAdd} title="Invite to a server or channel">
                         Add
                     </button>
                 ) : null}

@@ -334,7 +334,7 @@ export function ImportJsonWizard({
                         handleClose();
                     }}
                 >
-                    {result?.spaceId ? "Go to Space" : "Close"}
+                    {result?.spaceId ? "Go to server" : "Close"}
                 </button>
             );
         }
@@ -347,7 +347,7 @@ export function ImportJsonWizard({
             {step === "select" && source === "discord" && (
                 <div className="import-wizard-step">
                     <p className="room-dialog-muted">
-                        Copy a Discord server's categories and channels into a new Space, along with who can see and
+                        Copy a Discord server's categories and channels into a new server, along with who can see and
                         post in each channel. Messages, members and emoji stay on Discord.
                     </p>
                     <ol className="import-wizard-list">
@@ -484,7 +484,7 @@ export function ImportJsonWizard({
                             })}
                     </div>
                     <p className="room-dialog-muted" style={{ marginTop: 8 }}>
-                        Everyone in the Space can join the channels anyone can join. Invite people to the invite-only
+                        Everyone in the server can join the channels anyone can join. Invite people to the invite-only
                         ones after the import.
                     </p>
                     {minutesToWait > 0 && (
@@ -511,14 +511,14 @@ export function ImportJsonWizard({
                 <div className="import-wizard-step">
                     {result.spaceId ? (
                         <>
-                            <p className="import-wizard-success">Your Space is ready.</p>
+                            <p className="import-wizard-success">Your server is ready.</p>
                             <ul className="import-wizard-list">
                                 <li>Channels created: {result.channelsCreated}</li>
                                 {source === "json" ? <li>Emoji uploaded: {result.emojisUploaded}</li> : null}
                             </ul>
                             {source === "discord" ? (
                                 <>
-                                    <p className="room-dialog-muted">Still to do, in the Space's Server Settings:</p>
+                                    <p className="room-dialog-muted">Still to do, in Server Settings:</p>
                                     <ul className="import-wizard-list">
                                         <li>Add the server's picture under Overview, and its emoji under Emoji.</li>
                                         <li>Bring people over: invite them, or let anyone join under Visibility.</li>

@@ -1435,7 +1435,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     ...base,
                     kind: "space",
                     name: room.name || room.roomId,
-                    detail: "Space",
+                    detail: "Server",
                     keywords: [],
                     unread: summary?.unread ?? false,
                     count: summary?.count ?? 0,
@@ -1784,7 +1784,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 setSubspaceChildren((current) => new Map(current).set(spaceId, children));
                 if (!hierarchy.complete) {
                     setSubspaceErrors((current) =>
-                        new Map(current).set(spaceId, "This subspace is too large to list in full."),
+                        new Map(current).set(spaceId, "This sub-server is too large to list in full."),
                     );
                 }
             } catch (loadError) {
@@ -1794,10 +1794,10 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 }
                 const message =
                     loadError instanceof SpaceHierarchyPageTimeoutError
-                        ? "Still fetching this subspace. Reopen it to try again."
+                        ? "Still fetching this sub-server. Reopen it to try again."
                         : loadError instanceof Error
                           ? loadError.message
-                          : "Could not list this subspace.";
+                          : "Could not list this sub-server.";
                 setSubspaceErrors((current) => new Map(current).set(spaceId, message));
             } finally {
                 subspaceLoadingRef.current.delete(spaceId);
@@ -3235,7 +3235,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                             const confirmed = await confirmAction({
                                 title: `Remove ${name} from ${scopeName}?`,
                                 message: space
-                                    ? "They're removed from the space and its channels. They can come back if they're invited, or if it's open to join."
+                                    ? "They're removed from the server and its channels. They can come back if they're invited, or if it's open to join."
                                     : "They can come back if they're invited, or if it's open to join.",
                                 confirmLabel: "Remove",
                                 danger: true,
@@ -3255,7 +3255,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                             const confirmed = await confirmAction({
                                 title: `Ban ${name} from ${scopeName}?`,
                                 message: space
-                                    ? "They're removed from the space and its channels, and can't come back until they're unbanned."
+                                    ? "They're removed from the server and its channels, and can't come back until they're unbanned."
                                     : "They're removed, and can't come back until they're unbanned.",
                                 confirmLabel: "Ban",
                                 danger: true,
@@ -3450,7 +3450,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     type="button"
                     className="rail-icon rail-create-space"
                     onClick={() => setCreateSpaceOpen(true)}
-                    title="Create Space"
+                    title="Create server"
                     disabled={client.isGuest()}
                 >
                     +
@@ -3499,7 +3499,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     type="button"
                     className="channels-pane-jump"
                     onClick={() => setQuickSwitcherOpen(true)}
-                    title="Jump to a channel, DM or space"
+                    title="Jump to a channel, DM or server"
                     aria-keyshortcuts={usesCommandKey() ? "Meta+K" : "Control+K"}
                 >
                     <span className="channels-pane-jump-label">Jump to…</span>
@@ -3508,7 +3508,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 {showSpaceOnboarding ? (
                     <div className="space-onboarding-card">
                         <div className="space-onboarding-header">
-                            <h3 className="space-onboarding-title">Space is ready</h3>
+                            <h3 className="space-onboarding-title">Your server is ready</h3>
                             <button
                                 type="button"
                                 className="space-onboarding-dismiss"
@@ -3952,7 +3952,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     }
                     pushToast({
                         type: "success",
-                        message: createdInSpaceId ? "Channel created in Space." : "Room created.",
+                        message: createdInSpaceId ? "Channel created." : "Room created.",
                     });
                 }}
             />
@@ -3964,12 +3964,12 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                     setCreateSpaceOpen(false);
                     focusRoom(roomId);
                     setSpaceOnboardingSpaceId(roomId);
-                    pushToast({ type: "success", message: "Space created." });
+                    pushToast({ type: "success", message: "Server created." });
                 }}
                 onJoinPublicSpaceRequest={(target) => requestJoinRoom(target)}
                 onJoined={() => {
                     setCreateSpaceOpen(false);
-                    pushToast({ type: "success", message: "Joined public Space." });
+                    pushToast({ type: "success", message: "Joined public server." });
                 }}
                 onImport={setImportSource}
             />

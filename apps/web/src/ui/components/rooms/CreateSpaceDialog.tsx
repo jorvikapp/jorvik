@@ -204,7 +204,7 @@ export function CreateSpaceDialog({
             onCreated?.(response.room_id);
             onClose();
         } catch (createError) {
-            const message = createError instanceof Error ? createError.message : "Failed to create Space.";
+            const message = createError instanceof Error ? createError.message : "Failed to create server.";
             setCreateError(message);
         } finally {
             setSaving(false);
@@ -317,7 +317,7 @@ export function CreateSpaceDialog({
     return (
         <RoomDialog
             open={open}
-            title="Create Space"
+            title="Create server"
             onClose={onClose}
             footer={
                 <>
@@ -341,7 +341,7 @@ export function CreateSpaceDialog({
                             onClick={() => void submit()}
                             disabled={!canSubmit}
                         >
-                            {saving ? "Creating..." : "Create Space"}
+                            {saving ? "Creating..." : "Create server"}
                         </button>
                     ) : null}
                     {activeTab === "import" && onImport ? (
@@ -363,14 +363,14 @@ export function CreateSpaceDialog({
                     className={`room-dialog-tab${activeTab === "create" ? " is-active" : ""}`}
                     onClick={() => setActiveTab("create")}
                 >
-                    Create new space
+                    Create new server
                 </button>
                 <button
                     type="button"
                     className={`room-dialog-tab${activeTab === "discover" ? " is-active" : ""}`}
                     onClick={() => setActiveTab("discover")}
                 >
-                    Discover public spaces
+                    Discover public servers
                 </button>
                 {onImport ? (
                     <button
@@ -385,7 +385,7 @@ export function CreateSpaceDialog({
 
             {activeTab === "import" ? (
                 <div className="create-space-panel">
-                    <p className="room-dialog-muted">Start a Space with the channels of a server you already have.</p>
+                    <p className="room-dialog-muted">Start a server with the channels of one you already have.</p>
                     <div className="create-space-import-sources">
                         <label className="room-dialog-checkbox">
                             <input
@@ -407,16 +407,16 @@ export function CreateSpaceDialog({
                         </label>
                     </div>
                     {isGuest ? (
-                        <p className="room-dialog-warning">Register or sign in to import a Space.</p>
+                        <p className="room-dialog-warning">Register or sign in to import a server.</p>
                     ) : null}
                 </div>
             ) : activeTab === "create" ? (
                 <div className={`create-space-panel create-space-panel-${step}`}>
-                    {isGuest ? <p className="room-dialog-warning">Register or sign in to create a Space.</p> : null}
+                    {isGuest ? <p className="room-dialog-warning">Register or sign in to create a server.</p> : null}
 
                     {step === "visibility" ? (
                         <>
-                            <p className="room-dialog-muted">Choose who can discover and join this Space.</p>
+                            <p className="room-dialog-muted">Choose who can discover and join this server.</p>
                             <label className="room-dialog-checkbox">
                                 <input
                                     type="radio"
@@ -425,7 +425,7 @@ export function CreateSpaceDialog({
                                     onChange={() => setVisibilityChoice("private")}
                                     disabled={saving}
                                 />
-                                Private Space
+                                Private server
                             </label>
                             <label className="room-dialog-checkbox">
                                 <input
@@ -435,18 +435,18 @@ export function CreateSpaceDialog({
                                     onChange={() => setVisibilityChoice("public")}
                                     disabled={saving || !supportsPublic}
                                 />
-                                Public Space
+                                Public server
                             </label>
                             {!supportsPublic ? (
                                 <p className="room-dialog-muted">
-                                    This homeserver does not support public Space filtering. The Space will be private.
+                                    This homeserver can't list servers publicly, so this one will be private.
                                 </p>
                             ) : null}
                         </>
                     ) : (
                         <>
                             <label className="room-dialog-field">
-                                <span>Space name</span>
+                                <span>Server name</span>
                                 <input
                                     className="room-dialog-input"
                                     type="text"
@@ -475,7 +475,7 @@ export function CreateSpaceDialog({
                                         type="text"
                                         value={aliasLocalPart}
                                         onChange={(event) => setAliasLocalPart(event.target.value)}
-                                        placeholder="my-space"
+                                        placeholder="my-server"
                                         disabled={saving}
                                     />
                                 </label>
@@ -506,7 +506,7 @@ export function CreateSpaceDialog({
                                     submitPublicSearch();
                                 }
                             }}
-                            placeholder="Search public spaces"
+                            placeholder="Search public servers"
                             disabled={publicLoading || publicLoadingMore}
                         />
                         <input
@@ -520,7 +520,7 @@ export function CreateSpaceDialog({
                                     submitPublicSearch();
                                 }
                             }}
-                            placeholder={homeServerName.length > 0 ? homeServerName : "Server"}
+                            placeholder={homeServerName.length > 0 ? homeServerName : "Homeserver"}
                             aria-label="Homeserver to browse"
                             disabled={publicLoading || publicLoadingMore}
                         />
@@ -540,13 +540,13 @@ export function CreateSpaceDialog({
                     </div>
                     <p className="room-dialog-muted">
                         {directoryServer.length > 0
-                            ? `Browsing spaces published on ${directoryServer}.`
-                            : "Browsing spaces published on your own server. Enter another server to look there."}
+                            ? `Browsing servers published on ${directoryServer}.`
+                            : "Browsing servers published on your own homeserver. Enter another homeserver to look there."}
                     </p>
                     <div className="join-public-results">
-                        {publicLoading ? <p className="room-dialog-muted">Loading public spaces...</p> : null}
+                        {publicLoading ? <p className="room-dialog-muted">Loading public servers...</p> : null}
                         {!publicLoading && publicSpaces.length === 0 && !publicError ? (
-                            <p className="room-dialog-muted">No public spaces found for this query.</p>
+                            <p className="room-dialog-muted">No public servers found for this query.</p>
                         ) : null}
                         {publicSpaces.map((space) => (
                             <div key={space.room_id} className="join-public-space-item">

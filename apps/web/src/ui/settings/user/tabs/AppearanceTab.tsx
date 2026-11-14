@@ -149,7 +149,7 @@ export function AppearanceTab({
                         })
                     }
                 />
-                Show channel pictures in Spaces
+                Show channel pictures in servers
             </label>
 
             <label className="settings-toggle">

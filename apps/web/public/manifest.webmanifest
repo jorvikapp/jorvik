@@ -1,7 +1,7 @@
 {
     "name": "Jorvik",
     "short_name": "Jorvik",
-    "description": "Chat, voice and Spaces on Jorvik.",
+    "description": "Chat, voice and servers on Jorvik.",
     "id": "/",
     "start_url": "/",
     "scope": "/",

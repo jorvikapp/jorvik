@@ -109,16 +109,16 @@ describe("menu B: a member, or a message's author", () => {
             "Block (danger)",
             "--",
             "[Moderators only]",
-            "Remove from space (warning)",
-            "Ban from space (danger)",
+            "Remove from server (warning)",
+            "Ban from server (danger)",
         ]);
         expect(shape(memberMenuEntries({ ...facts, canKick: true }, memberActions())).slice(-2)).toEqual([
             "[Moderators only]",
-            "Remove from space (warning)",
+            "Remove from server (warning)",
         ]);
         expect(shape(memberMenuEntries({ ...facts, canBan: true }, memberActions())).slice(-2)).toEqual([
             "[Moderators only]",
-            "Ban from space (danger)",
+            "Ban from server (danger)",
         ]);
     });
 

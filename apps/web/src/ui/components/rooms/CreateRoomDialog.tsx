@@ -216,7 +216,7 @@ export function CreateRoomDialog({
         >
             {spaceParentId ? (
                 <p className="room-dialog-muted">
-                    This room will be added to the selected Space as a channel.
+                    This room will be added to the selected server as a channel.
                 </p>
             ) : null}
             <label className="room-dialog-field">
@@ -295,7 +295,7 @@ export function CreateRoomDialog({
                 Voice channel (chat suppressed)
             </label>
             {!canAddToSpace ? (
-                <p className="room-dialog-warning">You don't have permission to add channels to this Space.</p>
+                <p className="room-dialog-warning">You don't have permission to add channels to this server.</p>
             ) : null}
             {error ? <p className="room-dialog-error">{error}</p> : null}
         </RoomDialog>

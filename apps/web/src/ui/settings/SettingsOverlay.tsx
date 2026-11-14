@@ -228,7 +228,7 @@ export function SettingsOverlay({
 
     const renderServerTab = (): React.ReactNode => {
         if (!spaceRoom) {
-            return <div className="settings-empty">No space selected.</div>;
+            return <div className="settings-empty">No server selected.</div>;
         }
 
         switch (activeTab) {

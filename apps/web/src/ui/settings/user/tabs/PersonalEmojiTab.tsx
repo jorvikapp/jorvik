@@ -174,7 +174,7 @@ export function PersonalEmojiTab({ client, onOpenUploadDialog, onToast }: Person
     return (
         <div className="settings-tab">
             <h2 className="settings-tab-title">Emoji</h2>
-            <p className="settings-tab-description">Your own emoji, for you to use in any Space or DM.</p>
+            <p className="settings-tab-description">Your own emoji, for you to use in any server or DM.</p>
 
             <div className="settings-actions-row">
                 <input

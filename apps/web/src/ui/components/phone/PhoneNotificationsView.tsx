@@ -41,7 +41,7 @@ export function inboxTimeLabel(ts: number, now = Date.now()): string {
 }
 
 const INVITE_WHAT: Record<InboxInvite["kind"], string> = {
-    space: "the space",
+    space: "the server",
     direct: "a direct chat",
     room: "the channel",
 };
@@ -82,7 +82,7 @@ export function PhoneNotificationsView({
             </header>
             <div className="phone-page-body">
                 {invites.length === 0 && mentions.length === 0 ? (
-                    <p className="phone-empty">Nothing new. Mentions of you and invites to spaces and chats show up here.</p>
+                    <p className="phone-empty">Nothing new. Mentions of you and invites to servers and chats show up here.</p>
                 ) : null}
 
                 {invites.length > 0 ? <h3 className="phone-section-label">Invites</h3> : null}

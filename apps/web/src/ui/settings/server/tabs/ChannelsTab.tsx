@@ -43,7 +43,7 @@ export function ChannelsTab({
         <div className="settings-tab">
             <h2 className="settings-tab-title">Channels</h2>
             <p className="settings-tab-description">
-                Arrange this Space's channels. Everyone sees them in the order you set here.
+                Arrange this server's channels. Everyone sees them in the order you set here.
             </p>
 
             <div className="settings-actions-row">

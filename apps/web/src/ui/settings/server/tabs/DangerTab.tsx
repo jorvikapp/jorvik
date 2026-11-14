@@ -53,7 +53,7 @@ export function DangerTab({ client, spaceRoom, onLeftSpace, onToast }: DangerTab
                 <div>
                     <h3>Leave server</h3>
                     <p>
-                        You will leave this Space and lose quick access to its channels until invited again or re-joined.
+                        You will leave this server and lose quick access to its channels until invited again or re-joined.
                     </p>
                 </div>
                 <button
@@ -71,7 +71,7 @@ export function DangerTab({ client, spaceRoom, onLeftSpace, onToast }: DangerTab
                     <h3>Delete server</h3>
                     <p>
                         {canDelete
-                            ? "Removes everyone from this server and its channels, closes them so nobody can rejoin, and leaves. Messages stay on servers that already have them."
+                            ? "Removes everyone from this server and its channels, closes them so nobody can rejoin, and leaves. Messages stay on homeservers that already have them."
                             : "Only someone who can remove members and change settings in this server can delete it."}
                     </p>
                 </div>

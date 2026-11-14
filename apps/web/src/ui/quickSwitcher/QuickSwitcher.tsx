@@ -110,7 +110,7 @@ export function QuickSwitcher({ items, currentRoomId, onSelect, onClose }: Quick
                     className="quick-switcher-input"
                     autoFocus
                     value={query}
-                    placeholder="Jump to a channel, DM or space"
+                    placeholder="Jump to a channel, DM or server"
                     spellCheck={false}
                     autoComplete="off"
                     role="combobox"
@@ -161,7 +161,7 @@ export function QuickSwitcher({ items, currentRoomId, onSelect, onClose }: Quick
                     <p className="quick-switcher-empty">{query.trim() ? "Nothing by that name." : "No conversations yet."}</p>
                 )}
                 <p className="quick-switcher-hint">
-                    Start with <kbd>@</kbd> for people, <kbd>#</kbd> for channels or <kbd>*</kbd> for spaces.{" "}
+                    Start with <kbd>@</kbd> for people, <kbd>#</kbd> for channels or <kbd>*</kbd> for servers.{" "}
                     <kbd>↑</kbd> <kbd>↓</kbd> to choose, <kbd>Enter</kbd> to go.
                 </p>
             </div>

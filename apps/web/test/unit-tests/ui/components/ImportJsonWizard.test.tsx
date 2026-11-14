@@ -131,12 +131,12 @@ describe("ImportJsonWizard from Discord", () => {
         expect(createdRoom(client, "rules").power_level_content_override).toEqual({ events_default: 100 });
         expect(joinRule(createdRoom(client, "general"))).toBe("public");
         expect(joinRule(createdRoom(client, "jarls"))).toBeUndefined();
-        expect(container.textContent).toContain("Your Space is ready.");
+        expect(container.textContent).toContain("Your server is ready.");
         expect(container.textContent).toContain("Channels created: 4");
         expect(container.textContent).not.toContain("Emoji uploaded");
 
         await act(async () => {
-            buttonNamed("Go to Space").click();
+            buttonNamed("Go to server").click();
         });
         expect(onImported).toHaveBeenCalledWith("!room1:example.org");
     });

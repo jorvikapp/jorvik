@@ -194,7 +194,7 @@ export function activityAudience(
     };
 }
 
-/** "Activity visible to: friends and 3 spaces." */
+/** "Activity visible to: friends and 3 servers." */
 export function describeActivityAudience(settings: ActivityPrivacySettings, audience: ActivityAudience): string {
     if (!settings.enabled) {
         return "Your activity isn't shared.";
@@ -204,7 +204,7 @@ export function describeActivityAudience(settings: ActivityPrivacySettings, audi
         parts.push("friends");
     }
     if (audience.spaceCount > 0) {
-        parts.push(audience.spaceCount === 1 ? "1 space" : `${audience.spaceCount} spaces`);
+        parts.push(audience.spaceCount === 1 ? "1 server" : `${audience.spaceCount} servers`);
     }
     return parts.length > 0 ? `Activity visible to: ${parts.join(" and ")}.` : "Activity visible to: nobody yet.";
 }
