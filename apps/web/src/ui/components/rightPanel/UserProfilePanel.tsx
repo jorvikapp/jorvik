@@ -14,7 +14,8 @@ import { BadgesDialog } from "../badges/BadgesDialog";
 import { useBadgeSettings } from "../../hooks/useUserBadges";
 import { RoomDialog } from "../rooms/RoomDialog";
 import { ProfileHeader } from "./ProfileHeader";
-import { useProfileBannerSrc } from "../profile/ProfileBanner";
+import { BANNER_FIELD } from "../../../core/users/profileImages";
+import { useProfileImageSrc } from "../profile/ProfileBanner";
 import { AboutCard } from "./cards/AboutCard";
 import { RolesCard } from "./cards/RolesCard";
 
@@ -185,7 +186,7 @@ export function UserProfilePanel({
     }, [profile?.about, profile?.bio]);
 
     // null while loading or when it failed: no banner picture, just the colours.
-    const bannerSrc = useProfileBannerSrc(client, userId, (profile as Record<string, unknown> | null) ?? null);
+    const bannerSrc = useProfileImageSrc(client, userId, BANNER_FIELD, (profile as Record<string, unknown> | null) ?? null);
 
     const memberSince = getMemberSince(member);
     const aboutBody = memberSince ? `${aboutText || "No bio set"}\n\nMember since ${memberSince}` : aboutText;

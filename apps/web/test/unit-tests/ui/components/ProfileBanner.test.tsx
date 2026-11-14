@@ -2,8 +2,15 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BANNER_FIELD, bannerMxcFrom, clearSavedBanners, rememberBanner } from "../../../../src/core/users/profileBanner";
-import { bannerGradient, ProfileBanner, useProfileBannerSrc } from "../../../../src/ui/components/profile/ProfileBanner";
+import {
+    BANNER_FIELD,
+    clearSavedProfileImages,
+    NAMEPLATE_FIELD,
+    profileImageMxcFrom,
+    rememberProfileImage,
+} from "../../../../src/core/users/profileImages";
+import { bannerGradient, ProfileBanner, useProfileImageSrc } from "../../../../src/ui/components/profile/ProfileBanner";
+import { UserPanel } from "../../../../src/ui/components/user/UserPanel";
 import { ProfileTab } from "../../../../src/ui/settings/user/tabs/ProfileTab";
 
 vi.mock("../../../../src/ui/activity/useActivityPrivacy", () => ({
@@ -33,7 +40,7 @@ beforeEach(() => {
 afterEach(() => {
     act(() => root.unmount());
     container.remove();
-    clearSavedBanners();
+    clearSavedProfileImages();
     vi.restoreAllMocks();
 });
 
@@ -53,15 +60,15 @@ function fakeClient(profile: Record<string, unknown>, extra: Record<string, unkn
     };
 }
 
-describe("bannerMxcFrom", () => {
+describe("profileImageMxcFrom", () => {
     it("takes only an mxc:// address", () => {
-        expect(bannerMxcFrom(BANNER)).toBe(BANNER);
-        expect(bannerMxcFrom(` ${BANNER} `)).toBe(BANNER);
-        expect(bannerMxcFrom("https://example.com/a.gif")).toBeNull();
-        expect(bannerMxcFrom("mxc://test.local/../x")).toBeNull();
-        expect(bannerMxcFrom("javascript:alert(1)")).toBeNull();
-        expect(bannerMxcFrom(42)).toBeNull();
-        expect(bannerMxcFrom(undefined)).toBeNull();
+        expect(profileImageMxcFrom(BANNER)).toBe(BANNER);
+        expect(profileImageMxcFrom(` ${BANNER} `)).toBe(BANNER);
+        expect(profileImageMxcFrom("https://example.com/a.gif")).toBeNull();
+        expect(profileImageMxcFrom("mxc://test.local/../x")).toBeNull();
+        expect(profileImageMxcFrom("javascript:alert(1)")).toBeNull();
+        expect(profileImageMxcFrom(42)).toBeNull();
+        expect(profileImageMxcFrom(undefined)).toBeNull();
     });
 });
 
@@ -84,10 +91,10 @@ describe("ProfileBanner", () => {
 });
 
 function Probe({ client, profile }: { client: never; profile?: Record<string, unknown> | null }): React.ReactElement {
-    return <span>{useProfileBannerSrc(client, "@bob:test.local", profile) ?? "none"}</span>;
+    return <span>{useProfileImageSrc(client, "@bob:test.local", BANNER_FIELD, profile) ?? "none"}</span>;
 }
 
-describe("useProfileBannerSrc", () => {
+describe("useProfileImageSrc", () => {
     it("reads the banner from a profile that's already loaded", () => {
         const client = fakeClient({});
         act(() => root.render(<Probe client={client as never} profile={{ [BANNER_FIELD]: BANNER }} />));
@@ -101,7 +108,7 @@ describe("useProfileBannerSrc", () => {
         const client = fakeClient({ [BANNER_FIELD]: BANNER });
         await act(async () => root.render(<Probe client={client as never} />));
         expect(container.textContent).toBe(http(BANNER));
-        act(() => rememberBanner("@bob:test.local", null));
+        act(() => rememberProfileImage("@bob:test.local", BANNER_FIELD, null));
         expect(container.textContent).toBe("none");
     });
 });
@@ -112,7 +119,7 @@ describe("ProfileTab banner", () => {
         await act(async () => root.render(<ProfileTab client={client as never} onToast={vi.fn()} />));
         const upload = [...container.querySelectorAll("button")].find((b) => b.textContent === "Upload banner")!;
         expect(upload).toBeTruthy();
-        const input = container.querySelector<HTMLInputElement>('input[accept="image/png,image/jpeg,image/gif,image/webp"]')!;
+        const input = container.querySelector<HTMLInputElement>('input[data-field="app.jorvik.banner"]')!;
         const file = new File(["GIF89a"], "wave.gif", { type: "image/gif" });
         Object.defineProperty(input, "files", { value: [file] });
         await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
@@ -127,7 +134,7 @@ describe("ProfileTab banner", () => {
     it("refuses a file that isn't a PNG, JPEG, GIF or WebP, or is over the limit", async () => {
         const client = fakeClient({}, { getMediaConfig: vi.fn(async () => ({ "m.upload.size": 1_048_576 })) });
         await act(async () => root.render(<ProfileTab client={client as never} onToast={vi.fn()} />));
-        const input = container.querySelector<HTMLInputElement>('input[accept="image/png,image/jpeg,image/gif,image/webp"]')!;
+        const input = container.querySelector<HTMLInputElement>('input[data-field="app.jorvik.banner"]')!;
         const send = async (file: File) => {
             Object.defineProperty(input, "files", { value: [file], configurable: true });
             await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
@@ -145,7 +152,7 @@ describe("ProfileTab banner", () => {
     it("holds a banner to 10 MB even when the server takes more, and takes WebP", async () => {
         const client = fakeClient({});
         await act(async () => root.render(<ProfileTab client={client as never} onToast={vi.fn()} />));
-        const input = container.querySelector<HTMLInputElement>('input[accept="image/png,image/jpeg,image/gif,image/webp"]')!;
+        const input = container.querySelector<HTMLInputElement>('input[data-field="app.jorvik.banner"]')!;
         const send = async (file: File) => {
             Object.defineProperty(input, "files", { value: [file], configurable: true });
             await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
@@ -166,5 +173,69 @@ describe("ProfileTab banner", () => {
         const save = [...container.querySelectorAll("button")].find((b) => b.textContent === "Save profile")!;
         await act(async () => save.click());
         expect(client.deleteExtendedProfileProperty).toHaveBeenCalledWith(BANNER_FIELD);
+    });
+});
+
+const fileInput = (field: string): HTMLInputElement => container.querySelector<HTMLInputElement>(`input[data-field="${field}"]`)!;
+async function choose(input: HTMLInputElement, file: File): Promise<void> {
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
+}
+
+describe("nameplate", () => {
+    const PLATE = "mxc://test.local/Plate_2";
+
+    it("uploads a nameplate on its own, previews it in your panel, and saves only that field", async () => {
+        const client = fakeClient({ displayname: "alice" }, { uploadContent: vi.fn(async () => ({ content_uri: PLATE })) });
+        await act(async () => root.render(<ProfileTab client={client as never} onToast={vi.fn()} />));
+        expect([...container.querySelectorAll("button")].some((b) => b.textContent === "Upload nameplate")).toBe(true);
+        expect(container.querySelector(".settings-nameplate-preview .pane-user-nameplate")).toBeNull();
+
+        await choose(fileInput(NAMEPLATE_FIELD), new File(["GIF89a"], "plate.gif", { type: "image/gif" }));
+        expect(container.querySelector(".settings-nameplate-preview .pane-user-card.has-nameplate img")?.getAttribute("src")).toBe(http(PLATE));
+        // The banner keeps its colours.
+        expect(container.querySelector(".profile-preview-banner img")).toBeNull();
+
+        const save = [...container.querySelectorAll("button")].find((b) => b.textContent === "Save profile")!;
+        await act(async () => save.click());
+        expect(client.setExtendedProfileProperty).toHaveBeenCalledTimes(1);
+        expect(client.setExtendedProfileProperty).toHaveBeenCalledWith(NAMEPLATE_FIELD, PLATE);
+    });
+
+    it("has the same rules as the banner", async () => {
+        const client = fakeClient({});
+        await act(async () => root.render(<ProfileTab client={client as never} onToast={vi.fn()} />));
+        await choose(fileInput(NAMEPLATE_FIELD), new File(["x"], "a.bmp", { type: "image/bmp" }));
+        expect(container.querySelector(".settings-inline-error")?.textContent).toBe("A nameplate can be a PNG, JPEG, GIF or WebP picture.");
+        await choose(fileInput(NAMEPLATE_FIELD), new File([new Uint8Array(11 * 1_048_576)], "big.webp", { type: "image/webp" }));
+        expect(container.querySelector(".settings-inline-error")?.textContent).toMatch(/11\.0 MB; a nameplate can be up to 10 MB/);
+        expect(client.uploadContent).not.toHaveBeenCalled();
+    });
+
+    it("sits behind your name in the panel, and goes when it's removed", async () => {
+        const client = fakeClient({ [NAMEPLATE_FIELD]: PLATE });
+        await act(async () =>
+            root.render(
+                <UserPanel client={client as never} userId="@alice:test.local" displayName="alice" avatarSources={[]} handle="@alice" presence={null} onOpenSettings={() => undefined} />,
+            ),
+        );
+        const card = container.querySelector(".pane-user-card")!;
+        expect(card.classList.contains("has-nameplate")).toBe(true);
+        expect(card.querySelector(".pane-user-nameplate img")?.getAttribute("src")).toBe(http(PLATE));
+        // Behind the avatar and the name: it comes first.
+        expect(card.firstElementChild?.classList.contains("pane-user-nameplate")).toBe(true);
+        act(() => rememberProfileImage("@alice:test.local", NAMEPLATE_FIELD, null));
+        expect(card.classList.contains("has-nameplate")).toBe(false);
+        expect(card.querySelector(".pane-user-nameplate")).toBeNull();
+    });
+
+    it("is not there without one", async () => {
+        const client = fakeClient({});
+        await act(async () =>
+            root.render(
+                <UserPanel client={client as never} userId="@alice:test.local" displayName="alice" avatarSources={[]} handle="@alice" presence={null} onOpenSettings={() => undefined} />,
+            ),
+        );
+        expect(container.querySelector(".pane-user-nameplate")).toBeNull();
     });
 });

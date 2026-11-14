@@ -2,12 +2,13 @@ import React, { useState } from "react";
 import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import { PRESENCE_CHOICES } from "../../../core/presence/presenceControl";
+import { BANNER_FIELD } from "../../../core/users/profileImages";
 import type { PresenceSelectionController } from "../../presence/usePresenceSelection";
 import { useAppVersion } from "../../version/useAppVersion";
 import { ActivityLine } from "../activity/ActivityLine";
 import { Avatar } from "../Avatar";
 import { StatusMenu, type StatusMenuProps } from "../presence/StatusMenu";
-import { ProfileBanner, useProfileBannerSrc } from "../profile/ProfileBanner";
+import { ProfileBanner, useProfileImageSrc } from "../profile/ProfileBanner";
 import { BottomSheet } from "./BottomSheet";
 
 interface PhoneYouViewProps {
@@ -52,7 +53,7 @@ export function PhoneYouView({
     onOpenSettings,
 }: PhoneYouViewProps): React.ReactElement {
     const [statusOpen, setStatusOpen] = useState(false);
-    const bannerSrc = useProfileBannerSrc(client, ownUserId);
+    const bannerSrc = useProfileImageSrc(client, ownUserId, BANNER_FIELD);
     const version = useAppVersion();
     const choice = presence.effectiveChoice;
     const choiceLabel = PRESENCE_CHOICES.find((entry) => entry.choice === presence.selection.choice)?.label ?? "Online";

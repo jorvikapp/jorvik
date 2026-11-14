@@ -1,7 +1,12 @@
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
-import { BANNER_FIELD, bannerMxcFrom, savedBanner, subscribeBanners } from "../../../core/users/profileBanner";
+import {
+    profileImageMxcFrom,
+    savedProfileImage,
+    subscribeProfileImages,
+    type ProfileImageField,
+} from "../../../core/users/profileImages";
 import { mediaFromMxc } from "../../adapters/media";
 
 function hashToHue(value: string): number {
@@ -19,12 +24,13 @@ export function bannerGradient(userId: string): string {
 }
 
 /**
- * Where someone's banner picture loads from, or null. Pass the profile when it's already been fetched;
- * without it the profile is fetched here. A banner saved in this session wins over both.
+ * Where one of someone's profile pictures (banner, nameplate) loads from, or null. Pass the profile when it's
+ * already been fetched; without it the profile is fetched here. A picture saved in this session wins over both.
  */
-export function useProfileBannerSrc(
+export function useProfileImageSrc(
     client: MatrixClient | null | undefined,
     userId: string | null | undefined,
+    field: ProfileImageField,
     profile?: Record<string, unknown> | null,
 ): string | null {
     const [fetched, setFetched] = useState<string | null>(null);
@@ -39,21 +45,21 @@ export function useProfileBannerSrc(
             .getProfileInfo(userId)
             .then((info) => {
                 if (!cancelled) {
-                    setFetched(bannerMxcFrom((info as Record<string, unknown>)[BANNER_FIELD]));
+                    setFetched(profileImageMxcFrom((info as Record<string, unknown>)[field]));
                 }
             })
             .catch(() => undefined);
         return () => {
             cancelled = true;
         };
-    }, [client, userId, ownFetch]);
-    const saved = useSyncExternalStore(subscribeBanners, () => (userId ? savedBanner(userId) : undefined));
-    const mxc = saved !== undefined ? saved : ownFetch ? fetched : bannerMxcFrom(profile?.[BANNER_FIELD]);
+    }, [client, userId, field, ownFetch]);
+    const saved = useSyncExternalStore(subscribeProfileImages, () => (userId ? savedProfileImage(userId, field) : undefined));
+    const mxc = saved !== undefined ? saved : ownFetch ? fetched : profileImageMxcFrom(profile?.[field]);
     return useMemo(() => (client && mxc ? mediaFromMxc(client, mxc) : null), [client, mxc]);
 }
 
 /**
- * The banner: the picture when there is one (the full file, so a GIF moves), over the colours, which stay
+ * A strip with a picture in it when there is one (the full file, so a GIF moves), over the colours, which stay
  * when there's none or it doesn't load.
  */
 export function ProfileBanner({

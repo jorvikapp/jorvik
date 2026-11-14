@@ -6204,6 +6204,48 @@ select,
     background: var(--bg-active);
 }
 
+/* A nameplate: your picture behind your name, cropped to fill the name area, under a shade of the panel's own
+   colour that's deepest where the text is, so the name stays readable in both themes. The card's own hover
+   colour would sit under the picture, so hovering deepens the shade instead. */
+.pane-user-row.user-panel .pane-user-card.has-nameplate {
+    position: relative;
+    isolation: isolate;
+}
+
+.pane-user-nameplate {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.pane-user-nameplate::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--dock-card-bg) 70%, transparent),
+        color-mix(in srgb, var(--dock-card-bg) 25%, transparent)
+    );
+    transition: background-color var(--motion-fast) var(--motion-ease-standard);
+}
+
+.pane-user-row.user-panel .pane-user-card.has-nameplate:hover {
+    background: transparent;
+}
+
+.pane-user-card.has-nameplate:hover .pane-user-nameplate::after {
+    background-color: color-mix(in srgb, var(--bg-active) 45%, transparent);
+}
+
+.pane-user-card.has-nameplate .pane-user-name,
+.pane-user-card.has-nameplate .pane-user-context {
+    text-shadow: 0 1px 2px color-mix(in srgb, var(--dock-card-bg) 85%, transparent);
+}
+
 .pane-user-row.user-panel .pane-user-avatar {
     width: 32px;
     height: 32px;

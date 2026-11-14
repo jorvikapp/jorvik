@@ -4,11 +4,13 @@ import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 import type { UserActivity } from "../../../core/activity/activityStore";
 import type { ActivityGame } from "../../../core/activity/activityWire";
 import type { PresenceChoice } from "../../../core/presence/presenceControl";
+import { NAMEPLATE_FIELD } from "../../../core/users/profileImages";
 import { useUserActivity } from "../../activity/useActivity";
 import type { AudioDeviceKind } from "../../voice/audioDevices";
 import { toggleDeafened, toggleMicMuted, useLocalAvState } from "../../voice/localAvState";
 import { GameIcon } from "../activity/ActivityLine";
 import { Avatar } from "../Avatar";
+import { ProfileBanner, useProfileImageSrc } from "../profile/ProfileBanner";
 import { GearIcon, MicIcon, SoundIcon } from "../voice/AvIcons";
 import { DeviceMenu } from "./DeviceMenu";
 
@@ -137,12 +139,13 @@ export function UserPanel({
     };
     const activity = useUserActivity(userId);
     const context = userPanelContext(activity, statusMessage, handle);
+    const nameplateSrc = useProfileImageSrc(client, userId, NAMEPLATE_FIELD);
 
     return (
         <div className="pane-user-row user-panel">
             <button
                 type="button"
-                className="pane-user-card"
+                className={`pane-user-card${nameplateSrc ? " has-nameplate" : ""}`}
                 onClick={presence ? presence.onToggleMenu : onOpenSettings}
                 // The open menu closes on any press outside it, and the click would open it again: this
                 // press is the menu's own button, so leave closing to the click.
@@ -155,6 +158,7 @@ export function UserPanel({
                 aria-haspopup={presence ? "menu" : undefined}
                 aria-expanded={presence ? presence.menuOpen : undefined}
             >
+                {nameplateSrc ? <ProfileBanner className="pane-user-nameplate" src={nameplateSrc} /> : null}
                 <Avatar
                     className="pane-user-avatar"
                     name={displayName}

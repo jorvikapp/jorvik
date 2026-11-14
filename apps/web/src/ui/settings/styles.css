@@ -1146,6 +1146,24 @@
     background: var(--bg-pane);
 }
 
+/* Your panel as it sits at the bottom left, with the nameplate being edited: the name area at its real size. */
+.settings-nameplate-preview {
+    width: 100%;
+    max-width: 334px;
+    box-sizing: border-box;
+}
+
+.pane-user-row.user-panel.settings-nameplate-preview .pane-user-card {
+    flex: 0 1 208px;
+    margin-right: auto;
+    cursor: default;
+}
+
+.settings-nameplate-preview .user-panel-control {
+    width: 32px;
+    pointer-events: none;
+}
+
 /* The banner sits on top of the preview card, joined to it. Both take the profile card's width and the
    banner its shape (252 x 86 in the side panel), so a picture is cropped here as others will see it. */
 .profile-preview-banner {
