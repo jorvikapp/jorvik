@@ -7,6 +7,7 @@ import { useAppVersion } from "../../version/useAppVersion";
 import { ActivityLine } from "../activity/ActivityLine";
 import { Avatar } from "../Avatar";
 import { StatusMenu, type StatusMenuProps } from "../presence/StatusMenu";
+import { ProfileBanner, useProfileBannerSrc } from "../profile/ProfileBanner";
 import { BottomSheet } from "./BottomSheet";
 
 interface PhoneYouViewProps {
@@ -51,6 +52,7 @@ export function PhoneYouView({
     onOpenSettings,
 }: PhoneYouViewProps): React.ReactElement {
     const [statusOpen, setStatusOpen] = useState(false);
+    const bannerSrc = useProfileBannerSrc(client, ownUserId);
     const version = useAppVersion();
     const choice = presence.effectiveChoice;
     const choiceLabel = PRESENCE_CHOICES.find((entry) => entry.choice === presence.selection.choice)?.label ?? "Online";
@@ -58,7 +60,7 @@ export function PhoneYouView({
     return (
         <section className="phone-page phone-you" aria-label="You">
             <div className="phone-page-body phone-you-body">
-                <div className="phone-you-banner" aria-hidden="true" />
+                <ProfileBanner className="phone-you-banner" src={bannerSrc} />
                 <div className="phone-you-profile">
                     <span className="phone-you-avatar-wrap">
                         <Avatar

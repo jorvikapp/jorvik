@@ -1146,6 +1146,28 @@
     background: var(--bg-pane);
 }
 
+/* The banner sits on top of the preview card, joined to it. Both take the profile card's width and the
+   banner its shape (252 x 86 in the side panel), so a picture is cropped here as others will see it. */
+.profile-preview-banner {
+    width: 100%;
+    max-width: 320px;
+    box-sizing: border-box;
+    aspect-ratio: 252 / 86;
+    border: 1px solid var(--border);
+    border-bottom: 0;
+    border-radius: 12px 12px 0 0;
+    overflow: hidden;
+}
+
+.profile-preview-banner + .profile-preview-card.has-banner {
+    width: 100%;
+    max-width: 320px;
+    box-sizing: border-box;
+    margin-top: -10px;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
 .profile-preview-avatar {
     width: 56px;
     height: 56px;

@@ -428,6 +428,7 @@ button.phone-notif:active {
 .phone-you-banner {
     height: 104px;
     background: linear-gradient(135deg, var(--primary), var(--accent-soft));
+    overflow: hidden;
 }
 
 .phone-you-profile {

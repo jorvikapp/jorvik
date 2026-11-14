@@ -692,6 +692,16 @@
     height: 86px;
     margin: 0 -12px;
     border-radius: 12px 12px 0 0;
+    overflow: hidden;
+}
+
+/* A banner picture fills its strip, cropped to fit, over the colours. */
+.profile-banner-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    user-select: none;
 }
 
 .rp-profile-close {

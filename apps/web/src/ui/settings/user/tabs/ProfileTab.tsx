@@ -3,11 +3,13 @@ import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import { activityAudience, describeActivityAudience } from "../../../../core/activity/activityPrivacy";
 import { formatUserIdForDisplay } from "../../../../core/users/formatUserId";
+import { BANNER_FIELD, BANNER_MAX_BYTES, BANNER_TYPES, bannerMxcFrom, rememberBanner } from "../../../../core/users/profileBanner";
 import { useJoinedSpaces, useUserActivity } from "../../../activity/useActivity";
 import { useActivityPrivacy } from "../../../activity/useActivityPrivacy";
 import { mediaFromMxc, thumbnailFromMxc } from "../../../adapters/media";
 import { ActivityLine } from "../../../components/activity/ActivityLine";
 import { Avatar } from "../../../components/Avatar";
+import { bannerGradient, ProfileBanner } from "../../../components/profile/ProfileBanner";
 import type { ToastState } from "../../../components/Toast";
 
 // Synapse caps an extended profile value at 255 characters
@@ -25,6 +27,7 @@ interface ProfileTabProps {
 
 export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivityPrivacy }: ProfileTabProps): React.ReactElement {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const bannerInputRef = useRef<HTMLInputElement | null>(null);
     const userId = client.getUserId() ?? "";
     const { settings: activitySettings } = useActivityPrivacy(client);
     const spaces = useJoinedSpaces(client);
@@ -36,6 +39,10 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
     const [baselineDisplayName, setBaselineDisplayName] = useState("");
     const [baselineAvatarMxc, setBaselineAvatarMxc] = useState("");
     const [baselineBio, setBaselineBio] = useState("");
+    // "" is no banner: the colours made from your user ID.
+    const [bannerMxc, setBannerMxc] = useState("");
+    const [baselineBannerMxc, setBaselineBannerMxc] = useState("");
+    const [uploadingBanner, setUploadingBanner] = useState(false);
     // Custom profile fields are MSC4133 and off by default in Synapse. Hide the
     // field rather than offering one that cannot be saved.
     const [bioSupported, setBioSupported] = useState(false);
@@ -68,6 +75,9 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
 
                 const nextDisplayName = info.displayname ?? "";
                 const nextAvatarMxc = info.avatar_url ?? "";
+                const nextBannerMxc = bannerMxcFrom((info as Record<string, unknown>)[BANNER_FIELD]) ?? "";
+                setBannerMxc(nextBannerMxc);
+                setBaselineBannerMxc(nextBannerMxc);
                 setDisplayName(nextDisplayName);
                 setAvatarMxc(nextAvatarMxc);
                 setBaselineDisplayName(nextDisplayName);
@@ -119,13 +129,53 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
         [avatarMxc, client],
     );
 
+    // The full file, not a thumbnail: a GIF keeps moving.
+    const bannerPreview = useMemo(() => mediaFromMxc(client, bannerMxc), [bannerMxc, client]);
+    const bannerColours = useMemo(() => bannerGradient(userId), [userId]);
+
     // Until the profile loads (or without a display name), the short form of the id, as elsewhere in the app.
     const previewName = displayName.trim() || formatUserIdForDisplay(userId, client.getDomain()) || "User";
 
     const hasChanges =
         displayName.trim() !== baselineDisplayName.trim() ||
         avatarMxc !== baselineAvatarMxc ||
-        (bioSupported && bio.trim() !== baselineBio.trim());
+        (bioSupported && bio.trim() !== baselineBio.trim()) ||
+        (bioSupported && bannerMxc !== baselineBannerMxc);
+
+    const uploadBanner = async (file: File): Promise<void> => {
+        setError(null);
+        if (!(BANNER_TYPES as readonly string[]).includes(file.type)) {
+            setError("A banner can be a PNG, JPEG, GIF or WebP picture.");
+            return;
+        }
+        const serverMax = await client
+            .getMediaConfig()
+            .then((config) => config["m.upload.size"])
+            .catch(() => undefined);
+        const maxBytes = typeof serverMax === "number" && serverMax > 0 ? Math.min(serverMax, BANNER_MAX_BYTES) : BANNER_MAX_BYTES;
+        if (file.size > maxBytes) {
+            const size = (file.size / 1_048_576).toFixed(1);
+            setError(`That picture is ${size} MB; a banner can be up to ${Math.floor(maxBytes / 1_048_576)} MB.`);
+            return;
+        }
+        setUploadingBanner(true);
+        try {
+            const upload = await client.uploadContent(file, {
+                includeFilename: true,
+                type: file.type,
+                name: file.name,
+            });
+            const mxc = bannerMxcFrom(upload.content_uri);
+            if (!mxc) {
+                throw new Error("Homeserver did not return a valid MXC URL.");
+            }
+            setBannerMxc(mxc);
+        } catch (uploadError) {
+            setError(uploadError instanceof Error ? uploadError.message : "Failed to upload banner.");
+        } finally {
+            setUploadingBanner(false);
+        }
+    };
 
     const uploadAvatar = async (file: File): Promise<void> => {
         setUploading(true);
@@ -179,6 +229,17 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
                 setBio(nextBio);
             }
 
+            if (bioSupported && bannerMxc !== baselineBannerMxc) {
+                // Removing it is a delete, like the bio: the colours come back.
+                if (bannerMxc) {
+                    await client.setExtendedProfileProperty(BANNER_FIELD, bannerMxc);
+                } else {
+                    await client.deleteExtendedProfileProperty(BANNER_FIELD);
+                }
+                setBaselineBannerMxc(bannerMxc);
+                rememberBanner(userId, bannerMxc || null);
+            }
+
             setBaselineDisplayName(displayName);
             setBaselineAvatarMxc(avatarMxc);
             onToast({ type: "success", message: "Profile updated." });
@@ -198,7 +259,10 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
 
             <div className="settings-section-card profile-preview">
                 <h3>How others see you</h3>
-                <div className="profile-preview-card">
+                {bioSupported ? (
+                    <ProfileBanner className="profile-preview-banner" src={bannerPreview} background={bannerColours} />
+                ) : null}
+                <div className={`profile-preview-card${bioSupported ? " has-banner" : ""}`}>
                     <Avatar
                         className="profile-preview-avatar"
                         name={previewName}
@@ -284,6 +348,48 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
                 </div>
             </div>
 
+            {bioSupported ? (
+                <div className="settings-field settings-banner-field">
+                    <span>Profile banner</span>
+                    <div className="settings-profile-actions">
+                        <button
+                            type="button"
+                            className="settings-button"
+                            disabled={uploadingBanner || saving || !profileLoaded}
+                            onClick={() => bannerInputRef.current?.click()}
+                        >
+                            {uploadingBanner ? "Uploading..." : bannerMxc ? "Change banner" : "Upload banner"}
+                        </button>
+                        <button
+                            type="button"
+                            className="settings-button settings-button-secondary"
+                            disabled={uploadingBanner || saving || !bannerMxc}
+                            onClick={() => setBannerMxc("")}
+                        >
+                            Remove banner
+                        </button>
+                        <input
+                            ref={bannerInputRef}
+                            className="settings-hidden-input"
+                            type="file"
+                            accept={BANNER_TYPES.join(",")}
+                            onChange={(event) => {
+                                const selectedFile = event.target.files?.[0];
+                                if (selectedFile) {
+                                    void uploadBanner(selectedFile);
+                                }
+                                event.currentTarget.value = "";
+                            }}
+                        />
+                    </div>
+                    <span className="settings-inline-note">
+                        The picture behind your avatar on your profile: PNG, JPEG, GIF or WebP, up to{" "}
+                        {Math.floor(BANNER_MAX_BYTES / 1_048_576)} MB. Wide pictures work best, about 3:1 (for example
+                        960 x 300), and GIFs and animated WebPs move. Shown to people on this server.
+                    </span>
+                </div>
+            ) : null}
+
             <label className="settings-field">
                 <span>Display name</span>
                 <input
@@ -317,7 +423,7 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
                 <button
                     type="button"
                     className="settings-button"
-                    disabled={!hasChanges || saving || uploading}
+                    disabled={!hasChanges || saving || uploading || uploadingBanner}
                     onClick={() => void saveProfile()}
                 >
                     {saving ? "Saving..." : "Save profile"}

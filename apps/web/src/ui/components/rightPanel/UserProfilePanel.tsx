@@ -14,6 +14,7 @@ import { BadgesDialog } from "../badges/BadgesDialog";
 import { useBadgeSettings } from "../../hooks/useUserBadges";
 import { RoomDialog } from "../rooms/RoomDialog";
 import { ProfileHeader } from "./ProfileHeader";
+import { useProfileBannerSrc } from "../profile/ProfileBanner";
 import { AboutCard } from "./cards/AboutCard";
 import { RolesCard } from "./cards/RolesCard";
 
@@ -183,6 +184,9 @@ export function UserProfilePanel({
         return "";
     }, [profile?.about, profile?.bio]);
 
+    // null while loading or when it failed: no banner picture, just the colours.
+    const bannerSrc = useProfileBannerSrc(client, userId, (profile as Record<string, unknown> | null) ?? null);
+
     const memberSince = getMemberSince(member);
     const aboutBody = memberSince ? `${aboutText || "No bio set"}\n\nMember since ${memberSince}` : aboutText;
 
@@ -222,6 +226,7 @@ export function UserProfilePanel({
                 userId={userId}
                 localDomain={client.getDomain()}
                 avatarSources={avatarSources}
+                bannerSrc={bannerSrc}
                 presence={presenceEnabled ? presence : null}
                 onBack={onBack}
                 onMessage={canMessage ? openDm : undefined}

@@ -7,6 +7,7 @@ import type { PresenceVm } from "../../presence/buildPresenceVm";
 import { toAvatarPresenceState } from "../../presence/buildPresenceVm";
 import { ActivityLine } from "../activity/ActivityLine";
 import { PresenceText } from "../presence/PresenceText";
+import { bannerGradient, ProfileBanner } from "../profile/ProfileBanner";
 
 import { formatUserIdForDisplay } from "../../../core/users/formatUserId";
 
@@ -17,6 +18,8 @@ interface ProfileHeaderProps {
     userId: string;
     localDomain?: string | null;
     avatarSources: string[];
+    /** Their banner picture, if they've set one. */
+    bannerSrc?: string | null;
     presence: PresenceVm | null;
     onBack: () => void;
     onCopyMxid: () => Promise<void>;
@@ -38,20 +41,13 @@ function clippingLeftEdge(element: HTMLElement): number {
     return 0;
 }
 
-function hashToHue(value: string): number {
-    let hash = 0;
-    for (let index = 0; index < value.length; index++) {
-        hash = (hash * 31 + value.charCodeAt(index)) | 0;
-    }
-    return Math.abs(hash) % 360;
-}
-
 export function ProfileHeader({
     client,
     displayName,
     userId,
     localDomain,
     avatarSources,
+    bannerSrc,
     presence,
     onBack,
     onCopyMxid,
@@ -68,13 +64,7 @@ export function ProfileHeader({
     const [menuHangsRight, setMenuHangsRight] = useState(false);
     const menuRef = useRef<HTMLDivElement | null>(null);
     const menuPanelRef = useRef<HTMLDivElement | null>(null);
-    const hue = useMemo(() => hashToHue(userId), [userId]);
-    const bannerStyle = useMemo(
-        () => ({
-            background: `linear-gradient(135deg, hsl(${hue} 62% 42%), hsl(${(hue + 48) % 360} 55% 28%))`,
-        }),
-        [hue],
-    );
+    const bannerBackground = useMemo(() => bannerGradient(userId), [userId]);
 
     useLayoutEffect(() => {
         if (!menuOpen) {
@@ -116,7 +106,7 @@ export function ProfileHeader({
 
     return (
         <header className="rp-profile-hero">
-            <div className="rp-profile-banner" style={bannerStyle} />
+            <ProfileBanner className="rp-profile-banner" src={bannerSrc} background={bannerBackground} />
             <button type="button" className="rp-profile-close" onClick={onBack} aria-label="Close profile">
                 x
             </button>
