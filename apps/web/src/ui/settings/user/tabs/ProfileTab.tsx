@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import { activityAudience, describeActivityAudience } from "../../../../core/activity/activityPrivacy";
@@ -53,8 +53,9 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     // Without a banner, the colours made from your user ID; without a nameplate, the panel's own colour.
-    const banner = useProfileImageDraft(client, BANNER_FIELD, "banner", setError);
-    const nameplate = useProfileImageDraft(client, NAMEPLATE_FIELD, "nameplate", setError);
+    const pictureSaved = useCallback((message: string) => onToast({ type: "success", message }), [onToast]);
+    const banner = useProfileImageDraft(client, userId, BANNER_FIELD, "banner", setError, pictureSaved);
+    const nameplate = useProfileImageDraft(client, userId, NAMEPLATE_FIELD, "nameplate", setError, pictureSaved);
     const { load: loadBanner } = banner;
     const { load: loadNameplate } = nameplate;
 
@@ -138,8 +139,7 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
     const hasChanges =
         displayName.trim() !== baselineDisplayName.trim() ||
         avatarMxc !== baselineAvatarMxc ||
-        (bioSupported && bio.trim() !== baselineBio.trim()) ||
-        (bioSupported && (banner.changed || nameplate.changed));
+        (bioSupported && bio.trim() !== baselineBio.trim());
 
     const uploadAvatar = async (file: File): Promise<void> => {
         setUploading(true);
@@ -193,11 +193,6 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
                 setBio(nextBio);
             }
 
-            if (bioSupported) {
-                // Removing one is a delete, like the bio.
-                await banner.save(userId);
-                await nameplate.save(userId);
-            }
 
             setBaselineDisplayName(displayName);
             setBaselineAvatarMxc(avatarMxc);
@@ -318,7 +313,7 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
                             <>
                                 The picture behind your avatar on your profile: {PROFILE_IMAGE_RULES}. Wide pictures work
                                 best, about 3:1 (for example 960 x 300), and GIFs and animated WebPs move. Shown to people
-                                on this server.
+                                on this server; saved as soon as you pick it.
                             </>
                         }
                     />
@@ -331,7 +326,7 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
                             <>
                                 The picture behind your panel at the bottom left, under your name and your mic, sound and
                                 settings buttons: {PROFILE_IMAGE_RULES}. The panel is 334 x 56, so 668 x 112 stays sharp;
-                                it's cropped to fit a narrower window, and GIFs and animated WebPs move.
+                                it's cropped to fit a narrower window, and GIFs and animated WebPs move. Saved as soon as you pick it.
                             </>
                         }
                     >
@@ -402,7 +397,7 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
                 <button
                     type="button"
                     className="settings-button"
-                    disabled={!hasChanges || saving || uploading || banner.uploading || nameplate.uploading}
+                    disabled={!hasChanges || saving || uploading}
                     onClick={() => void saveProfile()}
                 >
                     {saving ? "Saving..." : "Save profile"}

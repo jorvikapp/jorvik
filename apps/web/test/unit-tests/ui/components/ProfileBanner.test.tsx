@@ -114,9 +114,10 @@ describe("useProfileImageSrc", () => {
 });
 
 describe("ProfileTab banner", () => {
-    it("uploads a GIF, previews it, and saves it to the profile field", async () => {
+    it("uploads a GIF, previews it, and saves it at once, with no Save profile step", async () => {
         const client = fakeClient({ displayname: "alice" });
-        await act(async () => root.render(<ProfileTab client={client as never} onToast={vi.fn()} />));
+        const onToast = vi.fn();
+        await act(async () => root.render(<ProfileTab client={client as never} onToast={onToast} />));
         const upload = [...container.querySelectorAll("button")].find((b) => b.textContent === "Upload banner")!;
         expect(upload).toBeTruthy();
         const input = container.querySelector<HTMLInputElement>('input[data-field="app.jorvik.banner"]')!;
@@ -125,10 +126,25 @@ describe("ProfileTab banner", () => {
         await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
         expect(client.uploadContent).toHaveBeenCalledWith(file, expect.objectContaining({ type: "image/gif" }));
         expect(container.querySelector(".profile-preview-banner img")?.getAttribute("src")).toBe(http(BANNER));
-
-        const save = [...container.querySelectorAll("button")].find((b) => b.textContent === "Save profile")!;
-        await act(async () => save.click());
         expect(client.setExtendedProfileProperty).toHaveBeenCalledWith(BANNER_FIELD, BANNER);
+        expect(onToast).toHaveBeenCalledWith({ type: "success", message: "Banner updated." });
+        // Nothing is left for Save profile to do.
+        const save = [...container.querySelectorAll("button")].find((b) => b.textContent === "Save profile")!;
+        expect(save.disabled).toBe(true);
+        expect([...container.querySelectorAll("button")].some((b) => b.textContent === "Change banner")).toBe(true);
+    });
+
+    it("keeps the old banner and says why when saving fails", async () => {
+        const client = fakeClient({ [BANNER_FIELD]: BANNER }, {
+            uploadContent: vi.fn(async () => ({ content_uri: "mxc://test.local/New_1" })),
+            setExtendedProfileProperty: vi.fn(async () => { throw new Error("M_FORBIDDEN: nope"); }),
+        });
+        await act(async () => root.render(<ProfileTab client={client as never} onToast={vi.fn()} />));
+        const input = container.querySelector<HTMLInputElement>('input[data-field="app.jorvik.banner"]')!;
+        Object.defineProperty(input, "files", { value: [new File(["GIF89a"], "x.gif", { type: "image/gif" })] });
+        await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
+        expect(container.querySelector(".settings-inline-error")?.textContent).toBe("M_FORBIDDEN: nope");
+        expect(container.querySelector(".profile-preview-banner img")?.getAttribute("src")).toBe(http(BANNER));
     });
 
     it("refuses a file that isn't a PNG, JPEG, GIF or WebP, or is over the limit", async () => {
@@ -164,15 +180,15 @@ describe("ProfileTab banner", () => {
         expect(client.uploadContent).toHaveBeenCalledWith(expect.any(File), expect.objectContaining({ type: "image/webp" }));
     });
 
-    it("removing the banner deletes the field", async () => {
+    it("removing the banner deletes the field at once", async () => {
         const client = fakeClient({ [BANNER_FIELD]: BANNER });
-        await act(async () => root.render(<ProfileTab client={client as never} onToast={vi.fn()} />));
+        const onToast = vi.fn();
+        await act(async () => root.render(<ProfileTab client={client as never} onToast={onToast} />));
         const remove = [...container.querySelectorAll("button")].find((b) => b.textContent === "Remove banner")!;
         await act(async () => remove.click());
         expect(container.querySelector(".profile-preview-banner img")).toBeNull();
-        const save = [...container.querySelectorAll("button")].find((b) => b.textContent === "Save profile")!;
-        await act(async () => save.click());
         expect(client.deleteExtendedProfileProperty).toHaveBeenCalledWith(BANNER_FIELD);
+        expect(onToast).toHaveBeenCalledWith({ type: "success", message: "Banner removed." });
     });
 });
 
@@ -185,7 +201,7 @@ async function choose(input: HTMLInputElement, file: File): Promise<void> {
 describe("nameplate", () => {
     const PLATE = "mxc://test.local/Plate_2";
 
-    it("uploads a nameplate on its own, previews it in your panel, and saves only that field", async () => {
+    it("uploads a nameplate on its own, previews it in your panel, and saves only that field at once", async () => {
         const client = fakeClient({ displayname: "alice" }, { uploadContent: vi.fn(async () => ({ content_uri: PLATE })) });
         await act(async () => root.render(<ProfileTab client={client as never} onToast={vi.fn()} />));
         expect([...container.querySelectorAll("button")].some((b) => b.textContent === "Upload nameplate")).toBe(true);
@@ -196,8 +212,6 @@ describe("nameplate", () => {
         // The banner keeps its colours.
         expect(container.querySelector(".profile-preview-banner img")).toBeNull();
 
-        const save = [...container.querySelectorAll("button")].find((b) => b.textContent === "Save profile")!;
-        await act(async () => save.click());
         expect(client.setExtendedProfileProperty).toHaveBeenCalledTimes(1);
         expect(client.setExtendedProfileProperty).toHaveBeenCalledWith(NAMEPLATE_FIELD, PLATE);
     });
