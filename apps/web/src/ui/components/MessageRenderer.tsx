@@ -308,8 +308,17 @@ function sanitizeNodes(
                 return;
             }
 
-            const src = element.getAttribute("src");
+            const src = element.getAttribute("src")?.trim();
             if (!src) {
+                return;
+            }
+            // Message images may only come from the homeserver's own media (mxc://). Any other address would be fetched by
+            // everyone who sees the message, telling that site who read it and when, so such an emoji shows as its name.
+            if (!/^mxc:\/\//i.test(src)) {
+                const name = sanitizeText(element.getAttribute("alt")) || sanitizeText(element.getAttribute("title"));
+                if (name) {
+                    rendered.push(<React.Fragment key={key}>{name}</React.Fragment>);
+                }
                 return;
             }
 

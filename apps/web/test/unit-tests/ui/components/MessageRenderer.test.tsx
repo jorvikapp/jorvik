@@ -102,6 +102,28 @@ describe("MessageRenderer formatting", () => {
     });
 });
 
+describe("MessageRenderer emoji images", () => {
+    it("shows emoji from the homeserver, and one from anywhere else as its name without fetching it", () => {
+        act(() => {
+            root.render(
+                <MessageRenderer
+                    body=":wave: :spy:"
+                    format="org.matrix.custom.html"
+                    formattedBody={
+                        '<img data-mx-emoticon src="mxc://matrix.jorvik.app/wave" alt=":wave:" height="32"> ' +
+                        '<img data-mx-emoticon src="https://tracker.example/pixel.png" alt=":spy:" height="32">'
+                    }
+                    resolveImageSource={(src) => src.replace("mxc://", "https://matrix.jorvik.app/_matrix/media/v3/thumbnail/")}
+                />,
+            );
+        });
+        const images = [...container.querySelectorAll("img")];
+        expect(images.map((image) => image.getAttribute("src"))).toEqual(["https://matrix.jorvik.app/_matrix/media/v3/thumbnail/matrix.jorvik.app/wave"]);
+        expect(container.innerHTML).not.toContain("tracker.example");
+        expect(container.textContent).toContain(":spy:");
+    });
+});
+
 describe("MessageRenderer old reply quotes", () => {
     it("leaves out the quote some clients put in front of replies", () => {
         render("<mx-reply><blockquote>In reply to <a href=\"https://matrix.to/#/@a:b\">@a:b</a> old</blockquote></mx-reply>the answer");

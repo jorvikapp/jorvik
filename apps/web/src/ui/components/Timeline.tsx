@@ -2883,14 +2883,14 @@ export function Timeline({
                                                     }
                                                     resolveImageSource={(src, width, height) => {
                                                         if (!/^mxc:\/\//i.test(src)) {
-                                                            return src;
+                                                            return null;
                                                         }
 
                                                         return mxcThumbnailToHttp(client, src, width, height);
                                                     }}
                                                     resolveImageFallbackSource={(src) => {
                                                         if (!/^mxc:\/\//i.test(src)) {
-                                                            return src;
+                                                            return null;
                                                         }
 
                                                         return mediaFromMxc(client, src);
