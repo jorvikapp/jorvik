@@ -75,6 +75,16 @@
   </branding>
 
   <releases>
+    <release version="1.0.32" date="2026-11-14">
+      <description>
+        <p>Put a picture on your profile and behind your name, and see what people are up to in your direct messages.</p>
+        <ul>
+          <li>Your direct messages show a line under each person's name: the game they're playing, if they share it with you, or else their status message. A status that is a web address, such as a stream link, opens when you click it</li>
+          <li>Put a picture in the banner behind your avatar on your profile. In your profile settings, choose a PNG, JPEG, GIF or WebP up to 10 MB. It's saved straight away, and GIFs and animated WebPs move</li>
+          <li>Add a nameplate: a picture that fills your panel at the bottom left, behind your name and your microphone, sound and settings buttons. It's set the same way as the banner</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.31" date="2026-11-06">
       <description>
         <p>A new look for your panel and the message box.</p>
