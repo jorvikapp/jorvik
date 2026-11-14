@@ -1689,6 +1689,47 @@ textarea {
     white-space: nowrap;
 }
 
+.room-item-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    font-size: 12px;
+    line-height: 15px;
+    color: var(--text-muted);
+}
+
+.room-item-status-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.room-item-status-icon {
+    flex: 0 0 auto;
+    display: inline-flex;
+    font-size: 11px;
+}
+
+.room-item-status-icon .activity-game-icon {
+    width: 14px;
+    height: 14px;
+}
+
+/* A status that is a web address: still quiet, but marked as something you can open. */
+.room-item-status-link {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+    text-underline-offset: 2px;
+}
+
+.room-item-status-link:hover {
+    color: var(--text-main);
+    text-decoration-color: currentColor;
+}
+
 .room-item-voice-users {
     display: flex;
     flex-direction: column;
@@ -2051,6 +2092,7 @@ textarea {
 }
 
 .room-item.is-muted .room-item-name,
+.room-item.is-muted .room-item-status,
 .room-item.is-muted .room-item-avatar {
     opacity: 0.55;
 }

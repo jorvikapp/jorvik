@@ -40,7 +40,8 @@ import {
 import { isVoiceChannelRoom } from "../voice/voiceChannel";
 import { usesEncryptedCallRoom } from "../../core/voice/callEncryptionMode";
 import { Avatar } from "./Avatar";
-import { getOneToOneDirectName } from "./rightPanel/directPartner";
+import { DmStatusLine } from "./DmStatusLine";
+import { getOneToOneDirectName, getOneToOnePartnerId } from "./rightPanel/directPartner";
 import micMuteIcon from "./icons/mic-02.svg";
 import volumeMuteIcon from "./icons/volume-mute-02.svg";
 
@@ -815,6 +816,9 @@ export function RoomList({
         const roomAvatarSeed = allowMemberAvatarFallback ? getRoomAvatarSeed(room) ?? room.roomId : room.roomId;
         const presenceUserId = directUserIdByRoomId.get(room.roomId) ?? null;
         const presence = presenceUserId ? presenceByUserId.get(presenceUserId) : null;
+        // The person in a one-to-one DM, for the line under their name (a group DM has no one person to
+        // show). Game activity doesn't depend on presence being on, so this is worked out even when it's off.
+        const dmPartnerId = showHashPrefix ? null : getOneToOnePartnerId(room, ownUserId);
         const isMenuOpen = orderingControlsEnabled && menuRoomId === room.roomId;
         const dragClass = draggedRoomId === room.roomId ? " is-dragging" : "";
         const isVoiceChannel = isVoiceChannelRoom(room) || voiceChannelHintRoomIds.has(room.roomId);
@@ -996,6 +1000,13 @@ export function RoomList({
                                 </span>
                                 {isVoiceChannel ? (
                                     <span className="room-item-subtitle">{voiceSubtitle}</span>
+                                ) : null}
+                                {dmPartnerId && !isVoiceChannel ? (
+                                    <DmStatusLine
+                                        client={client}
+                                        userId={dmPartnerId}
+                                        statusMessage={presenceEnabled ? presence?.statusMessage : null}
+                                    />
                                 ) : null}
                             </span>
                         </span>
