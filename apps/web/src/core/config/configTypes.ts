@@ -15,6 +15,8 @@ export interface CoreConfig {
     voice_service_url?: string;
     /** Where people manage their sign-in codes and passkeys, on servers that offer two-factor sign-in (Settings > My Account). */
     account_management_url?: string;
+    /** Where Settings asks the server to email a two-factor setup link (account.jorvik.app/jorvik/two-factor). */
+    two_factor_request_url?: string;
     livekit_ws_url?: string;
     // The push gateway for notifications (see core/push/webPush.ts).
     web_push?: {

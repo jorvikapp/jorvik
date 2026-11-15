@@ -45,6 +45,7 @@ if (fs.existsSync(sourceConfigPath)) {
             voice_service_url: "https://matrix.jorvik.app",
             enable_presence_by_hs_url: { "https://matrix.jorvik.app": true },
             account_management_url: "https://account.jorvik.app/if/user/#/settings",
+            two_factor_request_url: "https://account.jorvik.app/jorvik/two-factor",
         }, null, 2)}\n`,
         "utf8",
     );
