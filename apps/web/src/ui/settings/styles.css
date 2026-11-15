@@ -1223,3 +1223,8 @@
     align-items: center;
     gap: 10px;
 }
+
+.settings-two-factor-off {
+    display: grid;
+    gap: 10px;
+}

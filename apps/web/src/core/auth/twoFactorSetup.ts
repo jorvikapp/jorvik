@@ -16,15 +16,15 @@ export function twoFactorRequestUrl(): string | null {
 }
 
 export interface SetupStatus {
-    /** none: nothing asked lately; queued: the server hasn't got to it yet; email_sent; failed (see reason). */
-    state: "none" | "queued" | "email_sent" | "failed";
+    /** none: nothing asked lately; queued: the server hasn't got to it yet; email_sent; off (turned off); failed (see reason). */
+    state: "none" | "queued" | "email_sent" | "off" | "failed";
     /** The address it went to, partly hidden by the server. */
     email?: string;
     /** Why it failed: no_email, name_taken, already_on, deactivated, error, ... */
     reason?: string;
 }
 
-const STATES = new Set<SetupStatus["state"]>(["none", "queued", "email_sent", "failed"]);
+const STATES = new Set<SetupStatus["state"]>(["none", "queued", "email_sent", "off", "failed"]);
 
 /** The server's answer, or "none" for anything that isn't one. */
 export function parseSetupStatus(body: unknown): SetupStatus {
@@ -63,4 +63,13 @@ export function requestTwoFactorSetup(client: MatrixClient, base: string): Promi
 /** How this person's latest request went. */
 export function twoFactorSetupStatus(client: MatrixClient, base: string): Promise<SetupStatus> {
     return ask(client, `${base}/status`, "GET");
+}
+
+/**
+ * Tell the server it's been turned off: the person has just set a Matrix password, which Synapse only allows after
+ * they confirm with their Jorvik account and a code. The server checks that, then unlinks the Jorvik account and puts
+ * their email back on the Matrix account.
+ */
+export function requestTwoFactorOff(client: MatrixClient, base: string): Promise<SetupStatus> {
+    return ask(client, `${base}/off`, "POST");
 }
