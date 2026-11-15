@@ -79,6 +79,17 @@
   </branding>
 
   <releases>
+    <release version="1.0.33" date="2026-11-15">
+      <description>
+        <p>Spaces are now called servers, and you can turn on two-factor sign-in from Settings.</p>
+        <ul>
+          <li>What the app used to call a Space is now called a server, everywhere it shows up</li>
+          <li>Settings, My Account has a Two-factor sign-in section. It shows whether it's on for your account, and you can turn it on or off yourself. With it on, signing in asks for your password and a code from an authenticator app</li>
+          <li>Emoji pictures in messages only load from your homeserver, so a message can no longer make the app fetch a picture from another website</li>
+          <li>Security updates for Electron and for the tools that build the app, including a fix for the AppImage</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.32" date="2026-11-14">
       <description>
         <p>Put a picture on your profile and behind your name, and see what people are up to in your direct messages.</p>
