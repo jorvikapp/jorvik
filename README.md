@@ -12,6 +12,7 @@ Runs as a web app or a native desktop client (Windows · macOS · Linux).
 <details>
 <summary>More screenshots</summary>
 
+![Direct messages](docs/dms.png)
 ![On a phone](docs/phone.png)
 ![Voice calls](docs/voice.png)
 ![Custom emoji](docs/emoji.png)
