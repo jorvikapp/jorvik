@@ -13,6 +13,8 @@ export interface CoreConfig {
     sync_timeline_limit?: number;
     voice_enabled?: boolean;
     voice_service_url?: string;
+    /** Where people manage their sign-in codes and passkeys, on servers that offer two-factor sign-in (Settings > My Account). */
+    account_management_url?: string;
     livekit_ws_url?: string;
     // The push gateway for notifications (see core/push/webPush.ts).
     web_push?: {

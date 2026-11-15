@@ -3,6 +3,7 @@ import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import type { ToastState } from "../../../components/Toast";
 import { useAppVersion } from "../../../version/useAppVersion";
+import { TwoFactorSection } from "./TwoFactorSection";
 
 interface MyAccountTabProps {
     client: MatrixClient;
@@ -71,6 +72,8 @@ export function MyAccountTab({ client, onToast, onSignOut }: MyAccountTabProps):
                     </code>
                 </div>
             </div>
+
+            <TwoFactorSection client={client} />
 
             <div className="settings-actions-row">
                 <button

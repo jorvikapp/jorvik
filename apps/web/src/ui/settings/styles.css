@@ -1216,3 +1216,10 @@
     font-size: 13px;
     overflow-wrap: anywhere;
 }
+
+/* Settings > My Account: two-factor sign-in, with an On/Off chip beside the heading. */
+.settings-two-factor-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
