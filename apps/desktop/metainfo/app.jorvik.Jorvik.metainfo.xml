@@ -40,15 +40,19 @@
 
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/jorvikapp/jorvik/d881fb8207250bcadb348ece28bfca6825420830/docs/ui.png</image>
+      <image>https://raw.githubusercontent.com/jorvikapp/jorvik/38433d55c35346677b1d07051eb0f44c23d33592/docs/ui.png</image>
       <caption>A server with its channels and a conversation</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/jorvikapp/jorvik/0f28882a2ad704e7906688d91ca5617c898326b6/docs/voice.png</image>
+      <image>https://raw.githubusercontent.com/jorvikapp/jorvik/38433d55c35346677b1d07051eb0f44c23d33592/docs/dms.png</image>
+      <caption>Direct messages showing what people are up to</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/jorvikapp/jorvik/38433d55c35346677b1d07051eb0f44c23d33592/docs/voice.png</image>
       <caption>An end-to-end encrypted voice call</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/jorvikapp/jorvik/d881fb8207250bcadb348ece28bfca6825420830/docs/emoji.png</image>
+      <image>https://raw.githubusercontent.com/jorvikapp/jorvik/38433d55c35346677b1d07051eb0f44c23d33592/docs/emoji.png</image>
       <caption>Custom emoji for a server</caption>
     </screenshot>
   </screenshots>
