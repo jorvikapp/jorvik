@@ -293,6 +293,7 @@ export async function linuxTracks(bus: DBusConnection): Promise<RawTrack[]> {
  */
 export const WINDOWS_SCRIPT = String.raw`
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::InputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
