@@ -1,7 +1,8 @@
-import { createClient, decodeBase64, HttpApiEvent, type MatrixClient, type TokenRefreshFunction } from "matrix-js-sdk/src/matrix";
+import { createClient, decodeBase64, HttpApiEvent, type MatrixClient } from "matrix-js-sdk/src/matrix";
 import { logger } from "matrix-js-sdk/src/logger";
 
 import { MatrixClientManager } from "../client/MatrixClientManager";
+import { type LegacyTokenRefreshFunction } from "../client/legacyTokenRefresh";
 import { createMatrixClient } from "../client/createMatrixClient";
 import { emitAccessTokenRotated } from "./tokenEvents";
 import { SSO_PENDING_STORAGE_KEY } from "../auth/sso";
@@ -261,7 +262,7 @@ export class SessionLifecycle {
     private createTokenRefreshFunction(
         credentials: MatrixCredentials,
         persistSession: boolean,
-    ): TokenRefreshFunction | undefined {
+    ): LegacyTokenRefreshFunction | undefined {
         if (!credentials.refreshToken) {
             return undefined;
         }

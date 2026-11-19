@@ -2,13 +2,14 @@ import {
     type ICreateClientOpts,
     type IStartClientOpts,
     type MatrixClient,
-    type TokenRefreshFunction,
     MemoryStore,
     PendingEventOrdering,
     type User,
     UserEvent,
 } from "matrix-js-sdk/src/matrix";
 import { logger } from "matrix-js-sdk/src/logger";
+
+import { LegacyTokenKeeper, type LegacyTokenRefreshFunction } from "./legacyTokenRefresh";
 
 import type { MatrixClientAssignOpts, MatrixCredentials } from "../types/credentials";
 import { createMatrixClient } from "./createMatrixClient";
@@ -98,7 +99,7 @@ export class MatrixClientManager {
         return this.matrixClient;
     }
 
-    public replaceUsingCreds(creds: MatrixCredentials, tokenRefreshFunction?: TokenRefreshFunction): void {
+    public replaceUsingCreds(creds: MatrixCredentials, tokenRefreshFunction?: LegacyTokenRefreshFunction): void {
         this.createClient(creds, tokenRefreshFunction);
     }
 
@@ -165,13 +166,25 @@ export class MatrixClientManager {
         forwardOwnUserEvents(client);
     }
 
-    private createClient(creds: MatrixCredentials, tokenRefreshFunction?: TokenRefreshFunction): void {
+    private createClient(creds: MatrixCredentials, tokenRefreshFunction?: LegacyTokenRefreshFunction): void {
+        // The SDK only refreshes OAuth2-native sessions itself; Synapse refresh tokens are kept alive by
+        // LegacyTokenKeeper through the fetch it hands the SDK (see legacyTokenRefresh.ts). The refresh token
+        // stays out of the SDK's options, which would otherwise expect an OAuth2 client config.
+        let fetchFn: typeof fetch | undefined;
+        if (tokenRefreshFunction && creds.refreshToken && creds.accessToken) {
+            const keeper = new LegacyTokenKeeper({
+                accessToken: creds.accessToken,
+                refreshToken: creds.refreshToken,
+                refresh: tokenRefreshFunction,
+                onRefreshed: (tokens) => this.matrixClient?.setAccessToken(tokens.accessToken),
+            });
+            fetchFn = keeper.fetch;
+        }
         const opts: ICreateClientOpts = {
             baseUrl: creds.homeserverUrl,
             idBaseUrl: creds.identityServerUrl,
             accessToken: creds.accessToken,
-            refreshToken: creds.refreshToken,
-            tokenRefreshFunction,
+            fetchFn,
             userId: creds.userId,
             deviceId: creds.deviceId,
             pickleKey: creds.pickleKey,
