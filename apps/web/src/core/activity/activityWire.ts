@@ -10,7 +10,16 @@
  *         "expires_at": 1792850600000
  *     }
  *
- * "game": null means the game stopped. While a game runs the sender repeats the message every few
+ * It can also say what music they're listening to, with the game or on its own:
+ *
+ *     "music": {
+ *         "player": { "id": "spotify", "name": "Spotify" },
+ *         "title": "Song", "artist": "Artist", "album": "Album",
+ *         "cover": <EncryptedFile>
+ *     }
+ *
+ * "game": null with no "music" means everything stopped. An app from before music came along reads
+ * "game": null as stopped and ignores "music", so it simply never shows the music. While a game runs the sender repeats the message every few
  * minutes with a later expires_at, and a receiver forgets it once expires_at passes, so an app that
  * crashed or lost its connection doesn't leave anyone "playing" for good.
  *
@@ -54,16 +63,33 @@ export interface ActivityGame {
     icon?: ActivityIconFile;
 }
 
+export interface ActivityMusic {
+    /** The app or site playing it: an id like a game's ("spotify", "youtube-music") and a name. */
+    player: { id: string; name: string };
+    title: string;
+    artist?: string;
+    album?: string;
+    /** The cover, encrypted like a game's icon. */
+    cover?: ActivityIconFile;
+}
+
 export interface ActivityContent {
     device_id: string;
     game: ActivityGame | null;
+    music?: ActivityMusic;
     started_at?: number;
     expires_at?: number;
 }
 
+/** What a device shares now: a game, music, or both. */
+export interface SharedActivity {
+    game: ActivityGame | null;
+    music: ActivityMusic | null;
+}
+
 export type IncomingActivity =
-    | { game: ActivityGame; startedAt: number; expiresAt: number }
-    | { game: null };
+    | { game: ActivityGame | null; music: ActivityMusic | null; startedAt: number; expiresAt: number }
+    | { game: null; music: null; stopped: true };
 
 export function isGameId(value: unknown): value is string {
     return typeof value === "string" && GAME_ID_PATTERN.test(value);
@@ -134,14 +160,57 @@ export function sameGame(left: ActivityGame | null | undefined, right: ActivityG
     if (!left || !right) {
         return !left && !right;
     }
+    return left.id === right.id && left.name === right.name && sameFile(left.icon, right.icon);
+}
+
+/** Music with a malformed cover still counts, without the cover. */
+export function cleanMusic(value: unknown): ActivityMusic | null {
+    if (!value || typeof value !== "object") {
+        return null;
+    }
+    const { player, title, artist, album, cover } = value as Record<string, unknown>;
+    const { id, name } = (player ?? {}) as { id?: unknown; name?: unknown };
+    const playerName = cleanActivityText(name);
+    const cleanTitle = cleanActivityText(title);
+    if (!isGameId(id) || !playerName || !cleanTitle) {
+        return null;
+    }
+    const music: ActivityMusic = { player: { id, name: playerName }, title: cleanTitle };
+    const cleanArtist = cleanActivityText(artist);
+    const cleanAlbum = cleanActivityText(album);
+    const cleanCover = cleanIcon(cover);
+    if (cleanArtist) music.artist = cleanArtist;
+    if (cleanAlbum) music.album = cleanAlbum;
+    if (cleanCover) music.cover = cleanCover;
+    return music;
+}
+
+function sameFile(left: ActivityIconFile | undefined, right: ActivityIconFile | undefined): boolean {
     return (
-        left.id === right.id &&
-        left.name === right.name &&
-        left.icon?.url === right.icon?.url &&
-        left.icon?.key.k === right.icon?.key.k &&
-        left.icon?.iv === right.icon?.iv &&
-        left.icon?.hashes.sha256 === right.icon?.hashes.sha256
+        left?.url === right?.url &&
+        left?.key.k === right?.key.k &&
+        left?.iv === right?.iv &&
+        left?.hashes.sha256 === right?.hashes.sha256
     );
+}
+
+/** The same track from the same player, with the same cover. */
+export function sameMusic(left: ActivityMusic | null | undefined, right: ActivityMusic | null | undefined): boolean {
+    if (!left || !right) {
+        return !left && !right;
+    }
+    return (
+        left.player.id === right.player.id &&
+        left.player.name === right.player.name &&
+        left.title === right.title &&
+        left.artist === right.artist &&
+        left.album === right.album &&
+        sameFile(left.cover, right.cover)
+    );
+}
+
+export function sameActivity(left: SharedActivity | null | undefined, right: SharedActivity | null | undefined): boolean {
+    return sameGame(left?.game, right?.game) && sameMusic(left?.music, right?.music);
 }
 
 /** A game id from a name, for a desktop app too old to send one: "World of Warcraft" -> "world-of-warcraft". */
@@ -155,13 +224,21 @@ export function gameIdFromName(name: string): string | null {
     return isGameId(id) ? id : null;
 }
 
-export function playingContent(deviceId: string, game: ActivityGame, startedAt: number, now: number): ActivityContent {
-    return {
+/** The message for what's shared now; started_at is when the game started. */
+export function playingContent(deviceId: string, activity: SharedActivity, startedAt: number, now: number): ActivityContent {
+    const { game, music } = activity;
+    const content: ActivityContent = {
         device_id: deviceId,
-        game: game.icon ? { id: game.id, name: game.name, icon: game.icon } : { id: game.id, name: game.name },
-        started_at: startedAt,
-        expires_at: now + ACTIVITY_LIFETIME_MS,
+        game: game ? (game.icon ? { id: game.id, name: game.name, icon: game.icon } : { id: game.id, name: game.name }) : null,
     };
+    if (music) {
+        content.music = cleanMusic(music) ?? undefined;
+    }
+    if (game) {
+        content.started_at = startedAt;
+    }
+    content.expires_at = now + ACTIVITY_LIFETIME_MS;
+    return content;
 }
 
 export function stoppedContent(deviceId: string): ActivityContent {
@@ -179,21 +256,31 @@ export function parseIncomingActivity(content: unknown, now: number): IncomingAc
     if (!content || typeof content !== "object") {
         return null;
     }
-    const { game, started_at: startedAt, expires_at: expiresAt } = content as {
+    const { game, music, started_at: startedAt, expires_at: expiresAt } = content as {
         game?: unknown;
+        music?: unknown;
         started_at?: unknown;
         expires_at?: unknown;
     };
-    if (game === null) {
-        return { game: null };
+    const parsedMusic = cleanMusic(music);
+    if (game === null && !parsedMusic) {
+        return { game: null, music: null, stopped: true };
     }
-    const parsedGame = cleanGame(game);
-    if (!parsedGame || typeof expiresAt !== "number" || !Number.isFinite(expiresAt) || expiresAt <= now) {
+    const parsedGame = game === null ? null : cleanGame(game);
+    if (game !== null && !parsedGame) {
+        return null;
+    }
+    if (typeof expiresAt !== "number" || !Number.isFinite(expiresAt) || expiresAt <= now) {
         return null;
     }
     const started =
         typeof startedAt === "number" && Number.isFinite(startedAt) && startedAt <= now && now - startedAt <= MAX_PLAYING_MS
             ? startedAt
             : now;
-    return { game: parsedGame, startedAt: started, expiresAt: Math.min(expiresAt, now + MAX_ACCEPTED_LIFETIME_MS) };
+    return {
+        game: parsedGame,
+        music: parsedMusic,
+        startedAt: started,
+        expiresAt: Math.min(expiresAt, now + MAX_ACCEPTED_LIFETIME_MS),
+    };
 }

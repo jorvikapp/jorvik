@@ -53,7 +53,7 @@ describe("ActivityLine", () => {
         expect(formatPlayingFor(5 * 60_000)).toBe("5m");
         expect(formatPlayingFor(83 * 60_000)).toBe("1h 23m");
         expect(formatPlayingFor(120 * 60_000)).toBe("2h");
-        expect(activityText({ game: WOW, startedAt: 0, expiresAt: 1, receivedAt: 0 }, 83 * 60_000)).toBe(
+        expect(activityText({ game: WOW, music: null, startedAt: 0, expiresAt: 1, receivedAt: 0 }, 83 * 60_000)).toBe(
             "Playing World of Warcraft · 1h 23m",
         );
     });
@@ -108,5 +108,28 @@ describe("ActivityLine", () => {
         expect(container.querySelector("img")).toBeNull();
         expect(container.textContent).toBe("\uD83C\uDFAEPlaying Dota 2");
         expect(loadGameIconUrl).not.toHaveBeenCalled();
+    });
+
+    describe("music", () => {
+        const SONG = { player: { id: "spotify", name: "Spotify" }, title: "Song", artist: "Artist" };
+
+        it("shows the song with its player, and the game above it when there's one", () => {
+            const now = Date.now();
+            receiveActivity("@bob:s", "PC", { game: WOW, music: SONG, startedAt: now, expiresAt: now + 600_000 }, now);
+            act(() => root.render(<ActivityLine client={client} userId="@bob:s" />));
+            const lines = [...container.querySelectorAll(".activity-line")].map((line) => line.textContent);
+            expect(lines).toEqual(["🎮Playing World of Warcraft", "🎵Listening to Song by Artist · Spotify"]);
+        });
+
+        it("puts a note by a name for music alone, and the cover once it has loaded", () => {
+            const now = Date.now();
+            vi.mocked(peekGameIconUrl).mockReturnValue("blob:cover");
+            receiveActivity("@bob:s", "PC", { game: null, music: { ...SONG, cover: ICON }, startedAt: now, expiresAt: now + 600_000 }, now);
+            act(() => root.render(<ActivityIcon client={client} userId="@bob:s" />));
+            const icon = container.querySelector(".activity-icon")!;
+            expect(icon.getAttribute("aria-label")).toBe("Listening to Song by Artist");
+            expect(icon.querySelector("img")?.getAttribute("src")).toBe("blob:cover");
+            vi.mocked(peekGameIconUrl).mockReset();
+        });
     });
 });

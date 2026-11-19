@@ -26,6 +26,7 @@ import {
 } from "./util";
 import { TrayBadge } from "./tray-badge";
 import { GameActivityWatcher, gameActivitySupported, steamAppIdOf, steamIconFiles } from "./game-activity";
+import { MusicActivityWatcher, musicActivitySupported } from "./music-activity";
 import { beginSso, cancelSso, waitForSso } from "./sso";
 
 const APP_TITLE = "Jorvik";
@@ -202,6 +203,33 @@ const gameActivity = new GameActivityWatcher((game) => {
         mainWindow.webContents.send("heorot:gameActivity", game);
     }
 });
+
+// The music the user is listening to, for their music activity; it only looks while they share it.
+const musicActivity = new MusicActivityWatcher((track) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("heorot:musicActivity", track);
+    }
+});
+
+/** Covers are shown small: next to a name and on a profile card. */
+const MUSIC_COVER_SIZE = 96;
+
+/** A track's cover, decoded and drawn again as a square-ish PNG of at most 96px; null when there's none. */
+function musicCoverPng(bytes: Buffer): Buffer | null {
+    const image = nativeImage.createFromBuffer(bytes);
+    if (image.isEmpty()) {
+        return null;
+    }
+    const { width, height } = image.getSize();
+    if (width < 16 || height < 16) {
+        return null;
+    }
+    // Video thumbnails are wide; covers are square, so a wide picture is cropped to its middle.
+    const side = Math.min(width, height);
+    const square = image.crop({ x: Math.floor((width - side) / 2), y: Math.floor((height - side) / 2), width: side, height: side });
+    const sized = side > MUSIC_COVER_SIZE ? square.resize({ width: MUSIC_COVER_SIZE, height: MUSIC_COVER_SIZE, quality: "best" }) : square;
+    return sized.toPNG();
+}
 
 /** Largest icon handed to the page: activity shows it at text size, so more is only bytes. */
 const GAME_ICON_SIZE = 64;
@@ -682,6 +710,25 @@ function registerIpc(): void {
 
     ipcMain.handle("heorot:gameActivitySupported", () => gameActivitySupported());
 
+    ipcMain.handle("heorot:setMusicActivityEnabled", (_event, enabled: unknown) => {
+        musicActivity.setEnabled(enabled === true && musicActivitySupported());
+        return musicActivity.track;
+    });
+    ipcMain.handle("heorot:musicActivitySupported", () => musicActivitySupported());
+
+    // Only the track playing now.
+    ipcMain.handle("heorot:getMusicCover", async (_event, key: unknown) => {
+        if (typeof key !== "string") {
+            return null;
+        }
+        try {
+            const bytes = await musicActivity.cover(key);
+            return bytes ? musicCoverPng(bytes) : null;
+        } catch {
+            return null;
+        }
+    });
+
     // Only the game running now, so the page can't go through the user's Steam library.
     ipcMain.handle("heorot:getGameIcon", async (_event, gameId: unknown) => {
         if (typeof gameId !== "string" || gameActivity.game?.id !== gameId) {
@@ -804,4 +851,6 @@ app.on("before-quit", () => {
     trayBadge?.dispose();
     trayBadge = null;
     cancelSso();
+    // Ends the Windows media helper with the app.
+    musicActivity.setEnabled(false);
 });

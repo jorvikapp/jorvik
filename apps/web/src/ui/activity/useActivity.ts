@@ -22,11 +22,13 @@ import {
     MAX_ACTIVITY_RECIPIENTS,
     computeActivityRecipients,
     isSpaceIncluded,
+    sharesGames,
+    sharesMusic,
     type ActivityPrivacySettings,
     type ActivityRecipients,
     type ActivitySpace,
 } from "../../core/activity/activityPrivacy";
-import { ActivitySender, matrixActivityTransport, type PlayingGame } from "../../core/activity/activitySender";
+import { ActivitySender, matrixActivityTransport, type SharedNow } from "../../core/activity/activitySender";
 import {
     getUserActivity,
     setOwnActivity,
@@ -34,8 +36,9 @@ import {
     subscribeActivity,
     type UserActivity,
 } from "../../core/activity/activityStore";
-import type { ActivityGame, ActivityIconFile } from "../../core/activity/activityWire";
+import type { ActivityGame, ActivityIconFile, ActivityMusic } from "../../core/activity/activityWire";
 import { getDirectRoomIds } from "../../core/dm/directChats";
+import type { DetectedMusic } from "./useMusicDetection";
 
 /** Membership changes come in bursts (and loading members fires them too), so recipients are worked out again after a pause. */
 const RECIPIENTS_SETTLE_MS = 5_000;
@@ -107,6 +110,46 @@ function useSharedGameIcon(client: MatrixClient | null, gameId: string | null): 
     return known;
 }
 
+/** Covers are remembered by album (or by track, without one), so a whole album uploads one cover. */
+function coverId(music: ActivityMusic): string {
+    return `music:${[music.player.id, music.artist ?? "", music.album ?? music.title].join("\u0000")}`;
+}
+
+/**
+ * The cover to send with the track the user shares: the one uploaded for its album before, or the
+ * cover the desktop app reads from the player, encrypted and uploaded now. Null meanwhile and when
+ * there's none.
+ */
+function useSharedMusicCover(client: MatrixClient | null, detected: DetectedMusic | null): ActivityIconFile | null {
+    const userId = client?.getUserId() ?? null;
+    const id = detected ? coverId(detected.music) : null;
+    const key = detected?.key ?? null;
+    const remembered = useMemo(() => (userId && id ? rememberedGameIcon(userId, id) : null), [id, userId]);
+    const [uploaded, setUploaded] = useState<{ id: string; icon: ActivityIconFile } | null>(null);
+    const known = remembered ?? (uploaded?.id === id ? uploaded.icon : null);
+    useEffect(() => {
+        const getMusicCover = typeof window === "undefined" ? undefined : window.heorotDesktop?.getMusicCover;
+        if (!client || !userId || !id || !key || known || !getMusicCover) {
+            return;
+        }
+        let active = true;
+        void getMusicCover(key)
+            .then((png) => (png ? uploadGameIcon(client, userId, id, png) : null))
+            .then(
+                (icon) => {
+                    if (active && icon) {
+                        setUploaded({ id, icon });
+                    }
+                },
+                (error: unknown) => logger.warn("[Jorvik activity] could not upload the cover", error),
+            );
+        return () => {
+            active = false;
+        };
+    }, [client, id, key, known, userId]);
+    return known;
+}
+
 /** What someone is playing, as far as they share it with us; for the user themselves, what they share. */
 export function useUserActivity(userId: string | null | undefined): UserActivity | null {
     return useSyncExternalStore(subscribeActivity, () => getUserActivity(userId));
@@ -169,14 +212,16 @@ export async function gatherActivityRecipients(
 }
 
 /**
- * Shares the running game with the people the settings pick, while sharing is on, the game isn't
- * hidden and the user isn't invisible (sharing a game would give away that they're online). Recipients
- * are worked out again when settings or memberships change; anyone who drops out is told it stopped.
+ * Shares the running game and the music playing with the people the settings pick, while sharing each
+ * is on, the game isn't hidden and the user isn't invisible (sharing would give away that they're
+ * online). Recipients are worked out again when settings or memberships change; anyone who drops out
+ * is told it stopped.
  */
 export function useActivitySharing(
     client: MatrixClient | null,
     settings: ActivityPrivacySettings,
     detected: ActivityGame | null,
+    detectedMusic: DetectedMusic | null,
     invisible: boolean,
 ): void {
     // When the running game started: kept while the same game runs.
@@ -186,13 +231,16 @@ export function useActivitySharing(
     }
     const startedAt = start?.at ?? 0;
     const shareable =
-        settings.enabled && !invisible && detected && !settings.hidden_games.includes(detected.id) ? detected : null;
-    // Looked for, and uploaded, only for a game that's shared.
+        sharesGames(settings) && !invisible && detected && !settings.hidden_games.includes(detected.id) ? detected : null;
+    const shareableMusic = sharesMusic(settings) && !invisible ? detectedMusic : null;
+    // Looked for, and uploaded, only for what's shared.
     const icon = useSharedGameIcon(client, shareable?.id ?? null);
-    const shared = useMemo<PlayingGame | null>(
-        () => (shareable ? { ...shareable, ...(icon ? { icon } : {}), startedAt } : null),
-        [icon, shareable, startedAt],
-    );
+    const cover = useSharedMusicCover(client, shareableMusic);
+    const shared = useMemo<SharedNow | null>(() => {
+        const game = shareable ? { ...shareable, ...(icon ? { icon } : {}), startedAt } : null;
+        const music = shareableMusic ? { ...shareableMusic.music, ...(cover ? { cover } : {}) } : null;
+        return game || music ? { game, music } : null;
+    }, [cover, icon, shareable, shareableMusic, startedAt]);
     const senderRef = useRef<ActivitySender | null>(null);
     const [membershipTick, setMembershipTick] = useState(0);
 
@@ -217,12 +265,14 @@ export function useActivitySharing(
         if (!userId) {
             return;
         }
+        const game = shared?.game;
         setOwnActivity(
             userId,
             shared
                 ? {
-                      game: { id: shared.id, name: shared.name, ...(shared.icon ? { icon: shared.icon } : {}) },
-                      startedAt: shared.startedAt,
+                      game: game ? { id: game.id, name: game.name, ...(game.icon ? { icon: game.icon } : {}) } : null,
+                      music: shared.music,
+                      startedAt: game?.startedAt ?? 0,
                   }
                 : null,
         );

@@ -2,13 +2,13 @@ import React, { useCallback, useRef, useState } from "react";
 import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import type { UserActivity } from "../../../core/activity/activityStore";
-import type { ActivityGame } from "../../../core/activity/activityWire";
+import type { ActivityGame, ActivityMusic } from "../../../core/activity/activityWire";
 import type { PresenceChoice } from "../../../core/presence/presenceControl";
 import { NAMEPLATE_FIELD } from "../../../core/users/profileImages";
 import { useUserActivity } from "../../activity/useActivity";
 import type { AudioDeviceKind } from "../../voice/audioDevices";
 import { toggleDeafened, toggleMicMuted, useLocalAvState } from "../../voice/localAvState";
-import { GameIcon } from "../activity/ActivityLine";
+import { GameIcon, MusicCover, musicTitle } from "../activity/ActivityLine";
 import { Avatar } from "../Avatar";
 import { ProfileBanner, useProfileImageSrc } from "../profile/ProfileBanner";
 import { GearIcon, MicIcon, SoundIcon } from "../voice/AvIcons";
@@ -20,6 +20,7 @@ import { DeviceMenu } from "./DeviceMenu";
  */
 export type UserPanelContext =
     | { kind: "game"; game: ActivityGame; text: string }
+    | { kind: "music"; music: ActivityMusic; text: string }
     | { kind: "status"; text: string }
     | { kind: "handle"; text: string };
 
@@ -33,8 +34,11 @@ export function userPanelContext(
     statusMessage: string | null | undefined,
     handle: string,
 ): UserPanelContext {
-    if (activity) {
+    if (activity?.game) {
         return { kind: "game", game: activity.game, text: `Playing ${activity.game.name}` };
+    }
+    if (activity?.music) {
+        return { kind: "music", music: activity.music, text: musicTitle(activity.music) };
     }
     const status = statusMessage?.trim();
     if (status) {
@@ -180,6 +184,14 @@ export function UserPanel({
                                 </span>
                                 <span className="pane-user-context-verb">Playing </span>
                                 <span className="pane-user-context-text">{context.game.name}</span>
+                            </>
+                        ) : context.kind === "music" ? (
+                            <>
+                                <span className="pane-user-context-icon" aria-hidden="true">
+                                    <MusicCover client={client} music={context.music} />
+                                </span>
+                                <span className="pane-user-context-verb">Listening to </span>
+                                <span className="pane-user-context-text">{context.music.title}</span>
                             </>
                         ) : (
                             <span className="pane-user-context-text">{context.text}</span>

@@ -6,22 +6,26 @@ import {
     ACTIVITY_EVENT,
     contentDeviceId,
     parseIncomingActivity,
-    sameGame,
+    sameActivity,
     type ActivityGame,
+    type ActivityMusic,
     type IncomingActivity,
 } from "./activityWire";
 
 /**
- * What other people are playing, from their com.heorot.activity messages (activityWire.ts). Held in
- * memory only, never written to disk. Each of a person's devices has its own entry; the one received
- * most recently shows, until it expires or that device says the game stopped.
+ * What other people are playing and listening to, from their com.heorot.activity messages
+ * (activityWire.ts). Held in memory only, never written to disk. Each of a person's devices has its own
+ * entry; the game and the music each come from the device that sent one most recently, until it
+ * expires or that device says it stopped.
  *
- * The user's own game is here too while they share it (setOwnActivity), so their own profile and
+ * The user's own activity is here too while they share it (setOwnActivity), so their own profile and
  * member row show what others see.
  */
 
+/** At least one of game and music is set. startedAt is when the game started. */
 export interface UserActivity {
-    game: ActivityGame;
+    game: ActivityGame | null;
+    music: ActivityMusic | null;
     startedAt: number;
     expiresAt: number;
     receivedAt: number;
@@ -37,8 +41,11 @@ const byUser = new Map<string, Map<string, UserActivity>>();
 const acceptedTimes = new Map<string, number[]>();
 let own: { userId: string; activity: UserActivity } | null = null;
 const listeners = new Set<() => void>();
+/** What getUserActivity worked out per person, kept until something changes so React sees the same object. */
+const merged = new Map<string, UserActivity | null>();
 
 function notify(): void {
+    merged.clear();
     for (const listener of [...listeners]) {
         listener();
     }
@@ -48,7 +55,7 @@ function notify(): void {
 export function receiveActivity(userId: string, deviceId: string, incoming: IncomingActivity, now: number): boolean {
     const devices = byUser.get(userId);
     const current = devices?.get(deviceId);
-    if (incoming.game === null) {
+    if ("stopped" in incoming || (!incoming.game && !incoming.music)) {
         if (!devices || !current) {
             return false;
         }
@@ -64,7 +71,7 @@ export function receiveActivity(userId: string, deviceId: string, incoming: Inco
     const recent = (acceptedTimes.get(key) ?? []).filter((time) => now - time < 60_000);
     const last = recent[recent.length - 1];
     // The same game again with its icon, once the sender has uploaded it, isn't a repeat.
-    const repeat = sameGame(current?.game, incoming.game) && last !== undefined && now - last < ACTIVITY_RATE_LIMIT_MS;
+    const repeat = current !== undefined && sameActivity(current, incoming) && last !== undefined && now - last < ACTIVITY_RATE_LIMIT_MS;
     if (repeat || recent.length >= MAX_ACCEPTED_PER_MINUTE) {
         return false;
     }
@@ -73,7 +80,8 @@ export function receiveActivity(userId: string, deviceId: string, incoming: Inco
 
     const next = devices ?? new Map<string, UserActivity>();
     next.set(deviceId, {
-        game: incoming.game,
+        game: incoming.game ?? null,
+        music: incoming.music ?? null,
         startedAt: incoming.startedAt,
         expiresAt: incoming.expiresAt,
         receivedAt: now,
@@ -90,31 +98,56 @@ export function getUserActivity(userId: string | null | undefined): UserActivity
     if (own?.userId === userId) {
         return own.activity;
     }
-    let latest: UserActivity | null = null;
+    const cached = merged.get(userId);
+    if (cached !== undefined) {
+        return cached;
+    }
+    let withGame: UserActivity | null = null;
+    let withMusic: UserActivity | null = null;
     for (const activity of byUser.get(userId)?.values() ?? []) {
-        if (!latest || activity.receivedAt > latest.receivedAt) {
-            latest = activity;
+        if (activity.game && (!withGame || activity.receivedAt > withGame.receivedAt)) {
+            withGame = activity;
+        }
+        if (activity.music && (!withMusic || activity.receivedAt > withMusic.receivedAt)) {
+            withMusic = activity;
         }
     }
-    return latest;
+    let result: UserActivity | null;
+    if (!withGame || !withMusic || withGame === withMusic) {
+        result = withGame ?? withMusic;
+    } else {
+        result = {
+            ...withGame,
+            music: withMusic.music,
+            expiresAt: Math.min(withGame.expiresAt, withMusic.expiresAt),
+            receivedAt: Math.max(withGame.receivedAt, withMusic.receivedAt),
+        };
+    }
+    merged.set(userId, result);
+    return result;
 }
 
-/** The user's own game while they share it; null when they don't. */
-export function setOwnActivity(userId: string, activity: { game: ActivityGame; startedAt: number } | null): void {
-    if (!activity) {
+/** The user's own activity while they share it; null when they share nothing. */
+export function setOwnActivity(
+    userId: string,
+    activity: { game: ActivityGame | null; music?: ActivityMusic | null; startedAt: number } | null,
+): void {
+    if (!activity || (!activity.game && !activity.music)) {
         if (own) {
             own = null;
             notify();
         }
         return;
     }
-    if (own?.userId === userId && sameGame(own.activity.game, activity.game) && own.activity.startedAt === activity.startedAt) {
+    const music = activity.music ?? null;
+    if (own?.userId === userId && sameActivity(own.activity, { game: activity.game, music }) && own.activity.startedAt === activity.startedAt) {
         return;
     }
     own = {
         userId,
         activity: {
             game: activity.game,
+            music,
             startedAt: activity.startedAt,
             expiresAt: Number.POSITIVE_INFINITY,
             receivedAt: activity.startedAt,

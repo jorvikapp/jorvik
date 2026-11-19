@@ -1,11 +1,13 @@
 import { cleanActivityText, isGameId } from "./activityWire";
 
 /**
- * Who sees the game the user is playing. Kept in account data, so all of their devices share by the
- * same rules:
+ * Who sees the game the user is playing and the music they listen to. Kept in account data, so all of
+ * their devices share by the same rules:
  *
  *     "com.heorot.activity_privacy": {
  *         "enabled": false,
+ *         "share_games": true,
+ *         "share_music": false,
  *         "hidden_games": ["wow"],
  *         "space_scope": "small",
  *         "small_space_limit": 200,
@@ -15,7 +17,8 @@ import { cleanActivityText, isGameId } from "./activityWire";
  *
  * space_scope ("all", "small" or "none") is the default for each space the user is in; "small" means
  * spaces with at most small_space_limit members. A space's entry in space_overrides beats it. Friends
- * are the people the user has DMs with. hidden_games are never shared. Off until the user turns it on.
+ * are the people the user has DMs with. hidden_games are never shared. Off until the user turns it on;
+ * then games are shared and music only once they turn that on too.
  *
  * The activity itself goes out as encrypted to-device messages to exactly these people
  * (activitySender.ts); presence would show it to everyone in every shared room, and room state would
@@ -38,6 +41,8 @@ const ROOM_ID_PATTERN = /^![^:\s]+:\S+$/;
 
 export interface ActivityPrivacySettings {
     enabled: boolean;
+    share_games: boolean;
+    share_music: boolean;
     hidden_games: string[];
     /** The names of hidden games, for the settings list; the rules only use the ids. */
     hidden_game_names: Record<string, string>;
@@ -50,6 +55,8 @@ export interface ActivityPrivacySettings {
 export function defaultActivityPrivacy(): ActivityPrivacySettings {
     return {
         enabled: false,
+        share_games: true,
+        share_music: false,
         hidden_games: [],
         hidden_game_names: {},
         space_scope: "small",
@@ -96,6 +103,8 @@ export function parseActivityPrivacy(raw: unknown): ActivityPrivacySettings {
     const limit = source.small_space_limit;
     return {
         enabled: source.enabled === true,
+        share_games: source.share_games !== false,
+        share_music: source.share_music === true,
         hidden_games: hiddenGames,
         hidden_game_names: hiddenGameNames,
         space_scope: SPACE_SCOPES.includes(source.space_scope as SpaceScope)
@@ -108,6 +117,35 @@ export function parseActivityPrivacy(raw: unknown): ActivityPrivacySettings {
         space_overrides: overrides,
         share_with_friends: source.share_with_friends !== false,
     };
+}
+
+export function sharesGames(settings: ActivityPrivacySettings): boolean {
+    return settings.enabled && settings.share_games;
+}
+
+export function sharesMusic(settings: ActivityPrivacySettings): boolean {
+    return settings.enabled && settings.share_music;
+}
+
+/** Turns sharing games or music on or off; sharing ends altogether once neither is on. */
+export function withSharing(
+    settings: ActivityPrivacySettings,
+    kind: "games" | "music",
+    on: boolean,
+): ActivityPrivacySettings {
+    const next = { ...settings, [kind === "games" ? "share_games" : "share_music"]: on };
+    if (on) {
+        // Turning one on from everything off shares just that one.
+        if (!settings.enabled) {
+            next.share_games = kind === "games";
+            next.share_music = kind === "music";
+        }
+        next.enabled = true;
+    } else if (!next.share_games && !next.share_music) {
+        next.enabled = false;
+        next.share_games = true;
+    }
+    return next;
 }
 
 /** Whether a space's members are told: its own toggle if it has one, otherwise the default scope. */

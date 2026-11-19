@@ -8,6 +8,7 @@ import { defaultActivityPrivacy, type ActivityPrivacySettings } from "../../../.
 import { clearActivity, getUserActivity } from "../../../../src/core/activity/activityStore";
 import type { ActivityGame, ActivityIconFile } from "../../../../src/core/activity/activityWire";
 import { useActivitySharing } from "../../../../src/ui/activity/useActivity";
+import type { DetectedMusic } from "../../../../src/ui/activity/useMusicDetection";
 
 vi.mock("../../../../src/core/activity/activityIcons", () => ({
     clearGameIconUrls: vi.fn(),
@@ -48,16 +49,31 @@ function fakeClient() {
 
 const client = fakeClient();
 
-function Probe(props: { settings: ActivityPrivacySettings; game: ActivityGame | null; invisible: boolean }): null {
-    useActivitySharing(client as never, props.settings, props.game, props.invisible);
+function Probe(props: {
+    settings: ActivityPrivacySettings;
+    game: ActivityGame | null;
+    music: DetectedMusic | null;
+    invisible: boolean;
+}): null {
+    useActivitySharing(client as never, props.settings, props.game, props.music, props.invisible);
     return null;
 }
 
-async function render(settings: ActivityPrivacySettings, game: ActivityGame | null, invisible = false): Promise<void> {
+async function render(
+    settings: ActivityPrivacySettings,
+    game: ActivityGame | null,
+    invisible = false,
+    music: DetectedMusic | null = null,
+): Promise<void> {
     await act(async () => {
-        root.render(<Probe settings={settings} game={game} invisible={invisible} />);
+        root.render(<Probe settings={settings} game={game} music={music} invisible={invisible} />);
     });
 }
+
+const SONG: DetectedMusic = {
+    key: "spotify\u0000Song",
+    music: { player: { id: "spotify", name: "Spotify" }, title: "Song", artist: "Artist", album: "Album" },
+};
 
 beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -113,7 +129,7 @@ describe("useActivitySharing", () => {
         window.heorotDesktop = { getGameIcon };
         vi.mocked(rememberedGameIcon).mockReturnValue(ICON);
         await render(on, STARDEW);
-        expect(getUserActivity(ME)?.game.icon).toEqual(ICON);
+        expect(getUserActivity(ME)?.game?.icon).toEqual(ICON);
         expect(getGameIcon).not.toHaveBeenCalled();
 
         vi.mocked(rememberedGameIcon).mockReturnValue(null);
@@ -129,5 +145,39 @@ describe("useActivitySharing", () => {
         const startedAt = getUserActivity(ME)?.startedAt;
         await render({ ...on, share_with_friends: false }, WOW);
         expect(getUserActivity(ME)?.startedAt).toBe(startedAt);
+    });
+
+    describe("music", () => {
+        const musicOn = { ...on, share_music: true };
+
+        it("is shared only once sharing music is turned on, with the game or alone", async () => {
+            await render(on, null, false, SONG);
+            expect(getUserActivity(ME)).toBeNull();
+
+            await render(musicOn, null, false, SONG);
+            expect(getUserActivity(ME)).toMatchObject({ game: null, music: SONG.music });
+
+            await render(musicOn, WOW, false, SONG);
+            expect(getUserActivity(ME)).toMatchObject({ game: WOW, music: SONG.music });
+
+            // Music only: the game isn't shared.
+            await render({ ...musicOn, share_games: false }, WOW, false, SONG);
+            expect(getUserActivity(ME)).toMatchObject({ game: null, music: SONG.music });
+
+            await render(musicOn, WOW, true, SONG);
+            expect(getUserActivity(ME)).toBeNull();
+        });
+
+        it("sends the cover the desktop app reads, uploaded once per album", async () => {
+            const getMusicCover = vi.fn(async () => PNG);
+            window.heorotDesktop = { getMusicCover };
+            vi.mocked(rememberedGameIcon).mockReturnValue(null);
+            vi.mocked(uploadGameIcon).mockResolvedValue(ICON);
+
+            await render(musicOn, null, false, SONG);
+            expect(getMusicCover).toHaveBeenCalledWith(SONG.key);
+            expect(uploadGameIcon).toHaveBeenCalledWith(client, ME, "music:spotify\u0000Artist\u0000Album", PNG);
+            expect(getUserActivity(ME)?.music).toEqual({ ...SONG.music, cover: ICON });
+        });
     });
 });

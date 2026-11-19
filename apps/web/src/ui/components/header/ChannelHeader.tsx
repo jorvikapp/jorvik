@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { EventType, type MatrixClient, type Room } from "matrix-js-sdk/src/matrix";
 
 import { useMinuteClock, useUserActivity } from "../../activity/useActivity";
-import { activityText, GameIcon } from "../activity/ActivityLine";
+import { ActivityGlyph, activityText } from "../activity/ActivityLine";
 import type { RightSidebarMode } from "../rightPanel/types";
 
 interface ChannelHeaderProps {
@@ -220,7 +220,7 @@ export function ChannelHeader({
                 <p className="channel-header-topic" title={secondaryText}>
                     {activity ? (
                         <span className="channel-header-activity-icon" aria-hidden="true">
-                            <GameIcon client={client} game={activity.game} />
+                            <ActivityGlyph client={client} activity={activity} />
                         </span>
                     ) : null}
                     {secondaryText}

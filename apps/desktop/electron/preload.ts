@@ -24,6 +24,36 @@ export interface HeorotDesktopGame {
     name: string;
 }
 
+/** A track playing in a music app or on a music site. */
+export interface HeorotDesktopTrack {
+    /** Changes with the track; the cover is asked for by it. */
+    key: string;
+    player: { id: string; name: string };
+    title: string;
+    artist: string | null;
+    album: string | null;
+}
+
+function toTrack(value: unknown): HeorotDesktopTrack | null {
+    const track = value as { key?: unknown; player?: { id?: unknown; name?: unknown } | null; title?: unknown; artist?: unknown; album?: unknown } | null;
+    if (
+        !track ||
+        typeof track.key !== "string" ||
+        typeof track.title !== "string" ||
+        typeof track.player?.id !== "string" ||
+        typeof track.player.name !== "string"
+    ) {
+        return null;
+    }
+    return {
+        key: track.key,
+        player: { id: track.player.id, name: track.player.name },
+        title: track.title,
+        artist: typeof track.artist === "string" ? track.artist : null,
+        album: typeof track.album === "string" ? track.album : null,
+    };
+}
+
 /** How single sign-on in the browser ended. */
 export type HeorotDesktopSsoResult = { loginToken: string } | { cancelled: true } | { timedOut: true };
 
@@ -53,6 +83,12 @@ export interface HeorotDesktopBridge {
     onGameActivity: (listener: (game: HeorotDesktopGame | null) => void) => () => void;
     /** The icon Steam keeps of the running game, as a PNG; null for other games or when there's none. */
     getGameIcon: (gameId: string) => Promise<Uint8Array | null>;
+    /** Starts or stops looking for music playing; resolves to the track playing now, if any. */
+    setMusicActivityEnabled: (enabled: boolean) => Promise<HeorotDesktopTrack | null>;
+    musicActivitySupported: () => Promise<boolean>;
+    onMusicActivity: (listener: (track: HeorotDesktopTrack | null) => void) => () => void;
+    /** The cover of the track playing now, as a PNG; null for any other track or when there's none. */
+    getMusicCover: (key: string) => Promise<Uint8Array | null>;
     onNotificationClicked: (listener: (target: HeorotDesktopNotificationTarget) => void) => () => void;
     /** Single sign-on: a one-time local address for the homeserver to send the browser back to. */
     ssoBegin: () => Promise<string>;
@@ -125,6 +161,23 @@ const bridge: HeorotDesktopBridge = {
     },
     getGameIcon: async (gameId: string): Promise<Uint8Array | null> => {
         const data: unknown = await ipcRenderer.invoke("heorot:getGameIcon", gameId);
+        return data instanceof Uint8Array ? new Uint8Array(data) : null;
+    },
+    setMusicActivityEnabled: async (enabled: boolean): Promise<HeorotDesktopTrack | null> => {
+        return toTrack(await ipcRenderer.invoke("heorot:setMusicActivityEnabled", enabled));
+    },
+    musicActivitySupported: async (): Promise<boolean> => {
+        return (await ipcRenderer.invoke("heorot:musicActivitySupported")) === true;
+    },
+    onMusicActivity: (listener: (track: HeorotDesktopTrack | null) => void): (() => void) => {
+        const handler = (_event: IpcRendererEvent, track: unknown): void => {
+            listener(toTrack(track));
+        };
+        ipcRenderer.on("heorot:musicActivity", handler);
+        return () => ipcRenderer.removeListener("heorot:musicActivity", handler);
+    },
+    getMusicCover: async (key: string): Promise<Uint8Array | null> => {
+        const data: unknown = await ipcRenderer.invoke("heorot:getMusicCover", key);
         return data instanceof Uint8Array ? new Uint8Array(data) : null;
     },
     onNotificationClicked: (listener: (target: HeorotDesktopNotificationTarget) => void): (() => void) => {

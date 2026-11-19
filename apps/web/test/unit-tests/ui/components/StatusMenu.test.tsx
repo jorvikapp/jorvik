@@ -54,7 +54,7 @@ describe("StatusMenu", () => {
         expect(descriptions(false).Online).toBe("Visible and active");
     });
 
-    it("has a quick switch for sharing game activity, and the way to Activity Privacy", () => {
+    it("has quick switches for sharing game activity and music, and the way to Activity Privacy", () => {
         const onToggle = vi.fn();
         const onOpenSettings = vi.fn();
         const onClose = vi.fn();
@@ -65,7 +65,7 @@ describe("StatusMenu", () => {
                     statusMessage=""
                     error={null}
                     autoIdleOn
-                    activitySharing={{ enabled: false, onToggle, onOpenSettings }}
+                    activitySharing={{ games: false, music: true, onToggle, onOpenSettings }}
                     onChoose={() => undefined}
                     onStatusMessage={() => undefined}
                     onClose={onClose}
@@ -76,7 +76,11 @@ describe("StatusMenu", () => {
             candidate.textContent?.includes("Share game activity"),
         );
         act(() => label!.querySelector("input")!.click());
-        expect(onToggle).toHaveBeenCalledWith(true);
+        expect(onToggle).toHaveBeenCalledWith("games", true);
+        const musicLabel = [...container.querySelectorAll("label")].find((candidate) => candidate.textContent?.includes("Share music"));
+        expect(musicLabel!.querySelector("input")!.checked).toBe(true);
+        act(() => musicLabel!.querySelector("input")!.click());
+        expect(onToggle).toHaveBeenCalledWith("music", false);
 
         act(() => [...container.querySelectorAll("button")].find((button) => button.textContent === "Activity Privacy")!.click());
         expect(onClose).toHaveBeenCalled();

@@ -28,7 +28,8 @@
     "category": "public.app-category.social-networking",
     "extendInfo": {
       "NSCameraUsageDescription": "Jorvik uses your camera for video in calls and voice channels.",
-      "NSMicrophoneUsageDescription": "Jorvik uses your microphone for calls and voice channels."
+      "NSMicrophoneUsageDescription": "Jorvik uses your microphone for calls and voice channels.",
+      "NSAppleEventsUsageDescription": "When you share your music, Jorvik asks Spotify or Music what is playing."
     },
     "hardenedRuntime": false,
     "gatekeeperAssess": false,

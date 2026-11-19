@@ -95,9 +95,21 @@ describe("ActivityPrivacyTab", () => {
         expect(lastSaved(client)).toMatchObject({ enabled: true, space_scope: "small", share_with_friends: true });
     });
 
-    it("says where games are recognized", async () => {
+    it("says where games and music are recognized", async () => {
         await render(fakeClient());
-        expect(container.textContent).toContain("Available in the desktop app");
+        expect(container.textContent).toContain("The desktop app shares the game you're playing");
+        expect(container.textContent).toContain("The desktop app shares what you're listening to");
+    });
+
+    it("turns sharing music on and off by itself", async () => {
+        const client = fakeClient({ enabled: true });
+        await render(client);
+        const musicSwitch = (): HTMLInputElement =>
+            [...container.querySelectorAll("label")].find((label) => label.textContent?.includes("The music I'm listening to"))!
+                .querySelector("input")!;
+        expect(musicSwitch().checked).toBe(false);
+        await act(async () => musicSwitch().click());
+        expect(lastSaved(client)).toMatchObject({ enabled: true, share_games: true, share_music: true });
     });
 
     it("lists the spaces with small ones on by default, and says who can see it", async () => {

@@ -5,6 +5,7 @@ import {
     activityAudience,
     describeActivityAudience,
     isSpaceIncluded,
+    withSharing,
     type ActivityPrivacySettings,
     type SpaceScope,
 } from "../../../../core/activity/activityPrivacy";
@@ -25,24 +26,33 @@ interface ActivityPrivacyTabProps {
 
 type DetectionSupport = "desktop" | "sandboxed" | "browser";
 
-const DETECTION_NOTES: Record<DetectionSupport, string> = {
+const GAME_NOTES: Record<DetectionSupport, string> = {
     desktop:
         "Steam games are recognized, and popular games from other launchers. Only the game's name goes out (with " +
-        "its icon, for Steam games), end-to-end encrypted, to the people you pick below.",
+        "its icon, for Steam games).",
     sandboxed:
         "The Flatpak and Snap versions can't see other programs, so they can't tell which game you're playing. " +
-        "What you pick here still applies to the desktop app on your other computers.",
-    browser:
-        "Available in the desktop app: only it can see which game you're playing. What you pick here applies " +
-        "there too.",
+        "This still applies to the desktop app on your other computers.",
+    browser: "The desktop app shares the game you're playing; a browser can't see other programs.",
 };
 
-function useDetectionSupport(): DetectionSupport {
-    const [support, setSupport] = useState<DetectionSupport>(() =>
-        window.heorotDesktop?.setGameActivityEnabled ? "desktop" : "browser",
-    );
+const MUSIC_NOTES: Record<DetectionSupport, string> = {
+    desktop:
+        "Music apps such as Spotify, Apple Music and TIDAL, and music sites such as YouTube Music in your browser. " +
+        "Only the song, artist, album and cover go out, never videos.",
+    sandboxed:
+        "The Snap version can't see music players. This still applies to the desktop app on your other computers.",
+    browser: "The desktop app shares what you're listening to; a browser can't see other apps or tabs.",
+};
+
+/** Whether this app can see games ("games") or music ("music") playing on this computer. */
+function useDetectionSupport(kind: "games" | "music"): DetectionSupport {
+    const [support, setSupport] = useState<DetectionSupport>(() => {
+        const bridge = window.heorotDesktop;
+        return (kind === "games" ? bridge?.setGameActivityEnabled : bridge?.setMusicActivityEnabled) ? "desktop" : "browser";
+    });
     useEffect(() => {
-        const check = window.heorotDesktop?.gameActivitySupported;
+        const check = kind === "games" ? window.heorotDesktop?.gameActivitySupported : window.heorotDesktop?.musicActivitySupported;
         if (!check) {
             return;
         }
@@ -50,7 +60,7 @@ function useDetectionSupport(): DetectionSupport {
             (supported) => setSupport(supported ? "desktop" : "sandboxed"),
             () => undefined,
         );
-    }, []);
+    }, [kind]);
     return support;
 }
 
@@ -72,7 +82,8 @@ export function ActivityPrivacyTab({
     onToast,
 }: ActivityPrivacyTabProps): React.ReactElement {
     const { settings, save } = useActivityPrivacy(client);
-    const support = useDetectionSupport();
+    const gameSupport = useDetectionSupport("games");
+    const musicSupport = useDetectionSupport("music");
     const spaces = useJoinedSpaces(client);
     const [query, setQuery] = useState("");
 
@@ -109,8 +120,9 @@ export function ActivityPrivacyTab({
         <div className="settings-tab activity-privacy">
             <h2 className="settings-tab-title">Activity Privacy</h2>
             <p className="settings-tab-description">
-                Choose who can see the game you're playing. It goes end-to-end encrypted to just those people and
-                is never kept in a chat's history. Your status message is separate and stays as you set it.
+                Choose who can see the game you're playing and the music you're listening to. It goes end-to-end
+                encrypted to just those people and is never kept in a chat's history. Your status message is
+                separate and stays as you set it.
             </p>
 
             <div className="settings-section-card">
@@ -123,7 +135,31 @@ export function ActivityPrivacyTab({
                     />
                     Share my activity
                 </label>
-                <p className="settings-inline-note">{DETECTION_NOTES[support]}</p>
+                <div className="activity-privacy-kinds">
+                    <label className="settings-toggle">
+                        <input
+                            type="checkbox"
+                            checked={settings.enabled && settings.share_games}
+                            disabled={!settings.enabled}
+                            onChange={(event) => update(withSharing(settings, "games", event.target.checked))}
+                        />
+                        The game I'm playing
+                    </label>
+                    <p className="settings-inline-note">{GAME_NOTES[gameSupport]}</p>
+                    <label className="settings-toggle">
+                        <input
+                            type="checkbox"
+                            checked={settings.enabled && settings.share_music}
+                            disabled={!settings.enabled}
+                            onChange={(event) => update(withSharing(settings, "music", event.target.checked))}
+                        />
+                        The music I'm listening to
+                    </label>
+                    <p className="settings-inline-note">{MUSIC_NOTES[musicSupport]}</p>
+                </div>
+                <p className="settings-inline-note">
+                    Everything goes out end-to-end encrypted, to just the people you pick below.
+                </p>
 
                 <h4 className="activity-privacy-heading">Hidden games</h4>
                 <p className="settings-inline-note">These are never shared, whatever else you pick.</p>

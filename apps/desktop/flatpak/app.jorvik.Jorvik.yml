@@ -24,6 +24,8 @@ finish-args:
   # Tray icon and its unread badge.
   - --talk-name=org.kde.StatusNotifierWatcher
   - --talk-name=com.canonical.Unity
+  # Music activity: reading what media players are playing (MPRIS).
+  - --talk-name=org.mpris.MediaPlayer2.*
   - --filesystem=xdg-download
   # The window and taskbar entry match the desktop file (Wayland app id).
   - --env=CHROME_DESKTOP=app.jorvik.Jorvik.desktop

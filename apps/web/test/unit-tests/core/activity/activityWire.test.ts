@@ -11,6 +11,8 @@ import {
     parseIncomingActivity,
     playingContent,
     sameGame,
+    sameMusic,
+    cleanMusic,
     stoppedContent,
     type ActivityIconFile,
 } from "../../../../src/core/activity/activityWire";
@@ -27,7 +29,7 @@ const ICON: ActivityIconFile = {
 
 describe("activity messages", () => {
     it("say what's playing, since when, and until when to believe it", () => {
-        expect(playingContent("DEV", WOW, NOW - 5_000, NOW)).toEqual({
+        expect(playingContent("DEV", { game: WOW, music: null }, NOW - 5_000, NOW)).toEqual({
             device_id: "DEV",
             game: WOW,
             started_at: NOW - 5_000,
@@ -37,12 +39,13 @@ describe("activity messages", () => {
     });
 
     it("read back what a sender sent", () => {
-        expect(parseIncomingActivity(playingContent("DEV", WOW, NOW - 60_000, NOW), NOW + 1_000)).toEqual({
+        expect(parseIncomingActivity(playingContent("DEV", { game: WOW, music: null }, NOW - 60_000, NOW), NOW + 1_000)).toEqual({
             game: WOW,
+            music: null,
             startedAt: NOW - 60_000,
             expiresAt: NOW + ACTIVITY_LIFETIME_MS,
         });
-        expect(parseIncomingActivity(stoppedContent("DEV"), NOW)).toEqual({ game: null });
+        expect(parseIncomingActivity(stoppedContent("DEV"), NOW)).toEqual({ game: null, music: null, stopped: true });
     });
 
     it("keep names to one line of plain text, 128 characters at most", () => {
@@ -82,10 +85,10 @@ describe("activity messages", () => {
     });
 
     it("carry a Steam game's icon as an encrypted file, rebuilt from just the parts that matter", () => {
-        const sent = playingContent("DEV", { ...WOW, icon: ICON }, NOW, NOW);
+        const sent = playingContent("DEV", { game: { ...WOW, icon: ICON }, music: null }, NOW, NOW);
         expect(sent.game).toEqual({ ...WOW, icon: ICON });
         expect(parseIncomingActivity(sent, NOW)).toMatchObject({ game: { ...WOW, icon: ICON } });
-        expect(playingContent("DEV", WOW, NOW, NOW).game).toEqual(WOW);
+        expect(playingContent("DEV", { game: WOW, music: null }, NOW, NOW).game).toEqual(WOW);
         expect(
             cleanIcon({ ...ICON, mimetype: "image/svg+xml", key: { ...ICON.key, key_ops: ["sign"], extra: true } }),
         ).toEqual(ICON);
@@ -119,5 +122,51 @@ describe("activity messages", () => {
         expect(contentDeviceId({ device_id: "ABCDEFG" })).toBe("ABCDEFG");
         expect(contentDeviceId({ device_id: "two words" })).toBeNull();
         expect(contentDeviceId(null)).toBeNull();
+    });
+
+    describe("with music", () => {
+        const SONG = { player: { id: "spotify", name: "Spotify" }, title: "Song", artist: "Artist", album: "Album" };
+
+        it("carry music on its own, or with a game, and read it back", () => {
+            const alone = playingContent("DEV", { game: null, music: SONG }, NOW, NOW);
+            expect(alone).toEqual({ device_id: "DEV", game: null, music: SONG, expires_at: NOW + ACTIVITY_LIFETIME_MS });
+            expect(parseIncomingActivity(alone, NOW)).toEqual({
+                game: null,
+                music: SONG,
+                startedAt: NOW,
+                expiresAt: NOW + ACTIVITY_LIFETIME_MS,
+            });
+            const both = playingContent("DEV", { game: WOW, music: { ...SONG, cover: ICON } }, NOW - 1_000, NOW);
+            expect(parseIncomingActivity(both, NOW)).toMatchObject({ game: WOW, music: { ...SONG, cover: ICON }, startedAt: NOW - 1_000 });
+        });
+
+        it("keep what matters and drop the rest; music without a title or player id doesn't count", () => {
+            expect(cleanMusic({ ...SONG, artist: " ", extra: "x", cover: { url: "https://x" } })).toEqual({
+                player: SONG.player,
+                title: "Song",
+                album: "Album",
+            });
+            expect(cleanMusic({ ...SONG, title: "" })).toBeNull();
+            expect(cleanMusic({ ...SONG, player: { id: "Spotify!", name: "Spotify" } })).toBeNull();
+            expect(cleanMusic({ ...SONG, player: { id: "spotify" } })).toBeNull();
+            expect(cleanMusic("Song")).toBeNull();
+        });
+
+        it("treat a message with no game and broken music as stopped, and a broken game as nothing", () => {
+            const base = { device_id: "DEV", expires_at: NOW + 60_000 };
+            expect(parseIncomingActivity({ ...base, game: null, music: { title: "x" } }, NOW)).toEqual({
+                game: null,
+                music: null,
+                stopped: true,
+            });
+            expect(parseIncomingActivity({ ...base, game: { id: "WoW!" }, music: SONG }, NOW)).toBeNull();
+        });
+
+        it("compare tracks by player, title, artist, album and cover", () => {
+            expect(sameMusic(SONG, { ...SONG })).toBe(true);
+            expect(sameMusic(SONG, { ...SONG, title: "Other" })).toBe(false);
+            expect(sameMusic(SONG, { ...SONG, cover: ICON })).toBe(false);
+            expect(sameMusic(null, undefined)).toBe(true);
+        });
     });
 });

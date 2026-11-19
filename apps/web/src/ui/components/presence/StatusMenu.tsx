@@ -13,10 +13,11 @@ export interface StatusMenuProps {
     error: string | null;
     /** False when auto-idle is set to Never. */
     autoIdleOn: boolean;
-    /** The quick "Share game activity" switch, with the way to Activity Privacy. */
+    /** The quick "Share game activity" and "Share music" switches, with the way to Activity Privacy. */
     activitySharing?: {
-        enabled: boolean;
-        onToggle: (enabled: boolean) => void;
+        games: boolean;
+        music: boolean;
+        onToggle: (kind: "games" | "music", on: boolean) => void;
         onOpenSettings: () => void;
     };
     onChoose: (choice: PresenceChoice) => void;
@@ -133,10 +134,18 @@ export function StatusMenu({
                     <label className="status-menu-activity">
                         <input
                             type="checkbox"
-                            checked={activitySharing.enabled}
-                            onChange={(event) => activitySharing.onToggle(event.target.checked)}
+                            checked={activitySharing.games}
+                            onChange={(event) => activitySharing.onToggle("games", event.target.checked)}
                         />
                         <span>Share game activity</span>
+                    </label>
+                    <label className="status-menu-activity">
+                        <input
+                            type="checkbox"
+                            checked={activitySharing.music}
+                            onChange={(event) => activitySharing.onToggle("music", event.target.checked)}
+                        />
+                        <span>Share music</span>
                     </label>
                     <button
                         type="button"

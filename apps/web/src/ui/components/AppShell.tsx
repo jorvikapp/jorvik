@@ -29,6 +29,8 @@ import {
 } from "../activity/useActivity";
 import { useActivityPrivacy, useActivityPrivacyMigration } from "../activity/useActivityPrivacy";
 import { useGameDetection } from "../activity/useGameDetection";
+import { useMusicDetection } from "../activity/useMusicDetection";
+import { sharesGames, sharesMusic, withSharing } from "../../core/activity/activityPrivacy";
 import { StatusMenu } from "./presence/StatusMenu";
 import { createOrReuseDirectChat, ensureDirectRoomMapping, getDirectRoomIds } from "../adapters/dmAdapter";
 import { describeJoinError, joinRoomWithRetry } from "../adapters/joinAdapter";
@@ -1258,9 +1260,10 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const userAway = useAutoIdle(presenceEnabled ? userSettings.privacy.autoIdleMinutes * 60_000 : 0);
     const autoIdleOn = userSettings.privacy.autoIdleMinutes > 0;
     const presenceControl = usePresenceSelection(client, presenceEnabled, userAway);
-    // Game activity: shared, encrypted, only with the people Activity Privacy picks; never in presence.
+    // Game and music activity: shared, encrypted, only with the people Activity Privacy picks; never in presence.
     const activityPrivacy = useActivityPrivacy(client);
-    const detectedGame = useGameDetection(activityPrivacy.settings.enabled);
+    const detectedGame = useGameDetection(sharesGames(activityPrivacy.settings));
+    const detectedMusic = useMusicDetection(sharesMusic(activityPrivacy.settings));
     useActivityReceiver(client);
     // Sessions from before they had names of their own are called "Jorvik Web" or nothing; name this one.
     useEffect(() => {
@@ -1272,6 +1275,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         client,
         activityPrivacy.settings,
         detectedGame,
+        detectedMusic,
         presenceEnabled && presenceControl.effectiveChoice === "invisible",
     );
     const finishActivityPrivacyMigration = useCallback((): void => {
@@ -2736,10 +2740,14 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     }, []);
     const activitySharingControl = useMemo(
         () => ({
-            enabled: activityPrivacy.settings.enabled,
-            onToggle: (enabled: boolean): void => {
-                void activityPrivacy.save({ ...activityPrivacy.settings, enabled }).catch(() =>
-                    pushToast({ type: "error", message: "Couldn't change game activity sharing. Try again." }),
+            games: sharesGames(activityPrivacy.settings),
+            music: sharesMusic(activityPrivacy.settings),
+            onToggle: (kind: "games" | "music", on: boolean): void => {
+                void activityPrivacy.save(withSharing(activityPrivacy.settings, kind, on)).catch(() =>
+                    pushToast({
+                        type: "error",
+                        message: `Couldn't change ${kind === "games" ? "game activity" : "music"} sharing. Try again.`,
+                    }),
                 );
             },
             onOpenSettings: () => openUserSettings("activity"),

@@ -40,7 +40,7 @@ describe("activity store", () => {
         receiveActivity("@bob:s", "LAPTOP", playing(DOTA), NOW + 1_000);
         expect(getUserActivity("@bob:s")?.game).toEqual(DOTA);
 
-        receiveActivity("@bob:s", "LAPTOP", { game: null }, NOW + 2_000);
+        receiveActivity("@bob:s", "LAPTOP", { game: null, music: null, stopped: true }, NOW + 2_000);
         expect(getUserActivity("@bob:s")?.game).toEqual(WOW);
 
         pruneActivity(NOW + 600_000);
@@ -75,8 +75,8 @@ describe("activity store", () => {
         const listener = vi.fn();
         const unsubscribe = subscribeActivity(listener);
         receiveActivity("@bob:s", "PC", playing(), NOW);
-        receiveActivity("@bob:s", "PC", { game: null }, NOW + 1);
-        receiveActivity("@bob:s", "PC", { game: null }, NOW + 2);
+        receiveActivity("@bob:s", "PC", { game: null, music: null, stopped: true }, NOW + 1);
+        receiveActivity("@bob:s", "PC", { game: null, music: null, stopped: true }, NOW + 2);
         expect(listener).toHaveBeenCalledTimes(2);
         unsubscribe();
     });
@@ -155,10 +155,41 @@ describe("activity receiver", () => {
         const client = fakeClient();
         const stop = startActivityReceiver(client as never);
         deliver(client, "@bob:s", "@bob:s", content());
-        deliver(client, "@bob:s", "@bob:s", { game: null });
+        deliver(client, "@bob:s", "@bob:s", { game: null, music: null, stopped: true });
         await settle();
         await settle();
         expect(getUserActivity("@bob:s")).toBeNull();
         stop();
+    });
+
+    describe("music", () => {
+        const SONG = { player: { id: "spotify", name: "Spotify" }, title: "Song", artist: "Artist" };
+
+        it("shows a person's game and music together, even from different devices", () => {
+            receiveActivity("@bob:s", "PC", playing(WOW), NOW);
+            receiveActivity("@bob:s", "PHONE", { game: null, music: SONG, startedAt: NOW, expiresAt: NOW + 600_000 }, NOW + 1_000);
+            const both = getUserActivity("@bob:s");
+            expect(both).toMatchObject({ game: WOW, music: SONG });
+            // The same object until something changes, as React needs.
+            expect(getUserActivity("@bob:s")).toBe(both);
+
+            receiveActivity("@bob:s", "PHONE", { game: null, music: null, stopped: true }, NOW + 2_000);
+            expect(getUserActivity("@bob:s")).toMatchObject({ game: WOW, music: null });
+        });
+
+        it("takes a new track at once, but the same track again only after a while", () => {
+            const song = (title: string) => ({ game: null, music: { ...SONG, title }, startedAt: NOW, expiresAt: NOW + 600_000 });
+            expect(receiveActivity("@bob:s", "PC", song("One"), NOW)).toBe(true);
+            expect(receiveActivity("@bob:s", "PC", song("One"), NOW + 5_000)).toBe(false);
+            expect(receiveActivity("@bob:s", "PC", song("Two"), NOW + 16_000)).toBe(true);
+            expect(getUserActivity("@bob:s")?.music?.title).toBe("Two");
+        });
+
+        it("keeps the user's own music while they share it", () => {
+            setOwnActivity("@me:s", { game: null, music: SONG, startedAt: 0 });
+            expect(getUserActivity("@me:s")).toMatchObject({ game: null, music: SONG });
+            setOwnActivity("@me:s", { game: null, music: null, startedAt: 0 });
+            expect(getUserActivity("@me:s")).toBeNull();
+        });
     });
 });

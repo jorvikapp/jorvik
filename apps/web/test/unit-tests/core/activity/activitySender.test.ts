@@ -5,7 +5,9 @@ import {
     ActivitySender,
     matrixActivityTransport,
     type ActivityTransport,
+    MIN_CHANGE_INTERVAL_MS,
     type PlayingGame,
+    type SharedNow,
 } from "../../../../src/core/activity/activitySender";
 import {
     ACTIVITY_EVENT,
@@ -27,6 +29,11 @@ vi.mock("@matrix-org/matrix-sdk-crypto-wasm", () => ({
 const T0 = 1_792_850_000_000;
 const WOW: PlayingGame = { id: "wow", name: "World of Warcraft", startedAt: T0 - 60_000 };
 const OSU: PlayingGame = { id: "osu", name: "osu!", startedAt: T0 };
+const g = (game: PlayingGame): SharedNow => ({ game, music: null });
+const song = (title: string, cover?: ActivityIconFile): SharedNow => ({
+    game: null,
+    music: { player: { id: "spotify", name: "Spotify" }, title, artist: "Artist", ...(cover ? { cover } : {}) },
+});
 const ICON: ActivityIconFile = {
     url: "mxc://s/osu",
     key: { kty: "oct", alg: "A256CTR", k: "a".repeat(43), key_ops: ["encrypt", "decrypt"], ext: true },
@@ -40,6 +47,7 @@ interface Sent {
     game: string | null;
     expiresAt?: number;
     icon?: string;
+    music?: string;
 }
 
 function setup(delayMs = 0): { sender: ActivitySender; sent: Sent[] } {
@@ -54,6 +62,7 @@ function setup(delayMs = 0): { sender: ActivitySender; sent: Sent[] } {
                 game: content.game?.id ?? null,
                 expiresAt: content.expires_at,
                 ...(content.game?.icon ? { icon: content.game.icon.url } : {}),
+                ...(content.music ? { music: content.music.title } : {}),
             });
         },
     };
@@ -72,7 +81,7 @@ afterEach(() => {
 describe("ActivitySender", () => {
     it("tells everyone picked when a game starts, then again every few minutes while it runs", async () => {
         const { sender, sent } = setup();
-        sender.update(WOW, ["@bob:s", "@carol:s"]);
+        sender.update(g(WOW), ["@bob:s", "@carol:s"]);
         await sender.flush();
         expect(sent).toEqual([{ to: ["@bob:s", "@carol:s"], game: "wow", expiresAt: T0 + ACTIVITY_LIFETIME_MS }]);
 
@@ -89,8 +98,8 @@ describe("ActivitySender", () => {
 
     it("tells people who drop out that it stopped, and newcomers what's running", async () => {
         const { sender, sent } = setup();
-        sender.update(WOW, ["@bob:s", "@carol:s"]);
-        sender.update(WOW, ["@carol:s", "@dave:s"]);
+        sender.update(g(WOW), ["@bob:s", "@carol:s"]);
+        sender.update(g(WOW), ["@carol:s", "@dave:s"]);
         await sender.flush();
         expect(sent.map(({ to, game }) => ({ to, game }))).toEqual([
             { to: ["@bob:s", "@carol:s"], game: "wow" },
@@ -102,7 +111,7 @@ describe("ActivitySender", () => {
 
     it("tells everyone it stopped when the game ends, and stops repeating it", async () => {
         const { sender, sent } = setup();
-        sender.update(WOW, ["@bob:s"]);
+        sender.update(g(WOW), ["@bob:s"]);
         sender.update(null, ["@bob:s"]);
         await sender.flush();
         expect(sent.map(({ to, game }) => ({ to, game }))).toEqual([
@@ -116,8 +125,8 @@ describe("ActivitySender", () => {
 
     it("tells everyone about a different game", async () => {
         const { sender, sent } = setup();
-        sender.update(WOW, ["@bob:s"]);
-        sender.update(OSU, ["@bob:s"]);
+        sender.update(g(WOW), ["@bob:s"]);
+        sender.update(g(OSU), ["@bob:s"]);
         await sender.flush();
         expect(sent.map(({ game }) => game)).toEqual(["wow", "osu"]);
         sender.stop();
@@ -125,9 +134,9 @@ describe("ActivitySender", () => {
 
     it("tells everyone again once the game's icon is ready, and keeps sending it", async () => {
         const { sender, sent } = setup();
-        sender.update(OSU, ["@bob:s", "@carol:s"]);
-        sender.update({ ...OSU, icon: ICON }, ["@bob:s", "@carol:s"]);
-        sender.update({ ...OSU, icon: ICON }, ["@bob:s", "@carol:s"]);
+        sender.update(g(OSU), ["@bob:s", "@carol:s"]);
+        sender.update(g({ ...OSU, icon: ICON }), ["@bob:s", "@carol:s"]);
+        sender.update(g({ ...OSU, icon: ICON }), ["@bob:s", "@carol:s"]);
         await sender.flush();
         expect(sent.map(({ to, game, icon }) => ({ to, game, icon }))).toEqual([
             { to: ["@bob:s", "@carol:s"], game: "osu", icon: undefined },
@@ -142,12 +151,12 @@ describe("ActivitySender", () => {
 
     it("sends nothing while nobody is picked or nothing changed, and catches up when someone is picked", async () => {
         const { sender, sent } = setup();
-        sender.update(WOW, []);
+        sender.update(g(WOW), []);
         await sender.flush();
         expect(sent).toEqual([]);
 
-        sender.update(WOW, ["@bob:s"]);
-        sender.update(WOW, ["@bob:s"]);
+        sender.update(g(WOW), ["@bob:s"]);
+        sender.update(g(WOW), ["@bob:s"]);
         await sender.flush();
         expect(sent.map(({ to, game }) => ({ to, game }))).toEqual([{ to: ["@bob:s"], game: "wow" }]);
         sender.stop();
@@ -155,11 +164,66 @@ describe("ActivitySender", () => {
 
     it("sends in order, even when sending is slow", async () => {
         const { sender, sent } = setup(1_000);
-        sender.update(WOW, ["@bob:s"]);
+        sender.update(g(WOW), ["@bob:s"]);
         sender.update(null, []);
         await vi.advanceTimersByTimeAsync(5_000);
         await sender.flush();
         expect(sent.map(({ game }) => game)).toEqual(["wow", null]);
+    });
+});
+
+describe("ActivitySender with music", () => {
+    it("tells everyone what's playing at once, then each new track no more often than every 15 seconds", async () => {
+        const { sender, sent } = setup();
+        sender.update(song("One"), ["@bob:s"]);
+        await sender.flush();
+        expect(sent.map(({ game, music }) => ({ game, music }))).toEqual([{ game: null, music: "One" }]);
+
+        // Skipping through three tracks quickly sends only the last, once the 15 seconds are up.
+        await vi.advanceTimersByTimeAsync(2_000);
+        sender.update(song("Two"), ["@bob:s"]);
+        sender.update(song("Three"), ["@bob:s"]);
+        sender.update(song("Four"), ["@bob:s"]);
+        await sender.flush();
+        expect(sent).toHaveLength(1);
+        await vi.advanceTimersByTimeAsync(MIN_CHANGE_INTERVAL_MS);
+        await sender.flush();
+        expect(sent.map(({ music }) => music)).toEqual(["One", "Four"]);
+
+        // A track change long after the last goes out at once.
+        await vi.advanceTimersByTimeAsync(60_000);
+        sender.update(song("Five"), ["@bob:s"]);
+        await sender.flush();
+        expect(sent.map(({ music }) => music)).toEqual(["One", "Four", "Five"]);
+        sender.stop();
+    });
+
+    it("drops a queued track change when the music stops, and says it stopped at once", async () => {
+        const { sender, sent } = setup();
+        sender.update(song("One"), ["@bob:s"]);
+        sender.update(song("Two"), ["@bob:s"]);
+        sender.update(null, []);
+        await vi.advanceTimersByTimeAsync(MIN_CHANGE_INTERVAL_MS * 2);
+        await sender.flush();
+        expect(sent.map(({ to, music }) => ({ to, music }))).toEqual([
+            { to: ["@bob:s"], music: "One" },
+            { to: ["@bob:s"], music: undefined },
+        ]);
+    });
+
+    it("sends a game and music together, and a newcomer hears what the others were told", async () => {
+        const { sender, sent } = setup();
+        sender.update({ game: WOW, music: song("One").music }, ["@bob:s"]);
+        sender.update({ game: WOW, music: song("Two").music }, ["@bob:s", "@carol:s"]);
+        await sender.flush();
+        expect(sent.map(({ to, game, music }) => ({ to, game, music }))).toEqual([
+            { to: ["@bob:s"], game: "wow", music: "One" },
+            { to: ["@carol:s"], game: "wow", music: "One" },
+        ]);
+        await vi.advanceTimersByTimeAsync(MIN_CHANGE_INTERVAL_MS);
+        await sender.flush();
+        expect(sent[2]).toMatchObject({ to: ["@bob:s", "@carol:s"], game: "wow", music: "Two" });
+        sender.stop();
     });
 });
 

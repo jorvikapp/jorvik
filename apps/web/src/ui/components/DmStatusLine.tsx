@@ -3,10 +3,11 @@ import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 
 import { useUserActivity } from "../activity/useActivity";
 import { statusLinkHref } from "../presence/statusLink";
-import { GameIcon } from "./activity/ActivityLine";
+import { ActivityGlyph, shortActivityText } from "./activity/ActivityLine";
 
 /**
- * The line under a person's name in the DM list: the game they play, when they share it with us;
+ * The line under a person's name in the DM list: the game they play or the music they listen to, when
+ * they share it with us;
  * otherwise their status message; otherwise nothing, and the row stays a single line.
  */
 export function DmStatusLine({
@@ -22,11 +23,11 @@ export function DmStatusLine({
     const activity = useUserActivity(userId);
 
     if (activity) {
-        const text = `Playing ${activity.game.name}`;
+        const text = shortActivityText(activity);
         return (
             <span className="room-item-status is-activity" title={text}>
                 <span className="room-item-status-icon" aria-hidden="true">
-                    <GameIcon client={client} game={activity.game} />
+                    <ActivityGlyph client={client} activity={activity} />
                 </span>
                 <span className="room-item-status-text">{text}</span>
             </span>

@@ -9,6 +9,9 @@ import {
     isSpaceIncluded,
     migratedActivityPrivacy,
     parseActivityPrivacy,
+    sharesGames,
+    sharesMusic,
+    withSharing,
     type ActivityPrivacySettings,
 } from "../../../../src/core/activity/activityPrivacy";
 
@@ -26,12 +29,32 @@ describe("activity privacy settings", () => {
     it("start off, with friends and small spaces picked for when it's turned on", () => {
         expect(parseActivityPrivacy(undefined)).toEqual({
             enabled: false,
+            share_games: true,
+            share_music: false,
             hidden_games: [],
             hidden_game_names: {},
             space_scope: "small",
             small_space_limit: 200,
             space_overrides: {},
             share_with_friends: true,
+        });
+    });
+
+    it("turn games and music on and off, ending sharing once neither is on", () => {
+        const off = defaultActivityPrivacy();
+        const musicOnly = withSharing(off, "music", true);
+        expect(musicOnly).toMatchObject({ enabled: true, share_games: false, share_music: true });
+        expect(sharesGames(musicOnly)).toBe(false);
+        expect(sharesMusic(musicOnly)).toBe(true);
+        const both = withSharing(musicOnly, "games", true);
+        expect(both).toMatchObject({ enabled: true, share_games: true, share_music: true });
+        const gamesOnly = withSharing(both, "music", false);
+        expect(gamesOnly).toMatchObject({ enabled: true, share_games: true, share_music: false });
+        // Turning the last one off ends sharing, ready to share games again next time.
+        expect(withSharing(gamesOnly, "games", false)).toMatchObject({ enabled: false, share_games: true, share_music: false });
+        expect(parseActivityPrivacy({ enabled: true, share_games: false, share_music: true })).toMatchObject({
+            share_games: false,
+            share_music: true,
         });
     });
 
@@ -48,6 +71,8 @@ describe("activity privacy settings", () => {
             }),
         ).toEqual({
             enabled: false,
+            share_games: true,
+            share_music: false,
             hidden_games: ["wow"],
             hidden_game_names: { wow: "World of Warcraft" },
             space_scope: "small",

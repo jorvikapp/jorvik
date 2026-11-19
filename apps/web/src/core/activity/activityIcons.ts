@@ -4,15 +4,15 @@ import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 import { cleanIcon, type ActivityIconFile } from "./activityWire";
 
 /**
- * Game icons for activity (see activityWire.ts). The sender's desktop app hands over the icon Steam
- * keeps of the running game; it is encrypted, uploaded to the user's homeserver and remembered on this
+ * Game icons and music covers for activity (see activityWire.ts). The sender's desktop app hands over
+ * the icon Steam keeps of the running game, or the cover of the track playing; it is encrypted, uploaded to the user's homeserver and remembered on this
  * device for that account, so each game uploads once. Receivers download and decrypt an icon once per
  * session and show it from memory.
  */
 
 const STORAGE_PREFIX = "jorvik.activityIcons.";
-/** Games remembered per account; the oldest are forgotten first. */
-const MAX_REMEMBERED_ICONS = 100;
+/** Games and covers remembered per account; the oldest are forgotten first. */
+const MAX_REMEMBERED_ICONS = 300;
 /** Icons are PNGs of at most 64x64, a few kilobytes; anything far bigger isn't worth downloading. */
 const MAX_ICON_BYTES = 256 * 1024;
 /** An icon that failed to download or decrypt is tried again after this long. */

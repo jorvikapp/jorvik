@@ -8,7 +8,7 @@ import { getPresenceSortRank, toAvatarPresenceState } from "../../../presence/bu
 import { isPresenceEnabledForClient } from "../../../presence/presenceConfig";
 import { useUserActivity } from "../../../activity/useActivity";
 import { usePresenceMap } from "../../../presence/usePresence";
-import { ActivityIcon } from "../../activity/ActivityLine";
+import { ActivityIcon, shortActivityText } from "../../activity/ActivityLine";
 import { Avatar } from "../../Avatar";
 import { useLongPress } from "../../../layout/longPress";
 import { UserBadges } from "../../badges/UserBadges";
@@ -90,7 +90,7 @@ function MemberSecondLine({
         );
     }
     if (activity) {
-        const text = `Playing ${activity.game.name}`;
+        const text = shortActivityText(activity);
         return (
             <span className="rs-member-id rs-member-status rs-member-activity" title={text}>
                 {text}

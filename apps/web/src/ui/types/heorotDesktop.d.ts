@@ -22,6 +22,15 @@ export interface HeorotDesktopNotificationTarget {
 }
 
 /** A running game, as the desktop app's detector names it: "steam-<appid>" for Steam games. */
+/** A track playing in a music app or on a music site. */
+export interface HeorotDesktopTrack {
+    key: string;
+    player: { id: string; name: string };
+    title: string;
+    artist: string | null;
+    album: string | null;
+}
+
 export interface HeorotDesktopGame {
     id: string;
     name: string;
@@ -55,6 +64,13 @@ export interface HeorotDesktopBridge {
     onGameActivity?: (listener: (game: HeorotDesktopGame | string | null) => void) => () => void;
     /** Since 1.0.28: the icon Steam keeps of the running game, as a PNG of at most 64x64; null otherwise. */
     getGameIcon?: (gameId: string) => Promise<Uint8Array | null>;
+    /** Starts or stops looking for music playing; resolves to the track playing now, if any. */
+    setMusicActivityEnabled?: (enabled: boolean) => Promise<HeorotDesktopTrack | null>;
+    /** False in the Snap build, which can't see media players. */
+    musicActivitySupported?: () => Promise<boolean>;
+    onMusicActivity?: (listener: (track: HeorotDesktopTrack | null) => void) => () => void;
+    /** The cover of the track playing now (asked for by its key), as a PNG of at most 96x96; null otherwise. */
+    getMusicCover?: (key: string) => Promise<Uint8Array | null>;
     onNotificationClicked?: (listener: (target: HeorotDesktopNotificationTarget) => void) => () => void;
     /**
      * Since 1.0.29, single sign-on: listens on a one-time local address and returns it, for the homeserver
