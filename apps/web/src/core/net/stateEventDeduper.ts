@@ -11,7 +11,7 @@ export interface StateEventDeduper {
  * Collapses concurrent requests for the same state event into one.
  *
  * AppShell and RoomList each want authoritative values for the same singleton state
- * events on the same space, and previously each downloaded the room's entire state to get
+ * events on the same space, and each would otherwise download the room's entire state to get
  * them. Sharing the in-flight promise means simultaneous callers cost one request.
  *
  * Only in-flight requests are shared -- nothing is retained after settling -- so this

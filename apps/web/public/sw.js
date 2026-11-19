@@ -8,11 +8,10 @@ const PICKLE_KEY_STORE_NAME = "pickleKey";
 const DB_NAME = "heorot-core";
 const DB_VERSION = 1;
 const SERVER_SUPPORT_TTL_MS = 2 * 60 * 60 * 1000;
-// Opening a member list starts dozens of avatar requests at once. Each used to
-// ask the page for user info (which waits for the page's main thread, busy
-// rendering the very view that wants the avatars), read IndexedDB, decrypt the
-// token and, after the worker had idled, probe /versions -- per image. Sharing
-// one result for a short while makes the rest of the burst free. A 401 drops
+// Opening a member list starts dozens of avatar requests at once. Without a
+// cache each would ask the page for user info (waiting on its busy main thread),
+// read IndexedDB, decrypt the token and probe /versions. Sharing one result for
+// a short while makes the rest of the burst free. A 401 drops
 // it early, so a rotated token costs one retry rather than broken images.
 const AUTH_DATA_TTL_MS = 5 * 60 * 1000;
 const V3_MEDIA_PATH_PREFIX = "/_matrix/media/v3/";

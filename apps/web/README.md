@@ -1,6 +1,6 @@
 # @heorot/web
 
-React web app package within the Heorot monorepo. For user-facing documentation, setup guides, and voice configuration see the [root README](../../README.md).
+The Jorvik web client. The package keeps the `@heorot` name from the project Jorvik grew out of. For user-facing documentation, setup guides, and voice configuration see the [root README](../../README.md).
 
 ---
 
@@ -25,26 +25,10 @@ pnpm test           # vitest unit tests
 
 ```
 src/
-├── core/           # Matrix infrastructure (config, session lifecycle, storage, crypto)
-│   ├── client/     # MatrixClientManager — client instance lifecycle
-│   ├── config/     # Config loading and types
-│   ├── lifecycle/  # SessionLifecycle — login, restore, sign-out
-│   ├── platform/   # WebPlatform abstraction (pickle key, OIDC)
-│   └── storage/    # IndexedDB, localStorage, encrypted token helpers
-└── ui/             # React UI layer
-    ├── adapters/   # Bridge between Matrix SDK and UI components
-    ├── components/ # React components (AppShell, Timeline, Composer, ...)
-    ├── emoji/      # Custom emoji pack store and resolver
-    ├── hooks/      # Shared React hooks
-    ├── mentions/   # @mention tokenization
-    ├── notifications/ # Sound and notification hooks
-    ├── presence/   # Presence VM and config
-    ├── providers/  # MatrixProvider (central state machine)
-    ├── serviceWorker/ # Media service worker registration
-    ├── settings/   # User and server settings panels
-    ├── stores/     # Channel order, categories, spacers
-    ├── utils/      # Avatar color, MXC helpers, permalink
-    └── voice/      # Voice channel discovery and LiveKit integration
+├── core/   # Matrix logic, no React: client and session lifecycle, auth (password, SSO),
+│           # crypto and cross-signing, rooms, spaces, DMs, presence, push, voice, storage
+└── ui/     # React: AppShell, Timeline, Composer and the other components, settings,
+            # notifications, layout (desktop and phone), providers, styles
 ```
 
 **State machine** (`MatrixProvider`): `booting` → `login_required` / `starting` → `security_verification` / `security_recovery` → `ready`
@@ -93,7 +77,8 @@ Run `pnpm install` from the repo root, then clear Vite cache (`node_modules/.vit
 ## Tests
 
 ```bash
-pnpm test           # run all unit tests (vitest)
+pnpm test           # unit tests (vitest)
+pnpm test:smoke     # smoke tests
 ```
 
-Tests live in `test/unit-tests/`. Coverage areas: adapters, emoji, mentions, presence, settings, stores, voice.
+Unit tests live in `test/unit-tests/`, mirroring `src/`.

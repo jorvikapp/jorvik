@@ -48,3 +48,9 @@ Thumbs.db
 # IDE/editor files
 .idea/
 .vscode/
+
+# Local AI-assistant configuration
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+.claude/

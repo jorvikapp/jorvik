@@ -7,8 +7,8 @@ import { withSecretStorageKeyProvider } from "../client/cryptoCallbacks";
 /**
  * Where this account's cross-signing keys are, as far as this session can tell.
  *
- * Jorvik used to set up secret storage and key backup but never cross-signing,
- * so Element could "verify" against the recovery key and still find nothing to
+ * Accounts can have secret storage and key backup but no cross-signing, so
+ * Element can "verify" against the recovery key and still find nothing to
  * sign with. Everything here keeps one rule: existing keys are never replaced
  * behind the user's back. The SDK's bootstrapCrossSigning would do exactly that
  * when the keys exist but are neither on this device nor in secret storage, so

@@ -1,7 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 
-console.log("[jorvik-preload] loaded");
-
 export interface HeorotDesktopMediaAuthState {
     accessToken?: string;
     homeserverUrl?: string;
@@ -154,4 +152,3 @@ const bridge: HeorotDesktopBridge = {
 };
 
 contextBridge.exposeInMainWorld("heorotDesktop", bridge);
-console.log("[jorvik-notification] bridge-exposed=true");

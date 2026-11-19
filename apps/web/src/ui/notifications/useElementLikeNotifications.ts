@@ -254,7 +254,6 @@ export function useElementLikeNotifications({
 
         const displayPopupNotification = (event: MatrixEvent, room: Room): void => {
             const notificationsEnabled = settingsRef.current.notificationsEnabled;
-            console.log(`[jorvik-notification] renderer enabled=${notificationsEnabled}`);
             if (!notificationsEnabled) {
                 return;
             }
@@ -266,7 +265,6 @@ export function useElementLikeNotifications({
             if (!message) {
                 return;
             }
-            console.log("[jorvik-notification] renderer event-qualified=true");
 
             const senderName = senderDisplayName(event);
             const roomName = roomDisplayName(room);
@@ -293,8 +291,6 @@ export function useElementLikeNotifications({
 
             const avatarUrl = buildAvatarUrl(client, event);
             const appIconUrl = new URL("/jorvik-icon.png", window.location.href).toString();
-            console.log(`[jorvik-notification] renderer icon=${appIconUrl}`);
-            console.log(`[jorvik-notification] renderer titleLength=${title.length} bodyLength=${message.length}`);
             const notification = new Notification(title, {
                 body: message,
                 icon: appIconUrl,
@@ -366,7 +362,6 @@ export function useElementLikeNotifications({
             // badge are worked out elsewhere and keep updating. The event is
             // already marked processed, so nothing replays when DND ends.
             if (doNotDisturbRef.current) {
-                console.log("[jorvik-notification] renderer suppressed by do not disturb");
                 return;
             }
 

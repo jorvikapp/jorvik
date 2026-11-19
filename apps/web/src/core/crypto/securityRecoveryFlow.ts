@@ -332,8 +332,7 @@ export async function bootstrapSecretStorageSetup(
                 // key opens the backup at the next sign-in.
                 setupNewKeyBackup: !keepBackup,
             });
-            // Jorvik used to stop here, leaving accounts without cross-signing.
-            // Created after the new secret storage so the keys are saved in it;
+            // Cross-signing is created after the new secret storage so the keys are saved in it;
             // a first upload needs no password (MSC3967). Not fatal: the key
             // already exists now, and the next screen retries with it rather
             // than this one offering to make another.

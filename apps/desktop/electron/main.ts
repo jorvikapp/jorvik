@@ -87,17 +87,9 @@ function resolveIconPath(): string {
     return path.join(app.getAppPath(), "build", "icon.png");
 }
 
-function logWindowState(label: string, window: BrowserWindow | null = mainWindow): void {
-    if (!window) {
-        console.log(`[jorvik-window] ${label} mainWindow=false`);
-        return;
-    }
-    console.log(`[jorvik-window] ${label} destroyed=${window.isDestroyed()} visible=${window.isVisible()} minimized=${window.isMinimized()}`);
-}
-
 function resolveOverlayBadgePath(count: number): string | null {
-    // Windows draws the overlay at 16-32px. Handing it the full-size app icon,
-    // as this did before, renders nothing at all on the taskbar.
+    // Windows draws the overlay at 16-32px; the full-size app icon renders
+    // nothing at all on the taskbar.
     const name = count > 99 ? "overlay-99plus.png" : `overlay-${count}.png`;
     const candidates = [
         path.join(process.resourcesPath, "tray-badges", name),
@@ -117,12 +109,6 @@ function setNativeBadge(count: number): void {
                 ? nativeImage.createFromPath(badgePath)
                 : nativeImage.createFromPath(resolveIconPath()).resize({ width: 32, height: 32 });
             mainWindow.setOverlayIcon(overlay, `${safeCount} unread`);
-            console.log(`[jorvik-badge] ${JSON.stringify({
-                platform: "win32",
-                count: safeCount,
-                asset: badgePath ?? "missing, fell back to the app icon",
-                empty: overlay.isEmpty(),
-            })}`);
         } else {
             mainWindow?.setOverlayIcon(null, "");
         }
@@ -132,17 +118,10 @@ function setNativeBadge(count: number): void {
         lastBadgeCount = safeCount;
         trayBadge?.update(safeCount);
     } else {
-        const result = app.setBadgeCount?.(safeCount);
+        app.setBadgeCount?.(safeCount);
         if (process.platform === "linux") {
             lastBadgeCount = safeCount;
             trayBadge?.update(safeCount);
-            console.log(`[jorvik-badge] ${JSON.stringify({
-                electron: process.versions.electron,
-                count: safeCount,
-                apiPresent: typeof app.setBadgeCount === "function",
-                result: result ?? null,
-                desktopName: process.env.CHROME_DESKTOP ?? null,
-            })}`);
         }
     }
 }
@@ -182,10 +161,7 @@ function boundedText(value: unknown, maxLength: number): string {
 }
 
 function showNativeNotification(rawPayload: unknown): void {
-    const supported = ElectronNotification.isSupported();
-    console.log(`[jorvik-notification] isSupported=${supported}`);
-    if (!supported) {
-        console.log("[jorvik-notification] native notifications unsupported");
+    if (!ElectronNotification.isSupported()) {
         return;
     }
 
@@ -199,38 +175,22 @@ function showNativeNotification(rawPayload: unknown): void {
     if (eventId) target.eventId = eventId;
 
     const options = { title, body, icon: resolveIconPath() };
-    console.log(`[jorvik-notification] options=${JSON.stringify({
-        titleLength: title.length,
-        bodyLength: body.length,
-        icon: options.icon,
-        urgency: process.platform === "linux" ? "normal" : undefined,
-    })}`);
     let notification: ElectronNotification;
     try {
         notification = new ElectronNotification(options);
-        console.log("[jorvik-notification] created");
     } catch (error) {
         console.error(`[jorvik-notification] creation-failed error=${error instanceof Error ? error.message : String(error)}`);
         return;
     }
-    notification.on("show", () => {
-        console.log("[jorvik-notification] show");
-    });
     notification.on("failed", (...args) => {
         console.error(`[jorvik-notification] failed details=${JSON.stringify(args)}`);
     });
-    notification.on("close", () => {
-        console.log("[jorvik-notification] close");
-    });
     notification.on("click", () => {
-        console.log("[jorvik-notification] click");
-        console.log(`[jorvik-notification] clicked room=${target.roomId ? "yes" : "no"} event=${target.eventId ? "yes" : "no"}`);
         focusMainWindow();
         if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send("heorot:notificationClicked", target);
         }
     });
-    console.log("[jorvik-notification] before-show");
     notification.show();
 }
 
@@ -560,7 +520,6 @@ function createMainWindow(): BrowserWindow {
     appearanceTheme = readAppearanceTheme();
     const colors = WINDOW_COLORS[appearanceTheme];
     const preloadPath = resolvePreloadPath();
-    console.log(`[jorvik-preload] path=${preloadPath} exists=${fs.existsSync(preloadPath)}`);
 
     const window = new BrowserWindow({
         title: APP_TITLE,
@@ -588,7 +547,6 @@ function createMainWindow(): BrowserWindow {
         },
     });
     const windowIcon = nativeImage.createFromPath(resolveIconPath());
-    console.log(`[jorvik-icon] path=${resolveIconPath()} exists=${fs.existsSync(resolveIconPath())} empty=${windowIcon.isEmpty()}`);
     if (!windowIcon.isEmpty()) {
         window.setIcon(windowIcon);
     }
@@ -621,11 +579,9 @@ function createMainWindow(): BrowserWindow {
     });
 
     window.on("close", (event) => {
-        logWindowState("close event", window);
         const shouldMinimizeOnClose = !isAppQuitting && closeOnWindowCloseMinimize && process.platform !== "darwin";
         if (shouldMinimizeOnClose && !window.isMinimized()) {
             event.preventDefault();
-            console.log("[jorvik-window] hide called");
             window.hide();
             return;
         }
@@ -643,7 +599,6 @@ function createMainWindow(): BrowserWindow {
 }
 
 function focusMainWindow(): void {
-    logWindowState("showMainWindow called");
     if (!mainWindow) {
         return;
     }
@@ -657,7 +612,6 @@ function focusMainWindow(): void {
     }
 
     mainWindow.focus();
-    logWindowState("showMainWindow complete");
 }
 
 function registerIpc(): void {
@@ -833,7 +787,6 @@ async function bootstrap(): Promise<void> {
         { label: "Quit Jorvik", click: () => { isAppQuitting = true; app.quit(); } },
     ]));
     tray.on("click", () => {
-        console.log("[jorvik-window] tray click fired");
         focusMainWindow();
     });
     configureAppProtocol();
@@ -843,11 +796,6 @@ async function bootstrap(): Promise<void> {
 
     mainWindow = createMainWindow();
     await loadRenderer(mainWindow);
-
-    // Auto updater stub (infrastructure intentionally not implemented in MVP).
-    if (app.isPackaged) {
-        console.log("[heorot-desktop] auto-updater stub: disabled");
-    }
 }
 
 void bootstrap();

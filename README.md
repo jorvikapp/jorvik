@@ -3,7 +3,7 @@
   Jorvik
 </h1>
 
-A self-hosted Matrix client built to feel like Discord. Spaces are servers. Rooms are channels. Voice and video calls come with screen sharing, and end-to-end encryption is on by default.
+Jorvik is a chat and voice app for Matrix. Servers hold text and voice channels, calls come with video and screen sharing, and end-to-end encryption is on by default.
 
 Runs as a web app or a native desktop client (Windows · macOS · Linux).
 
@@ -20,7 +20,7 @@ Runs as a web app or a native desktop client (Windows · macOS · Linux).
 </details>
 
 **What makes it different:**
-- Discord-style spaces and channels on top of the open Matrix protocol
+- Servers and channels on top of the open Matrix protocol
 - Voice channels — self-hosted, no third-party infra required
 - Custom emoji per space and personal packs
 - Fully self-hostable in minutes via Docker Compose
@@ -78,7 +78,7 @@ Personal open-source experiment — alpha stage. Core features work, rough edges
 
 ## Goals
 
-- Community-first Matrix UX with Discord-like interaction patterns
+- Community-first chat on Matrix: servers, channels and voice in one place
 - Strong self-hosting support — one domain, one compose file
 - Privacy by default: E2EE on, no analytics, no telemetry
 - Open protocol, open source
@@ -103,25 +103,29 @@ Personal open-source experiment — alpha stage. Core features work, rough edges
 - Live participant list
 - Auto-discovery via `/.well-known/matrix/client`
 
-**Spaces (servers)**
-- Space hierarchy: spaces contain channels, categories keep them organized
+**Servers**
+- Servers contain channels (Matrix spaces underneath); categories keep them organized
 - Channel ordering — manual drag-and-drop or activity-sorted
 - Collapsible categories
-- Discoverable channels within a space
-- Space and channel settings, visibility controls, member management, role permissions
+- Discoverable channels within a server
+- Import a server's channel layout from a Discord template link
+- Server and channel settings, visibility controls, member management, role permissions
 
 **Security**
 - End-to-end encryption via Rust Crypto WASM (matrix-sdk-crypto)
 - Cross-signing and device verification (SAS and QR code)
 - Key backup and security recovery (secret storage)
 - Forced verification mode (server-configurable)
+- Single sign-on, and two-factor sign-in where the homeserver offers it
 
 **User experience**
 - Online/offline/away presence indicators
 - User profiles with avatar and roles
 - Resizable channel sidebar
 - Appearance themes (light / dark)
-- Notification sounds
+- Notification sounds, and push notifications in the browser and on phones
+- Phone-friendly layout for the web app
+- Profile bios, banners, and optional game activity shared with people you pick
 
 **Desktop extras** *(Electron)*
 - Native window with titlebar overlay
@@ -136,7 +140,7 @@ Personal open-source experiment — alpha stage. Core features work, rough edges
 | Layer | Technology |
 |---|---|
 | UI | React 19, TypeScript, Vite |
-| Matrix | matrix-js-sdk 40.x, Rust Crypto WASM |
+| Matrix | matrix-js-sdk 45.x, Rust Crypto WASM |
 | Voice and video | LiveKit client |
 | Desktop | Electron 44, electron-builder |
 | Package manager | pnpm 10 |
@@ -314,10 +318,9 @@ npm run build:desktop
 ## Known limitations
 
 - **Alpha stage** — UX and some settings flows are still evolving
-- **No auto-updater** — update by pulling the repo and rebuilding
-- **No push notifications** — browser/OS notifications only while the app is open
+- **No in-app updater** — the desktop app updates through your package manager, or by downloading the new release
 - **Voice media is direct UDP** — RTP traffic cannot go through an HTTP proxy; clients need UDP access to LiveKit or an external TURN server
-- **End-to-end tests** — coverage is unit tests only; integration and E2E test suite is not yet in place
+- **End-to-end tests** — unit and smoke tests only; there is no full end-to-end suite yet
 
 ---
 
@@ -325,7 +328,6 @@ npm run build:desktop
 
 Planned:
 - Mobile clients (Android / iOS)
-- Push notifications
 - Voice participant limit and scaling improvements
 - Federation UX improvements
 

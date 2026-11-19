@@ -2108,18 +2108,13 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     }, [userSettings]);
 
     const handleUserSettingsChange = useCallback((nextSettings: UserLocalSettings): void => {
-        console.log(
-            `[jorvik-notification] settings update before=${userSettings.notifications.notificationsEnabled} after=${nextSettings.notifications.notificationsEnabled}`,
-        );
         setUserSettings(nextSettings);
         try {
             saveUserLocalSettings(nextSettings);
-            const persisted = loadUserLocalSettings();
-            console.log(`[jorvik-notification] settings persisted=${persisted.notifications.notificationsEnabled}`);
         } catch (error) {
-            console.error(`[jorvik-notification] settings persist failed error=${error instanceof Error ? error.message : String(error)}`);
+            console.error("Couldn't save settings", error);
         }
-    }, [userSettings]);
+    }, []);
 
     useEffect(() => {
         if (typeof window === "undefined") {
@@ -2776,8 +2771,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         setInviteOpen(true);
     }, []);
 
-    // Do not reserve sidebar space until a room is selected.  The empty-state
-    // panel used to leave a fixed 280px black column beside the chat view.
+    // Do not reserve sidebar space until a room is selected.
     const shouldRenderRightPanel = Boolean(activeRoom && !activeRoom.isSpaceRoom())
         && (panelMode.mode === "user" || rightSidebarMode !== "closed");
 

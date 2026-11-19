@@ -173,7 +173,7 @@ export function consumeSsoReturn(): SsoReturn | null {
 
 export type DesktopSsoResult = { loginToken: string } | { cancelled: true } | { timedOut: true };
 
-/** The desktop app's side of single sign-on (since 1.0.29). */
+/** The desktop app's side of single sign-on. */
 export interface DesktopSsoBridge {
     /** Starts listening on a one-time local address and returns it, for the homeserver to send the browser back to. */
     ssoBegin: () => Promise<string>;

@@ -1,7 +1,6 @@
 /**
- * "jorvik-security-key-lilith-2026-10-01.txt". Every download used to be
- * security-key.txt, so people collected a pile of look-alike files with no way
- * to tell which key belonged to which account, or which one was ever saved.
+ * Names a downloaded security key after its account and date, e.g.
+ * "jorvik-security-key-lilith-2026-10-01.txt", so keys can be told apart.
  */
 export function securityKeyFileName(account: string | null | undefined, date: Date = new Date()): string {
     const localpart = (account ?? "")

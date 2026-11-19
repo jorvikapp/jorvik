@@ -54,7 +54,7 @@ Build everything + package installer:
 pnpm run dist
 ```
 
-## macOS packaging (Matrix-native flow)
+## macOS packaging
 
 Build unsigned (default, local/dev):
 

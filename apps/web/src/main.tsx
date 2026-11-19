@@ -8,7 +8,7 @@ import { applyAppearanceTheme, loadUserLocalSettings } from "./ui/settings/user/
 import { installPhoneLayout } from "./ui/layout/phoneLayout";
 
 // Paint the first screen in the saved theme. AppShell keeps it applied, but it only mounts once
-// you're signed in, so in light mode every start used to go dark first, then flip to light.
+// you're signed in, so without this a light-mode start would flash dark first.
 const { appearance } = loadUserLocalSettings();
 applyAppearanceTheme(appearance);
 void window.heorotDesktop?.setAppearanceTheme?.(appearance.theme);

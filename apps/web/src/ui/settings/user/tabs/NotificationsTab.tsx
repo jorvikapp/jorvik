@@ -99,10 +99,7 @@ export function NotificationsTab({ settings, onChange }: NotificationsTabProps):
 
     const setDesktopEnabled = async (enabled: boolean): Promise<void> => {
         setError(null);
-        console.log(`[jorvik-notification] settings toggle requested=${enabled} before=${settings.notificationsEnabled}`);
-
         if (!enabled) {
-            console.log("[jorvik-notification] settings toggle after=false");
             onChange({ ...settings, notificationsEnabled: false });
             return;
         }
@@ -112,7 +109,6 @@ export function NotificationsTab({ settings, onChange }: NotificationsTabProps):
         }
 
         if (Notification.permission === "granted") {
-            console.log("[jorvik-notification] settings toggle after=true");
             onChange({ ...settings, notificationsEnabled: true });
             return;
         }
@@ -127,7 +123,6 @@ export function NotificationsTab({ settings, onChange }: NotificationsTabProps):
             return;
         }
 
-        console.log("[jorvik-notification] settings toggle after=true");
         onChange({ ...settings, notificationsEnabled: true });
     };
 
