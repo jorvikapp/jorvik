@@ -79,6 +79,17 @@
   </branding>
 
   <releases>
+    <release version="1.0.34" date="2026-11-19">
+      <description>
+        <p>Share the music you're listening to, the way you share the game you're playing.</p>
+        <ul>
+          <li>Turn on Share music in your status menu, or in Settings, Activity Privacy. The people you share your activity with see the song, the artist and the album cover, end-to-end encrypted</li>
+          <li>It works with music apps such as Spotify, Apple Music and TIDAL, and with music sites such as YouTube Music in your browser. Videos are never shared</li>
+          <li>Games and music each have their own switch, so you can share one without the other</li>
+          <li>Updated Matrix and encryption libraries, and security updates for Electron</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.33" date="2026-11-15">
       <description>
         <p>Spaces are now called servers, and you can turn on two-factor sign-in from Settings.</p>
