@@ -58,6 +58,22 @@ test("music apps win over a browser, and text is cleaned", () => {
     assert.equal(music.pickTrack([raw(["vlc"])]), null);
 });
 
+test("of two browser entries for one tab, the one with the artist wins, and the site's name leaves the title", () => {
+    const url = "https://music.youtube.com/playlist?list=LM";
+    const firefox = raw(["org.mpris.MediaPlayer2.firefox.instance_1_1434"], { title: "Rap God | YouTube Music", artist: "", album: "", url });
+    const plasma = raw(["org.mpris.MediaPlayer2.plasma-browser-integration"], { title: "Rap God", artist: "Eminem", album: "Rap God", url });
+    for (const tracks of [[firefox, plasma], [plasma, firefox]]) {
+        const picked = music.pickTrack(tracks);
+        assert.equal(picked.track.title, "Rap God");
+        assert.equal(picked.track.artist, "Eminem");
+        assert.equal(picked.track.player.name, "YouTube Music");
+    }
+    const alone = music.pickTrack([firefox]).track;
+    assert.equal(alone.title, "Rap God");
+    assert.equal(alone.artist, null);
+    assert.equal(music.toDetectedTrack(raw(["spotify"], { title: "YouTube Music" })).title, "YouTube Music", "a title that is only the name stays");
+});
+
 test("Windows sessions and AppleScript output parse", () => {
     const sessions = music.parseWindowsSessions('[{"app":"Spotify.exe","title":"T","artist":"A","album":""}]');
     assert.equal(sessions.length, 1);

@@ -166,19 +166,38 @@ export function musicPlayerOf(track: RawTrack): MusicPlayer | null {
     return id && name && cleanText(track.album) && cleanText(track.artist) ? { id, name } : null;
 }
 
+/** "Rap God | YouTube Music" -> "Rap God": a browser without the page's song details sends the tab's title. */
+function withoutSiteName(title: string, playerName: string): string {
+    const names = [playerName, ...MUSIC_SITES.map((site) => site.player.name)];
+    for (const name of names) {
+        for (const separator of [" | ", " - ", " – ", " — ", " · "]) {
+            const suffix = `${separator}${name}`;
+            if (title.length > suffix.length && title.toLowerCase().endsWith(suffix.toLowerCase())) {
+                return title.slice(0, -suffix.length).trim();
+            }
+        }
+    }
+    return title;
+}
+
 /** The track as the app gets it, when it is music. */
 export function toDetectedTrack(raw: RawTrack): DetectedTrack | null {
     const player = musicPlayerOf(raw);
-    const title = cleanText(raw.title);
-    if (!player || !title) {
+    const fullTitle = cleanText(raw.title);
+    if (!player || !fullTitle) {
         return null;
     }
     const artist = cleanText(raw.artist);
     const album = cleanText(raw.album);
+    const title = withoutSiteName(fullTitle, player.name);
     return { key: [player.id, title, artist ?? "", album ?? ""].join("\u0000"), player, title, artist, album };
 }
 
-/** Of several things playing, the one to show: music apps before browsers. */
+/**
+ * Of several things playing, the one to show: music apps before browsers, and of browsers one that names the artist.
+ * Firefox on KDE shows up twice for the same tab: Firefox itself with only the tab's title, and Plasma's browser
+ * integration with the song, artist, album and cover.
+ */
 export function pickTrack(tracks: RawTrack[]): { track: DetectedTrack; raw: RawTrack } | null {
     let fallback: { track: DetectedTrack; raw: RawTrack } | null = null;
     for (const raw of tracks) {
@@ -189,7 +208,9 @@ export function pickTrack(tracks: RawTrack[]): { track: DetectedTrack; raw: RawT
         if (!findPlayer(BROWSERS, raw.sources)) {
             return { track, raw };
         }
-        fallback ??= { track, raw };
+        if (!fallback || (!fallback.track.artist && track.artist)) {
+            fallback = { track, raw };
+        }
     }
     return fallback;
 }
