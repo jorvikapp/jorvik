@@ -254,7 +254,7 @@ export function UserProfilePanel({
                 emptyText={loadingProfile ? "Loading profile..." : "No bio set."}
             />
 
-            <LinksCard links={links} />
+            <LinksCard client={client} links={links} />
 
             <RolesCard roleLabel={role.label} roleBadgeClass={role.badgeClass} mutualRoomsCount={mutualRoomsCount} />
 

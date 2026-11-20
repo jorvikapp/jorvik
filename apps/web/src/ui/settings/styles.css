@@ -1267,3 +1267,7 @@
 .settings-profile-link-row input[aria-invalid="true"] {
     border-color: var(--danger, #e5484d);
 }
+
+[data-theme="light"] .rp-link-stream {
+    color: var(--text-muted, #5c6670);
+}
