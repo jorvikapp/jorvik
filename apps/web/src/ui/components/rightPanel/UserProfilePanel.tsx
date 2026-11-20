@@ -17,6 +17,8 @@ import { ProfileHeader } from "./ProfileHeader";
 import { BANNER_FIELD } from "../../../core/users/profileImages";
 import { useProfileImageSrc } from "../profile/ProfileBanner";
 import { AboutCard } from "./cards/AboutCard";
+import { LinksCard } from "./cards/LinksCard";
+import { LINKS_FIELD, profileLinksFrom } from "../../../core/users/profileLinks";
 import { RolesCard } from "./cards/RolesCard";
 
 interface UserProfilePanelProps {
@@ -188,6 +190,8 @@ export function UserProfilePanel({
     // null while loading or when it failed: no banner picture, just the colours.
     const bannerSrc = useProfileImageSrc(client, userId, BANNER_FIELD, (profile as Record<string, unknown> | null) ?? null);
 
+    const links = useMemo(() => profileLinksFrom((profile as Record<string, unknown> | null)?.[LINKS_FIELD]), [profile]);
+
     const memberSince = getMemberSince(member);
     const aboutBody = memberSince ? `${aboutText || "No bio set"}\n\nMember since ${memberSince}` : aboutText;
 
@@ -249,6 +253,8 @@ export function UserProfilePanel({
                 body={aboutBody}
                 emptyText={loadingProfile ? "Loading profile..." : "No bio set."}
             />
+
+            <LinksCard links={links} />
 
             <RolesCard roleLabel={role.label} roleBadgeClass={role.badgeClass} mutualRoomsCount={mutualRoomsCount} />
 

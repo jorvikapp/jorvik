@@ -919,3 +919,59 @@
     display: grid;
     gap: 8px;
 }
+
+.rp-links {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.rp-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 6px 8px;
+    margin: 0 -6px;
+    border-radius: 8px;
+    color: #e6edf3;
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.rp-link:hover,
+.rp-link:focus-visible {
+    background: #1a2632;
+}
+
+.rp-link-site {
+    flex: none;
+    min-width: 64px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: #22303d;
+    color: #c9d5df;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.rp-link-site.is-twitch { background: #9146ff; color: #fff; }
+.rp-link-site.is-youtube { background: #d9302c; color: #fff; }
+.rp-link-site.is-kick { background: #53fc18; color: #0e141b; }
+
+.rp-link-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rp-link-open {
+    flex: none;
+    color: #9aa7b2;
+}

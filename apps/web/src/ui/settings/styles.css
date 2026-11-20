@@ -1237,3 +1237,33 @@
     display: grid;
     gap: 10px;
 }
+
+[data-theme="light"] .rp-link {
+    color: var(--text-main);
+}
+
+[data-theme="light"] .rp-link:hover,
+[data-theme="light"] .rp-link:focus-visible {
+    background: var(--bg-hover);
+}
+
+[data-theme="light"] .rp-link-site:not(.is-twitch):not(.is-youtube):not(.is-kick) {
+    background: var(--bg-hover);
+    color: var(--text-main);
+}
+
+.settings-profile-link-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.settings-profile-link-row .settings-inline-error {
+    grid-column: 1 / -1;
+    margin: 0;
+}
+
+.settings-profile-link-row input[aria-invalid="true"] {
+    border-color: var(--danger, #e5484d);
+}

@@ -4,6 +4,7 @@ import type { MatrixClient } from "matrix-js-sdk/src/matrix";
 import { activityAudience, describeActivityAudience } from "../../../../core/activity/activityPrivacy";
 import { formatUserIdForDisplay } from "../../../../core/users/formatUserId";
 import { BANNER_FIELD, NAMEPLATE_FIELD } from "../../../../core/users/profileImages";
+import { LINKS_FIELD, MAX_PROFILE_LINK_LENGTH, MAX_PROFILE_LINKS, profileLinksFrom, webLinkHref } from "../../../../core/users/profileLinks";
 import { useJoinedSpaces, useUserActivity } from "../../../activity/useActivity";
 import { useActivityPrivacy } from "../../../activity/useActivityPrivacy";
 import { mediaFromMxc, thumbnailFromMxc } from "../../../adapters/media";
@@ -40,6 +41,9 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
     const [baselineDisplayName, setBaselineDisplayName] = useState("");
     const [baselineAvatarMxc, setBaselineAvatarMxc] = useState("");
     const [baselineBio, setBaselineBio] = useState("");
+    // What's typed in each link box; saved as the web addresses they make.
+    const [links, setLinks] = useState<string[]>([]);
+    const [baselineLinks, setBaselineLinks] = useState<string[]>([]);
     // Custom profile fields are MSC4133 and off by default in Synapse. Hide the
     // field rather than offering one that cannot be saved.
     const [bioSupported, setBioSupported] = useState(false);
@@ -107,6 +111,9 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
                 const nextBio = typeof storedBio === "string" ? storedBio : "";
                 setBio(nextBio);
                 setBaselineBio(nextBio);
+                const nextLinks = profileLinksFrom((info as Record<string, unknown>)[LINKS_FIELD]);
+                setLinks(nextLinks);
+                setBaselineLinks(nextLinks);
             } catch (loadError) {
                 if (!canceled) {
                     setError(loadError instanceof Error ? loadError.message : "Failed to load profile.");
@@ -136,10 +143,16 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
     // Until the profile loads (or without a display name), the short form of the id, as elsewhere in the app.
     const previewName = displayName.trim() || formatUserIdForDisplay(userId, client.getDomain()) || "User";
 
+    const linkHrefs = links.map((link) => (link.trim() ? webLinkHref(link) : null));
+    const badLink = links.some((link, index) => link.trim() !== "" && !linkHrefs[index]);
+    const savedLinks = [...new Set(linkHrefs.filter((href): href is string => Boolean(href)))];
+    const linksChanged = savedLinks.join("\n") !== baselineLinks.join("\n");
+
     const hasChanges =
         displayName.trim() !== baselineDisplayName.trim() ||
         avatarMxc !== baselineAvatarMxc ||
-        (bioSupported && bio.trim() !== baselineBio.trim());
+        (bioSupported && bio.trim() !== baselineBio.trim()) ||
+        (bioSupported && linksChanged);
 
     const uploadAvatar = async (file: File): Promise<void> => {
         setUploading(true);
@@ -191,6 +204,16 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
                 }
                 setBaselineBio(nextBio);
                 setBio(nextBio);
+            }
+
+            if (bioSupported && linksChanged) {
+                if (savedLinks.length > 0) {
+                    await client.setExtendedProfileProperty(LINKS_FIELD, savedLinks);
+                } else {
+                    await client.deleteExtendedProfileProperty(LINKS_FIELD);
+                }
+                setBaselineLinks(savedLinks);
+                setLinks(savedLinks);
             }
 
 
@@ -391,13 +414,65 @@ export function ProfileTab({ client, onToast, statusMessage = "", onOpenActivity
                 </label>
             ) : null}
 
+            {bioSupported ? (
+                <div className="settings-field settings-profile-links">
+                    <span id="profile-links-label">Links</span>
+                    {links.map((link, index) => (
+                        <div key={index} className="settings-profile-link-row">
+                            <input
+                                type="url"
+                                inputMode="url"
+                                value={link}
+                                aria-labelledby="profile-links-label"
+                                aria-invalid={Boolean(link.trim() && !linkHrefs[index])}
+                                placeholder="twitch.tv/yourname"
+                                maxLength={MAX_PROFILE_LINK_LENGTH}
+                                onChange={(event) => {
+                                    const value = event.target.value;
+                                    setLinks((current) => current.map((item, i) => (i === index ? value : item)));
+                                }}
+                                disabled={saving}
+                            />
+                            <button
+                                type="button"
+                                className="settings-button settings-button-secondary"
+                                aria-label={`Remove link ${index + 1}`}
+                                onClick={() => setLinks((current) => current.filter((_, i) => i !== index))}
+                                disabled={saving}
+                            >
+                                Remove
+                            </button>
+                            {link.trim() && !linkHrefs[index] ? (
+                                <span className="settings-inline-error">That isn't a web address. Try twitch.tv/yourname.</span>
+                            ) : null}
+                        </div>
+                    ))}
+                    {links.length < MAX_PROFILE_LINKS ? (
+                        <div>
+                            <button
+                                type="button"
+                                className="settings-button settings-button-secondary"
+                                onClick={() => setLinks((current) => [...current, ""])}
+                                disabled={saving || !profileLoaded}
+                            >
+                                Add link
+                            </button>
+                        </div>
+                    ) : null}
+                    <span className="settings-inline-note">
+                        Up to {MAX_PROFILE_LINKS}: Twitch, YouTube, your website and so on. They show on your profile to people on
+                        this server, and open in the browser.
+                    </span>
+                </div>
+            ) : null}
+
             {error ? <p className="settings-inline-error">{error}</p> : null}
 
             <div className="settings-actions-row">
                 <button
                     type="button"
                     className="settings-button"
-                    disabled={!hasChanges || saving || uploading}
+                    disabled={!hasChanges || badLink || saving || uploading}
                     onClick={() => void saveProfile()}
                 >
                     {saving ? "Saving..." : "Save profile"}
