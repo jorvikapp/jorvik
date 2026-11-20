@@ -74,6 +74,19 @@ test("of two browser entries for one tab, the one with the artist wins, and the 
     assert.equal(music.toDetectedTrack(raw(["spotify"], { title: "YouTube Music" })).title, "YouTube Music", "a title that is only the name stays");
 });
 
+test("Apple Music's tab title gives the song and the artist", () => {
+    const tab = (title) => music.toDetectedTrack(raw(["org.mpris.MediaPlayer2.firefox.instance_1_9"], { title, artist: "", album: "", url: "https://music.apple.com/us/song/rap-god/1440871447" }));
+    for (const title of ["Rap God - Song with Lyrics by Eminem - Apple Music", "Rap God - Song by Eminem - Apple Music", "Rap God - Single by Eminem"]) {
+        const track = tab(title);
+        assert.equal(track.title, "Rap God", title);
+        assert.equal(track.artist, "Eminem", title);
+        assert.equal(track.player.name, "Apple Music");
+    }
+    assert.equal(tab("Love Me - Remix").title, "Love Me - Remix", "a plain dash in a title stays");
+    const named = music.toDetectedTrack(raw(["spotify"], { title: "Song by Night - Song by Someone", artist: "Real Artist" }));
+    assert.equal(named.title, "Song by Night - Song by Someone", "only Apple Music, and only without an artist");
+});
+
 test("Windows sessions and AppleScript output parse", () => {
     const sessions = music.parseWindowsSessions('[{"app":"Spotify.exe","title":"T","artist":"A","album":""}]');
     assert.equal(sessions.length, 1);

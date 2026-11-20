@@ -180,6 +180,12 @@ function withoutSiteName(title: string, playerName: string): string {
     return title;
 }
 
+/**
+ * Apple Music's tab titles name the artist: "Rap God - Song with Lyrics by Eminem" -> song "Rap God", artist "Eminem".
+ * Also "- Song by", "- Single by", "- EP by" and "- Album by".
+ */
+const APPLE_MUSIC_TAB_TITLE = /^(.+?) - (?:Song|Single|EP|Album)(?: with Lyrics)? by (.+)$/i;
+
 /** The track as the app gets it, when it is music. */
 export function toDetectedTrack(raw: RawTrack): DetectedTrack | null {
     const player = musicPlayerOf(raw);
@@ -187,9 +193,14 @@ export function toDetectedTrack(raw: RawTrack): DetectedTrack | null {
     if (!player || !fullTitle) {
         return null;
     }
-    const artist = cleanText(raw.artist);
+    let artist = cleanText(raw.artist);
     const album = cleanText(raw.album);
-    const title = withoutSiteName(fullTitle, player.name);
+    let title = withoutSiteName(fullTitle, player.name);
+    const apple = !artist && player.id === "apple-music" ? APPLE_MUSIC_TAB_TITLE.exec(title) : null;
+    if (apple) {
+        title = apple[1].trim();
+        artist = apple[2].trim();
+    }
     return { key: [player.id, title, artist ?? "", album ?? ""].join("\u0000"), player, title, artist, album };
 }
 
