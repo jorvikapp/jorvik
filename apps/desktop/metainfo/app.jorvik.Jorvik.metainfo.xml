@@ -79,6 +79,17 @@
   </branding>
 
   <releases>
+    <release version="1.0.35" date="2026-11-20">
+      <description>
+        <p>Add your links to your profile, and show when you're live on Twitch.</p>
+        <ul>
+          <li>Settings, Profile has a Links section for up to five links, such as Twitch, YouTube or your website. Other people see them on your profile and can open them in the browser</li>
+          <li>A Twitch link shows LIVE, with the game and the stream's title, while that channel is streaming</li>
+          <li>Music from YouTube Music in Firefox now shows the artist</li>
+          <li>Music from Apple Music in the browser shows the song and the artist instead of the page's title</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.34" date="2026-11-19">
       <description>
         <p>Share the music you're listening to, the way you share the game you're playing.</p>
