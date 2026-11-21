@@ -38,6 +38,7 @@ import {
     playScreenShareStopSound,
 } from "../../notifications/sound";
 import { useMatrix } from "../../providers/MatrixProvider";
+import { MicrophoneOpenTimeoutError, openMicrophoneForJoin, stopAll } from "../../voice/microphoneJoin";
 import type { AudioSettings } from "../../settings/user/settingsStore";
 import { RoomDialog } from "../rooms/RoomDialog";
 import { ParticipantVideo } from "./ParticipantVideo";
@@ -385,7 +386,7 @@ function extractJoinRetryAfterMs(error: unknown): number | null {
 }
 
 function isRecoverableVoiceJoinError(error: unknown): boolean {
-    if (isAbortError(error)) {
+    if (isAbortError(error) || error instanceof MicrophoneOpenTimeoutError) {
         return false;
     }
 
@@ -1452,15 +1453,26 @@ export const VoiceRoom = React.forwardRef<VoiceRoomHandle, VoiceRoomProps>(funct
             // Muted or deafened before the call: join that way, without opening the mic at all.
             const joinMicMuted = getLocalAvState().micMuted;
             if (!joinMicMuted) {
-                await withTimeout(
-                    room.localParticipant.setMicrophoneEnabled(
-                        true,
-                        buildMicrophoneCaptureOptions(audioSettings),
-                        buildMicrophonePublishOptions(audioSettings),
-                    ),
-                    VOICE_JOIN_MEDIA_SETUP_TIMEOUT_MS,
-                    "Microphone setup timed out.",
+                // Opening the mic can wait on a popup: no short timeout or retry there (see microphoneJoin.ts).
+                const micTracks = await openMicrophoneForJoin(
+                    () => room.localParticipant.createTracks({ audio: buildMicrophoneCaptureOptions(audioSettings) }),
+                    isCurrentJoinRequest,
                 );
+                if (!micTracks) {
+                    void room.disconnect().catch(() => undefined);
+                    return;
+                }
+                const publishOptions = buildMicrophonePublishOptions(audioSettings);
+                try {
+                    await withTimeout(
+                        Promise.all(micTracks.map((track) => room.localParticipant.publishTrack(track, publishOptions))),
+                        VOICE_JOIN_MEDIA_SETUP_TIMEOUT_MS,
+                        "Microphone setup timed out.",
+                    );
+                } catch (publishError) {
+                    stopAll(micTracks);
+                    throw publishError;
+                }
             }
             ensureCurrentJoinRequest();
             if (!isCurrentJoinRequest()) {

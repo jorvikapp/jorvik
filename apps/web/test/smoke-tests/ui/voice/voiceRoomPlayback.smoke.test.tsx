@@ -233,6 +233,32 @@ describe("voice room smoke", () => {
                                 },
                             });
                         },
+                        // Joining opens the mic itself and then publishes it (see microphoneJoin.ts).
+                        createTracks: async (options: { audio?: unknown }) => {
+                            if (options.audio && micFailure) {
+                                throw micFailure;
+                            }
+                            return [
+                                {
+                                    kind: Track.Kind.Audio,
+                                    source: Track.Source.Microphone,
+                                    stop: () => undefined,
+                                    mediaStreamTrack: {
+                                        getSettings: () => ({
+                                            echoCancellation: true,
+                                            noiseSuppression: true,
+                                            autoGainControl: true,
+                                            voiceIsolation: true,
+                                        }),
+                                    },
+                                },
+                            ];
+                        },
+                        publishTrack: async (track: { kind: string; source: string }) => {
+                            const publication = { kind: track.kind, source: track.source, track };
+                            this.localParticipant.trackPublications.set(track.source, publication);
+                            return publication;
+                        },
                         setScreenShareEnabled: async () => undefined,
                         // Like LiveKit: turning the camera off mutes its publication.
                         setCameraEnabled: async (enabled: boolean, ...rest: unknown[]) => {
