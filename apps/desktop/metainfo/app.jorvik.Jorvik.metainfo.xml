@@ -79,6 +79,16 @@
   </branding>
 
   <releases>
+    <release version="1.0.36" date="2026-11-22">
+      <description>
+        <p>Fixes for channels you were invited to, and for joining voice.</p>
+        <ul>
+          <li>Opening a channel you were invited to in one of your servers now joins it. Before, it stayed empty with no way to accept the invite</li>
+          <li>Joining voice waits while you answer the microphone popup, instead of dropping you from the call after a few seconds</li>
+          <li>If the microphone opens after a voice join has given up, it is closed straight away</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.35" date="2026-11-20">
       <description>
         <p>Add your links to your profile, and show when you're live on Twitch.</p>
