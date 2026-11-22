@@ -1476,7 +1476,7 @@ export function Composer({
         }
 
         if (room.getMyMembership() !== "join") {
-            setError("Room is not joined yet. Wait for join to finish or press Join.");
+            setError("You're not in this channel yet. Try again in a moment.");
             return;
         }
 

@@ -2643,7 +2643,16 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         if (!activeRoomCandidate || activeRoomCandidate.isSpaceRoom()) {
             return;
         }
-        if (!directRoomIds.has(activeRoomCandidate.roomId)) {
+        const isDirect = directRoomIds.has(activeRoomCandidate.roomId);
+        // A channel someone was invited to in a server they're in: opening it joins it, as Join would. Without
+        // this it looks like any other channel but stays empty, with nothing to accept the invite.
+        const parentServerId = isDirect
+            ? null
+            : (spaces.find(
+                  (space) =>
+                      space.getMyMembership() === "join" && readSpaceChildOrder(space).has(activeRoomCandidate.roomId),
+              )?.roomId ?? null);
+        if (!isDirect && !parentServerId) {
             return;
         }
 
@@ -2652,7 +2661,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             autoJoiningDirectRoomIdsRef.current.delete(activeRoomCandidate.roomId);
             return;
         }
-        if (membership !== "invite" && membership !== "knock") {
+        if (membership !== "invite" && (membership !== "knock" || !isDirect)) {
             return;
         }
         if (autoJoiningDirectRoomIdsRef.current.has(activeRoomCandidate.roomId)) {
@@ -2660,7 +2669,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
         }
 
         autoJoiningDirectRoomIdsRef.current.add(activeRoomCandidate.roomId);
-        void requestJoinRoom(activeRoomCandidate.roomId, { preferredSpaceId: null })
+        void requestJoinRoom(activeRoomCandidate.roomId, { preferredSpaceId: parentServerId })
             .catch((joinError) => {
                 pushToast({
                     type: "error",
@@ -2670,7 +2679,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
             .finally(() => {
                 autoJoiningDirectRoomIdsRef.current.delete(activeRoomCandidate.roomId);
             });
-    }, [activeRoomId, client, directRoomIds, pushToast, requestJoinRoom]);
+    }, [activeRoomId, client, directRoomIds, pushToast, requestJoinRoom, spaces]);
 
     useEffect(() => {
         if (!pendingFocusRoomId) {
