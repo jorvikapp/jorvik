@@ -42,6 +42,7 @@ import {
 import { Toast, type ToastState } from "./Toast";
 import { ReactionsRow } from "./reactions/ReactionsRow";
 import { useLongPress } from "../layout/longPress";
+import { retryUnsent, sendDisplayState, isPermanentSendFailure } from "../../core/messages/sendRetry";
 
 interface TimelineProps {
     client: MatrixClient;
@@ -690,28 +691,6 @@ export function isRenderableMessage(event: MatrixEvent): boolean {
 
     const content = getMessageContent(event);
     return isRenderableMessageContent(content);
-}
-
-/**
- * True while a message we sent has not yet come back from the server.
- *
- * The client starts with pendingEventOrdering Detached, which keeps unsent
- * events out of the live timeline, so without this they are invisible until the
- * server echoes them back. On a distant server that is most of a second of the
- * composer looking like it did nothing.
- */
-export function isPendingEvent(event: MatrixEvent): boolean {
-    const status = event.status;
-    return (
-        status === EventStatus.ENCRYPTING ||
-        status === EventStatus.SENDING ||
-        status === EventStatus.QUEUED ||
-        status === EventStatus.NOT_SENT
-    );
-}
-
-export function hasSendFailed(event: MatrixEvent): boolean {
-    return event.status === EventStatus.NOT_SENT;
 }
 
 function extractMessageEvents(room: Room | null): MatrixEvent[] {
@@ -1389,6 +1368,18 @@ export function Timeline({
 }: TimelineProps): React.ReactElement {
     const decryptTuning = useMemo<DecryptTuning>(() => loadDecryptTuning(), []);
     const [events, setEvents] = useState<MatrixEvent[]>(() => extractMessageEvents(room));
+    // Our messages on their way turn red once they've taken too long (sendDisplayState); this clock
+    // re-renders the chat each second while any are waiting, so that happens without another event.
+    const hasMessagesOnTheirWay = useMemo(() => events.some((event) => sendDisplayState(event) !== "sent"), [events]);
+    const [sendClock, setSendClock] = useState(() => Date.now());
+    useEffect(() => {
+        if (!hasMessagesOnTheirWay) {
+            return undefined;
+        }
+        setSendClock(Date.now());
+        const timer = setInterval(() => setSendClock(Date.now()), 1000);
+        return () => clearInterval(timer);
+    }, [hasMessagesOnTheirWay]);
     const [emojiSourcesByShortcode, setEmojiSourcesByShortcode] = useState<ReadonlyMap<string, string>>(
         () => new Map(),
     );
@@ -2658,9 +2649,12 @@ export function Timeline({
                               }
                             : null;
 
+                    const sendState = sendDisplayState(event, sendClock);
+                    const sendRefusedReason =
+                        sendState === "failed" && isPermanentSendFailure(event) ? event.error?.message : undefined;
                     const eventElement = (
                         <div
-                            className={`timeline-event${isActiveReplyTarget ? " timeline-event-reply-target" : ""}${isDirectMentionEvent ? " timeline-event-direct-mention" : ""}${isPendingEvent(event) ? " timeline-event-pending" : ""}${hasSendFailed(event) ? " timeline-event-failed" : ""}`}
+                            className={`timeline-event${isActiveReplyTarget ? " timeline-event-reply-target" : ""}${isDirectMentionEvent ? " timeline-event-direct-mention" : ""}${sendState === "sending" ? " timeline-event-pending" : ""}${sendState === "failed" ? " timeline-event-failed" : ""}`}
                             key={key}
                             data-event-key={key}
                             data-event-id={eventId ?? undefined}
@@ -2696,6 +2690,7 @@ export function Timeline({
                                 onReply={onReply}
                                 onEdit={onEdit}
                                 onToast={pushToast}
+                                unsent={sendState === "failed"}
                             />
                             {reply ? (
                                 <button
@@ -2959,6 +2954,26 @@ export function Timeline({
                                 mxEvent={event}
                                 customReactionImagesEnabled={customReactionImagesEnabled}
                             />
+                            {sendState === "failed" ? (
+                                event.status === EventStatus.NOT_SENT ? (
+                                    <button
+                                        type="button"
+                                        className="timeline-unsent"
+                                        title={sendRefusedReason ? `The server refused it: ${sendRefusedReason}` : "Send it again"}
+                                        onClick={() => retryUnsent(client, room, { includeRefused: true })}
+                                    >
+                                        <span>Not sent</span>
+                                        <span aria-hidden="true">·</span>
+                                        <span className="timeline-unsent-action">Retry</span>
+                                    </button>
+                                ) : (
+                                    <button type="button" className="timeline-unsent" disabled>
+                                        <span>Not sent yet</span>
+                                        <span aria-hidden="true">·</span>
+                                        <span>Trying again...</span>
+                                    </button>
+                                )
+                            ) : null}
                             {visibleReadReceipts.length > 0 ? (
                                 <div
                                     className={`timeline-read-receipts${showHeader ? "" : " timeline-read-receipts-grouped"}`}

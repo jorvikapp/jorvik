@@ -13,6 +13,7 @@ import { reportMessage } from "../../../core/moderation/reports";
 import { ReportDialog } from "../moderation/ReportDialog";
 import { usePhoneLayout } from "../../layout/phoneLayout";
 import { UNDECRYPTABLE_PREVIEW } from "../../messages/undecryptable";
+import { canRemoveUnsent, retryUnsent } from "../../../core/messages/sendRetry";
 
 interface Position {
     x: number;
@@ -30,6 +31,8 @@ interface MessageActionsBarProps {
     onReply: (event: MatrixEvent) => void;
     onEdit: (event: MatrixEvent) => void;
     onToast: (toast: Omit<ToastState, "id">) => void;
+    /** Our message didn't go out (shown in red): its actions are Retry, Edit, Copy text and Delete. */
+    unsent?: boolean;
 }
 
 export function MessageActionsBar({
@@ -43,6 +46,7 @@ export function MessageActionsBar({
     onReply,
     onEdit,
     onToast,
+    unsent = false,
 }: MessageActionsBarProps): React.ReactElement {
     const {
         canEdit,
@@ -187,6 +191,24 @@ export function MessageActionsBar({
         );
     };
 
+    const retryUnsentMessage = (): void => {
+        retryUnsent(client, room, { includeRefused: true });
+    };
+
+    // Taking back a message that never went out: nothing to delete for anyone else, so no question asked.
+    const removeUnsentMessage = (): void => {
+        if (!canRemoveUnsent(event)) {
+            onToast({ type: "error", message: "Still trying to send this one. Try again in a few seconds." });
+            return;
+        }
+        try {
+            client.cancelPendingEvent(event);
+        } catch (error) {
+            const details = error instanceof Error ? error.message : String(error);
+            onToast({ type: "error", message: `Couldn't remove the message. (${details})` });
+        }
+    };
+
     const openContextMenuFromMore = (): void => {
         const rect = moreButtonRef.current?.getBoundingClientRect();
         if (!rect) {
@@ -224,6 +246,49 @@ export function MessageActionsBar({
 
     return (
         <>
+            {unsent ? (
+                <div className={`message-actions-bar${isVisible ? " is-visible" : ""}`}>
+                    <button
+                        type="button"
+                        className="message-actions-button"
+                        title="Retry"
+                        aria-label="Retry"
+                        onClick={retryUnsentMessage}
+                    >
+                        ↻
+                    </button>
+                    {canEdit ? (
+                        <button
+                            type="button"
+                            className="message-actions-button"
+                            title="Edit"
+                            aria-label="Edit"
+                            onClick={() => onEdit(event)}
+                        >
+                            ✏
+                        </button>
+                    ) : null}
+                    <button
+                        type="button"
+                        className="message-actions-button"
+                        title="Delete"
+                        aria-label="Delete"
+                        onClick={removeUnsentMessage}
+                    >
+                        🗑
+                    </button>
+                    <button
+                        ref={moreButtonRef}
+                        type="button"
+                        className="message-actions-button"
+                        title="More"
+                        aria-label="More actions"
+                        onClick={openContextMenuFromMore}
+                    >
+                        ⋯
+                    </button>
+                </div>
+            ) : (
             <div className={`message-actions-bar${isVisible ? " is-visible" : ""}`}>
                 <button
                     ref={barReactButtonRef}
@@ -302,6 +367,7 @@ export function MessageActionsBar({
                     </div>
                 ) : null}
             </div>
+            )}
 
             {isPhone ? (
                 <MessageActionSheet
@@ -312,6 +378,8 @@ export function MessageActionsBar({
                     canDelete={canDelete}
                     canCopyText={Boolean(plainTextBody && plainTextBody.trim().length > 0)}
                     canReport={canReport}
+                    unsent={unsent}
+                    onRetry={retryUnsentMessage}
                     onClose={onCloseContextMenu}
                     onQuickReact={(key) => {
                         void handleReactSelection({ key });
@@ -320,6 +388,10 @@ export function MessageActionsBar({
                     onReply={() => onReply(event)}
                     onEdit={() => onEdit(event)}
                     onDelete={() => {
+                        if (unsent) {
+                            removeUnsentMessage();
+                            return;
+                        }
                         void handleDelete();
                     }}
                     onReport={() => setReportOpen(true)}
@@ -354,12 +426,18 @@ export function MessageActionsBar({
                 canDelete={canDelete}
                 canCopyText={Boolean(plainTextBody && plainTextBody.trim().length > 0)}
                 canReport={canReport}
+                unsent={unsent}
+                onRetry={retryUnsentMessage}
                 onReport={() => setReportOpen(true)}
                 onClose={onCloseContextMenu}
                 onReact={openReactFromContextMenu}
                 onReply={() => onReply(event)}
                 onEdit={() => onEdit(event)}
                 onDelete={() => {
+                    if (unsent) {
+                        removeUnsentMessage();
+                        return;
+                    }
                     void handleDelete();
                 }}
                 onCopyLink={() => {

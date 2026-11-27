@@ -11,6 +11,9 @@ interface MessageActionSheetProps {
     canDelete: boolean;
     canCopyText: boolean;
     canReport: boolean;
+    /** The message didn't go out: offer Retry, Edit, Copy text and Delete only. */
+    unsent?: boolean;
+    onRetry?: () => void;
     onClose: () => void;
     onQuickReact: (key: string) => void;
     onMoreReactions: () => void;
@@ -32,6 +35,8 @@ export function MessageActionSheet({
     canDelete,
     canCopyText,
     canReport,
+    unsent = false,
+    onRetry,
     onClose,
     onQuickReact,
     onMoreReactions,
@@ -46,6 +51,39 @@ export function MessageActionSheet({
         onClose();
         action();
     };
+
+    if (unsent) {
+        return (
+            <BottomSheet open={open} label="Message actions" onClose={onClose} className="message-action-sheet">
+                <div className="message-action-sheet-preview">
+                    <span className="message-action-sheet-sender">Not sent</span>
+                    <span className="message-action-sheet-body">{preview}</span>
+                </div>
+                <div className="sheet-group">
+                    {onRetry ? (
+                        <button type="button" className="sheet-item" onClick={() => run(onRetry)}>
+                            Retry
+                        </button>
+                    ) : null}
+                    {canEdit ? (
+                        <button type="button" className="sheet-item" onClick={() => run(onEdit)}>
+                            Edit message
+                        </button>
+                    ) : null}
+                    {canCopyText ? (
+                        <button type="button" className="sheet-item" onClick={() => run(onCopyText)}>
+                            Copy text
+                        </button>
+                    ) : null}
+                </div>
+                <div className="sheet-group">
+                    <button type="button" className="sheet-item sheet-item-danger" onClick={() => run(onDelete)}>
+                        Delete message
+                    </button>
+                </div>
+            </BottomSheet>
+        );
+    }
 
     return (
         <BottomSheet open={open} label="Message actions" onClose={onClose} className="message-action-sheet">

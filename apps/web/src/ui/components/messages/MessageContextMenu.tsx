@@ -13,6 +13,9 @@ interface MessageContextMenuProps {
     canDelete: boolean;
     canCopyText: boolean;
     canReport: boolean;
+    /** The message didn't go out: offer Retry, Edit, Copy text and Delete only. */
+    unsent?: boolean;
+    onRetry?: () => void;
     onReport: () => void;
     onClose: () => void;
     onReact: () => void;
@@ -31,6 +34,8 @@ export function MessageContextMenu({
     canDelete,
     canCopyText,
     canReport,
+    unsent = false,
+    onRetry,
     onReport,
     onClose,
     onReact,
@@ -101,6 +106,44 @@ export function MessageContextMenu({
         action();
         onClose();
     };
+
+    if (unsent) {
+        return createPortal(
+            <div
+                ref={menuRef}
+                className="message-context-menu"
+                style={{
+                    left: `${clampedPosition?.x ?? position.x}px`,
+                    top: `${clampedPosition?.y ?? position.y}px`,
+                }}
+                role="menu"
+            >
+                {onRetry ? (
+                    <button type="button" className="message-context-menu-item" onClick={() => clickAction(onRetry)}>
+                        Retry
+                    </button>
+                ) : null}
+                {canEdit ? (
+                    <button type="button" className="message-context-menu-item" onClick={() => clickAction(onEdit)}>
+                        Edit
+                    </button>
+                ) : null}
+                {canCopyText ? (
+                    <button type="button" className="message-context-menu-item" onClick={() => clickAction(onCopyText)}>
+                        Copy text
+                    </button>
+                ) : null}
+                <button
+                    type="button"
+                    className="message-context-menu-item message-context-menu-item-danger"
+                    onClick={() => clickAction(onDelete)}
+                >
+                    Delete
+                </button>
+            </div>,
+            document.body,
+        );
+    }
 
     return createPortal(
         <div

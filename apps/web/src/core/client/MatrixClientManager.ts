@@ -10,6 +10,7 @@ import {
 import { logger } from "matrix-js-sdk/src/logger";
 
 import { LegacyTokenKeeper, type LegacyTokenRefreshFunction } from "./legacyTokenRefresh";
+import { createSendScheduler, withSendTimeout } from "../messages/sendRetry";
 
 import type { MatrixClientAssignOpts, MatrixCredentials } from "../types/credentials";
 import { createMatrixClient } from "./createMatrixClient";
@@ -180,6 +181,8 @@ export class MatrixClientManager {
             });
             fetchFn = keeper.fetch;
         }
+        // Sending a message gets a time limit and the scheduler's retry rules; see sendRetry.ts.
+        fetchFn = withSendTimeout(fetchFn ?? ((input, init) => globalThis.fetch(input, init)));
         const opts: ICreateClientOpts = {
             baseUrl: creds.homeserverUrl,
             idBaseUrl: creds.identityServerUrl,
@@ -190,6 +193,7 @@ export class MatrixClientManager {
             pickleKey: creds.pickleKey,
             timelineSupport: true,
             cryptoCallbacks: { ...coreCryptoCallbacks },
+            scheduler: createSendScheduler(),
         };
 
         this.matrixClient = createMatrixClient(opts);

@@ -95,6 +95,90 @@ textarea {
     animation: spin 900ms linear infinite;
 }
 
+/* Shown over everything when the server has been out of reach for a while; looks like the loading screen. */
+.server-disconnected {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: var(--bg-app);
+}
+
+.server-disconnected-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    max-width: 420px;
+    text-align: center;
+}
+
+.server-disconnected-card h2 {
+    margin: 4px 0 0;
+    font-size: 20px;
+    color: var(--text-main);
+}
+
+.server-disconnected-card p {
+    margin: 0;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.server-disconnected-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.server-disconnected-primary,
+.server-disconnected-secondary {
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.server-disconnected-primary {
+    border: 0;
+    background: var(--primary);
+    color: #fff;
+}
+
+.server-disconnected-primary:disabled {
+    opacity: 0.7;
+    cursor: default;
+}
+
+.server-disconnected-secondary {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-main);
+}
+
+.server-disconnected-secondary:hover,
+.server-disconnected-primary:hover:not(:disabled) {
+    filter: brightness(1.1);
+}
+
+.server-disconnected-dismiss {
+    border: 0;
+    background: none;
+    padding: 4px;
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
 @keyframes spin {
     from {
         transform: rotate(0deg);
@@ -2945,6 +3029,37 @@ textarea {
 .timeline-event-failed {
     opacity: 1;
     border-left: 2px solid var(--danger, #da4453);
+    background: color-mix(in srgb, var(--danger, #da4453) 7%, transparent);
+}
+
+/* "Not sent" under a message that didn't go out: the label retries it. */
+.timeline-unsent {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    /* Under the message text, like reactions. */
+    margin: 2px 0 2px 50px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--danger, #da4453);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.timeline-unsent:disabled {
+    cursor: default;
+    opacity: 0.85;
+}
+
+.timeline-unsent-action {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.timeline-unsent:hover:not(:disabled) .timeline-unsent-action {
+    text-decoration-thickness: 2px;
 }
 
 .timeline-event-direct-mention:hover {

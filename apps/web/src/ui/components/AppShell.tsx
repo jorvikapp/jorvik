@@ -142,6 +142,8 @@ import { UserPanel } from "./user/UserPanel";
 import { CameraIcon, MicIcon, SoundIcon } from "./voice/AvIcons";
 import { toggleDeafened, toggleMicMuted, useLocalAvState } from "../voice/localAvState";
 import { nameThisDevice } from "../../core/devices/deviceName";
+import { startSendRetryKeeper } from "../../core/messages/sendRetry";
+import { ServerDisconnected } from "./ServerDisconnected";
 
 interface AppShellProps {
     client: MatrixClient;
@@ -1037,6 +1039,8 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const [statusMenuOpen, setStatusMenuOpen] = useState(false);
     const { config: coreConfig } = useMatrix();
     const localDomain = useMemo(() => client.getDomain(), [client]);
+    // Messages that didn't go out are sent again when the server is back (sendRetry.ts).
+    useEffect(() => startSendRetryKeeper(client), [client]);
     const [pendingFocusRoomId, setPendingFocusRoomId] = useState<string | null>(null);
     const [userSettings, setUserSettings] = useState<UserLocalSettings>(() => loadUserLocalSettings());
     const [toast, setToast] = useState<ToastState | null>(null);
@@ -4116,6 +4120,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
                 onClose={closeRailMenu}
             />
             <Toast toast={toast} onClose={() => setToast(null)} />
+            <ServerDisconnected client={client} />
         </div>
     );
 }

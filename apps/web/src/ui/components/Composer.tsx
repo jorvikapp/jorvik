@@ -29,6 +29,7 @@ import { GifPicker } from "./composer/GifPicker";
 import { Toast, type ToastState } from "./Toast";
 import { TypingIndicator } from "./typing/TypingIndicator";
 import { usePhoneLayout } from "../layout/phoneLayout";
+import { canRemoveUnsent } from "../../core/messages/sendRetry";
 
 interface ComposerProps {
     client: MatrixClient;
@@ -1519,7 +1520,11 @@ export function Composer({
                 const mentions = buildMentionsPayload(formatted.mentionedUserIds);
 
                 const newContent = buildTextMessageContent(formatted.content);
-                if (editingEventId) {
+                // Editing a message that never went out: it has no ID on the server to edit, so the new
+                // text goes out in its place, as a reply to whatever the original replied to.
+                const editingUnsent =
+                    editingEvent !== null && Boolean(editingEventId) && !editingEventId!.startsWith("$");
+                if (editingEventId && !editingUnsent) {
                     const editContent = buildEditMessageContent(editingEventId, newContent, mentions);
                     await client.sendEvent(
                         room.roomId,
@@ -1534,23 +1539,34 @@ export function Composer({
                     if (mentions) {
                         content["m.mentions"] = mentions;
                     }
-                    attachReplyRelation(content, replyToEvent?.getId() ?? null);
+                    const replyTarget = editingUnsent
+                        ? (editingEvent!.getContent()["m.relates_to"]?.["m.in_reply_to"]?.event_id ?? null)
+                        : (replyToEvent?.getId() ?? null);
+                    attachReplyRelation(content, replyTarget);
+                    if (editingUnsent) {
+                        if (!canRemoveUnsent(editingEvent!)) {
+                            throw new Error("The original is still on its way. Try again in a few seconds.");
+                        }
+                        client.cancelPendingEvent(editingEvent!);
+                    }
 
-                    await client.sendEvent(
-                        room.roomId,
-                        EventType.RoomMessage,
-                        content as any,
-                        "",
-                    );
+                    // The message is in the chat from here on. If the server doesn't take it, it stays there,
+                    // turns red and is sent again (sendRetry.ts), so the box doesn't wait for the answer.
+                    client
+                        .sendEvent(room.roomId, EventType.RoomMessage, content as any, "")
+                        .catch(() => {});
                 }
             }
 
             if (wasEditingMessage) {
                 onCancelEdit();
-                pushToast({
-                    type: "success",
-                    message: "Message edited.",
-                });
+                // A message that never went out was replaced, not edited; it just goes out with the new text.
+                if (editingEventId?.startsWith("$")) {
+                    pushToast({
+                        type: "success",
+                        message: "Message edited.",
+                    });
+                }
             }
             if (hadReply) {
                 onCancelReply();
@@ -1567,21 +1583,8 @@ export function Composer({
                 }
             }
         } catch (sendError) {
-            let message = sendError instanceof Error ? sendError.message : "Unknown error";
-            let fallbackMessage = wasEditingMessage ? "Failed to edit message" : "Failed to send message";
-
-            if (sendError instanceof Error && sendError.message.includes("Event blocked by other events not yet sent")) {
-                const blockedEvents = room.getPendingEvents().filter((pendingEvent) => pendingEvent.status === "not_sent");
-                for (const blockedEvent of blockedEvents) {
-                    try {
-                        client.cancelPendingEvent(blockedEvent);
-                    } catch {
-                        // best-effort recovery of a blocked pending queue
-                    }
-                }
-                fallbackMessage = "Previous unsent message blocked this room. It was cleared.";
-                message = "Previous unsent message was cleared. Send again.";
-            }
+            const message = sendError instanceof Error ? sendError.message : "Unknown error";
+            const fallbackMessage = wasEditingMessage ? "Failed to edit message" : "Failed to send message";
 
             pushToast({
                 type: "error",
@@ -1725,12 +1728,9 @@ export function Composer({
                 };
                 attachReplyRelation(content, upload.replyToEventId);
 
-                await client.sendEvent(
-                    room.roomId,
-                    EventType.RoomMessage,
-                    content as any,
-                    "",
-                );
+                // Uploaded: from here it's a message in the chat like any other, red with Retry if the
+                // server doesn't take it (sendRetry.ts), so the upload is done either way.
+                client.sendEvent(room.roomId, EventType.RoomMessage, content as any, "").catch(() => {});
 
                 removeUpload(uploadId);
             } catch (uploadError) {
