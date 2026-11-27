@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 
 import { getAvatarColor } from "../utils/avatarColor";
 import type { PresenceState } from "../presence/buildPresenceVm";
+import { useOnPhone } from "../presence/useOnPhone";
 
 interface AvatarProps {
     name: string;
@@ -11,6 +12,8 @@ interface AvatarProps {
     seed?: string;
     userId?: string;
     presenceState?: Exclude<PresenceState, "unknown"> | null;
+    /** Whose presence the dot shows, when that isn't `userId` (a DM's avatar is seeded by the room). */
+    presenceUserId?: string | null;
 }
 
 function getLocalpartFromUserId(userId?: string): string {
@@ -50,13 +53,15 @@ function buildSourceList(src?: string | null, sources?: Array<string | null | un
     );
 }
 
-export function Avatar({ name, src, sources, className, seed, userId, presenceState }: AvatarProps): React.ReactElement {
+export function Avatar({ name, src, sources, className, seed, userId, presenceState, presenceUserId }: AvatarProps): React.ReactElement {
     const [sourceIndex, setSourceIndex] = useState(0);
     const initials = useMemo(() => getInitials(name, userId), [name, userId]);
     // Callers build `sources` inline (memberAvatarSources returns a fresh array
     // every call), so keying off its identity would reset sourceIndex on every
     // parent render - re-requesting URLs that already failed. Key off the URLs
     // themselves instead, so a render with unchanged sources is a no-op.
+    const dotUserId = presenceUserId ?? (userId?.startsWith("@") ? userId : undefined);
+    const onPhone = useOnPhone(dotUserId, presenceState === "online" || presenceState === "idle" || presenceState === "dnd");
     const sourceKey = buildSourceList(src, sources).join("\n");
     const sourceList = useMemo(() => (sourceKey ? sourceKey.split("\n") : []), [sourceKey]);
     const imageSrc = sourceList[sourceIndex] ?? null;
@@ -92,7 +97,9 @@ export function Avatar({ name, src, sources, className, seed, userId, presenceSt
                     <span className="avatar-fallback">{initials}</span>
                 )}
             </span>
-            {presenceState ? <span className={`avatar-presence-dot is-${presenceState}`} /> : null}
+            {presenceState ? (
+                <span className={`avatar-presence-dot is-${presenceState}${onPhone ? " is-phone" : ""}`} />
+            ) : null}
         </span>
     );
 }

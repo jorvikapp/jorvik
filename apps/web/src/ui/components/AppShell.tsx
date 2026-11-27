@@ -143,6 +143,7 @@ import { CameraIcon, MicIcon, SoundIcon } from "./voice/AvIcons";
 import { toggleDeafened, toggleMicMuted, useLocalAvState } from "../voice/localAvState";
 import { nameThisDevice } from "../../core/devices/deviceName";
 import { startSendRetryKeeper } from "../../core/messages/sendRetry";
+import { useOnPhoneService } from "../presence/useOnPhone";
 import { ServerDisconnected } from "./ServerDisconnected";
 
 interface AppShellProps {
@@ -1041,6 +1042,7 @@ export function AppShell({ client, onLogout }: AppShellProps): React.ReactElemen
     const localDomain = useMemo(() => client.getDomain(), [client]);
     // Messages that didn't go out are sent again when the server is back (sendRetry.ts).
     useEffect(() => startSendRetryKeeper(client), [client]);
+    useOnPhoneService(client);
     const [pendingFocusRoomId, setPendingFocusRoomId] = useState<string | null>(null);
     const [userSettings, setUserSettings] = useState<UserLocalSettings>(() => loadUserLocalSettings());
     const [toast, setToast] = useState<ToastState | null>(null);

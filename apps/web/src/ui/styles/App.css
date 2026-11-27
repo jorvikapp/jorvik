@@ -1653,6 +1653,24 @@ textarea {
     background: var(--status-offline);
 }
 
+/* On their phone: the dot becomes a small phone in the same colour, with a dark screen and a home dot. */
+.avatar-presence-dot.is-phone {
+    width: calc(var(--avatar-presence-size) * 0.9 + var(--avatar-presence-ring));
+    height: calc(var(--avatar-presence-size) * 1.35 + var(--avatar-presence-ring) * 2);
+    border-radius: calc(var(--avatar-presence-size) * 0.22 + var(--avatar-presence-ring));
+}
+
+.avatar-presence-dot.is-phone::before {
+    content: "";
+    position: absolute;
+    left: 24%;
+    right: 24%;
+    top: 14%;
+    bottom: 34%;
+    border-radius: 1px;
+    background: var(--avatar-presence-ring-color);
+}
+
 .room-item {
     position: relative;
     background: transparent;

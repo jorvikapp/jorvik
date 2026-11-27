@@ -990,6 +990,7 @@ export function RoomList({
                                     seed={roomAvatarSeed}
                                     userId={roomAvatarSeed}
                                     presenceState={presenceEnabled ? toAvatarPresenceState(presence) : null}
+                                    presenceUserId={presenceUserId}
                                 />
                             ) : null}
                             <span className="room-item-title-block">
