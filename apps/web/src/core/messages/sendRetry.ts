@@ -2,6 +2,7 @@ import {
     ClientEvent,
     EventStatus,
     MatrixScheduler,
+    RoomEvent,
     SyncState,
     type MatrixClient,
     type MatrixError,
@@ -13,14 +14,48 @@ import {
  * Sending while the server is down.
  *
  * A message goes into the chat at once and the composer is free again. The SDK's scheduler sends messages
- * one at a time in order, and retries a failed send for the first few seconds. After that the message is
+ * one at a time in order, and retries a failed send for its first 15 seconds. After that the message is
  * left "not sent": the chat shows it in red with Retry, and this keeper sends it again by itself when the
  * server answers again (and every so often while it doesn't). A message is never dropped to make room for
  * the next one.
  */
 
-/** How long a message may take before the chat shows it in red as not sent. */
-export const SEND_SHOWN_FAILED_AFTER_MS = 10_000;
+/**
+ * How long a message may be on its way to the server before the chat shows it in red as not sent. Counted
+ * from when it actually leaves (sendStartedAt), not from Enter: in an encrypted chat the first message
+ * shares a new key with every device first, which on a slow line takes seconds before the send begins.
+ */
+export const SEND_SHOWN_FAILED_AFTER_MS = 15_000;
+
+/**
+ * A message that hasn't even left after this long (still encrypting or waiting in line) is shown red too,
+ * so a server that stops answering during the key sharing doesn't leave it faded forever.
+ */
+export const SEND_NEVER_LEFT_AFTER_MS = 30_000;
+
+const sendStarts = new WeakMap<MatrixEvent, number>();
+
+/** Note the first time this message started going to the server (its first "sending"). */
+export function noteSendStart(event: MatrixEvent, at: number = Date.now()): void {
+    if (event.status === EventStatus.SENDING && !sendStarts.has(event)) {
+        sendStarts.set(event, at);
+    }
+}
+
+/** When this message first started going to the server, if it has. */
+export function sendStartedAt(event: MatrixEvent): number | undefined {
+    return sendStarts.get(event);
+}
+
+/**
+ * How long this message has been failing to get out, for the red point and the retry rule: since it first
+ * started sending; or since Enter if it was turned down before it could start (held behind an unsent one,
+ * or the encryption step failed).
+ */
+function sendAge(event: MatrixEvent, now: number): number {
+    const started = sendStarts.get(event);
+    return now - (started ?? event.getTs());
+}
 
 /** One attempt at sending a message gives up after this long, so a server that never answers can't hold it. */
 export const SEND_REQUEST_TIMEOUT_MS = 15_000;
@@ -68,7 +103,10 @@ export function sendRetryDelayMs(
     if (!isRetryableSendError(error)) {
         return -1;
     }
-    const age = event ? now - event.getTs() : Number.POSITIVE_INFINITY;
+    if (event) {
+        noteSendStart(event, now);
+    }
+    const age = event ? sendAge(event, now) : Number.POSITIVE_INFINITY;
     if (age >= SEND_SHOWN_FAILED_AFTER_MS) {
         return -1;
     }
@@ -169,6 +207,9 @@ export function startSendRetryKeeper(
     client: MatrixClient,
     { everyMs = SEND_AUTO_RETRY_EVERY_MS }: { everyMs?: number } = {},
 ): () => void {
+    // Note when each message starts going out, so the red point counts from then (sendStartedAt).
+    const onLocalEcho = (event: MatrixEvent): void => noteSendStart(event);
+    client.on(RoomEvent.LocalEchoUpdated, onLocalEcho);
     let wasDown = false;
     const onSync = (state: SyncState, previous: SyncState | null): void => {
         if (DOWN_STATES.has(state)) {
@@ -184,6 +225,7 @@ export function startSendRetryKeeper(
     const timer = setInterval(() => retryAllRooms(client), everyMs);
     return () => {
         client.off(ClientEvent.Sync, onSync);
+        client.off(RoomEvent.LocalEchoUpdated, onLocalEcho);
         clearInterval(timer);
     };
 }
@@ -191,8 +233,9 @@ export function startSendRetryKeeper(
 export type SendDisplayState = "sent" | "sending" | "failed";
 
 /**
- * What the chat shows for one of our messages: "sending" (faded) for its first SEND_SHOWN_FAILED_AFTER_MS,
- * then "failed" (red, with Retry) until it is out. A message the server refused is red straight away.
+ * What the chat shows for one of our messages: "sending" (faded) until it has been on its way for
+ * SEND_SHOWN_FAILED_AFTER_MS (or hasn't left after SEND_NEVER_LEFT_AFTER_MS), then "failed" (red, with
+ * Retry) until it is out. A message the server refused is red straight away.
  */
 export function sendDisplayState(event: MatrixEvent, now: number = Date.now()): SendDisplayState {
     const status = event.status;
@@ -207,7 +250,10 @@ export function sendDisplayState(event: MatrixEvent, now: number = Date.now()): 
     if (isPermanentSendFailure(event)) {
         return "failed";
     }
-    return now - event.getTs() >= SEND_SHOWN_FAILED_AFTER_MS ? "failed" : "sending";
+    noteSendStart(event, now);
+    const left = sendStarts.has(event) || status === EventStatus.NOT_SENT;
+    const limit = left ? SEND_SHOWN_FAILED_AFTER_MS : SEND_NEVER_LEFT_AFTER_MS;
+    return sendAge(event, now) >= limit ? "failed" : "sending";
 }
 
 /** True when the message can be taken back out of the queue now (it isn't on its way to the server). */

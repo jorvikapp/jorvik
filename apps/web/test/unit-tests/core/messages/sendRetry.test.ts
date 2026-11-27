@@ -1,9 +1,21 @@
 import { EventEmitter } from "events";
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { ClientEvent, EventStatus, MatrixError, MatrixEvent, SyncState, type MatrixClient, type Room } from "matrix-js-sdk/src/matrix";
+import {
+    ClientEvent,
+    EventStatus,
+    MatrixError,
+    MatrixEvent,
+    RoomEvent,
+    SyncState,
+    type MatrixClient,
+    type Room,
+} from "matrix-js-sdk/src/matrix";
 
 import {
+    SEND_NEVER_LEFT_AFTER_MS,
     SEND_SHOWN_FAILED_AFTER_MS,
+    noteSendStart,
+    sendStartedAt,
     canRemoveUnsent,
     isRetryableSendError,
     retryUnsent,
@@ -58,12 +70,22 @@ describe("sendRetryDelayMs", () => {
         expect(sendRetryDelayMs(event, 2, noAnswer, now)).toBe(2000);
         expect(sendRetryDelayMs(event, 5, noAnswer, now)).toBe(4000);
         const nearlyRed = ourMessage(EventStatus.SENDING, 0);
+        noteSendStart(nearlyRed, nearlyRed.getTs());
         const later = nearlyRed.getTs() + SEND_SHOWN_FAILED_AFTER_MS - 500;
         expect(sendRetryDelayMs(nearlyRed, 3, noAnswer, later)).toBe(500);
     });
 
-    it("hands the message back as not sent once it's old enough to show red", () => {
-        expect(sendRetryDelayMs(ourMessage(EventStatus.SENDING, SEND_SHOWN_FAILED_AFTER_MS), 1, noAnswer)).toBe(-1);
+    it("hands the message back as not sent once it has been on its way long enough to show red", () => {
+        const event = ourMessage(EventStatus.SENDING, 0);
+        noteSendStart(event, Date.now() - SEND_SHOWN_FAILED_AFTER_MS);
+        expect(sendRetryDelayMs(event, 1, noAnswer)).toBe(-1);
+    });
+
+    it("doesn't count the time before the message started going out (encryption setup)", () => {
+        // Enter was 20 s ago, but sharing the key took most of that; the send itself only just began.
+        const event = ourMessage(EventStatus.SENDING, 20_000);
+        noteSendStart(event, Date.now() - 1000);
+        expect(sendRetryDelayMs(event, 1, noAnswer)).toBe(1000);
     });
 
     it("never retries a refusal", () => {
@@ -72,14 +94,44 @@ describe("sendRetryDelayMs", () => {
 });
 
 describe("sendDisplayState", () => {
+    function onItsWayFor(ms: number): MatrixEvent {
+        const event = ourMessage(EventStatus.SENDING, ms);
+        noteSendStart(event, Date.now() - ms);
+        return event;
+    }
+
     it("is faded at first, red after the wait, and plain once sent", () => {
-        expect(sendDisplayState(ourMessage(EventStatus.SENDING, 1000))).toBe("sending");
+        expect(sendDisplayState(onItsWayFor(1000))).toBe("sending");
         // A refused connection fails at once, but the message still looks like it's sending for a while.
         expect(sendDisplayState(ourMessage(EventStatus.NOT_SENT, 1000, noAnswer))).toBe("sending");
-        expect(sendDisplayState(ourMessage(EventStatus.SENDING, SEND_SHOWN_FAILED_AFTER_MS + 1))).toBe("failed");
-        expect(sendDisplayState(ourMessage(EventStatus.QUEUED, SEND_SHOWN_FAILED_AFTER_MS + 1))).toBe("failed");
+        expect(sendDisplayState(ourMessage(EventStatus.NOT_SENT, SEND_SHOWN_FAILED_AFTER_MS + 1, noAnswer))).toBe("failed");
+        expect(sendDisplayState(onItsWayFor(SEND_SHOWN_FAILED_AFTER_MS + 1))).toBe("failed");
         expect(sendDisplayState(ourMessage(null, SEND_SHOWN_FAILED_AFTER_MS + 1))).toBe("sent");
         expect(sendDisplayState(ourMessage(EventStatus.SENT, SEND_SHOWN_FAILED_AFTER_MS + 1))).toBe("sent");
+    });
+
+    it("counts from when the message left, not from Enter", () => {
+        // 12 s of key sharing, then 5 s on its way: not red yet.
+        const event = ourMessage(EventStatus.SENDING, 17_000);
+        noteSendStart(event, Date.now() - 5000);
+        expect(sendDisplayState(event)).toBe("sending");
+    });
+
+    it("notes the start the first time it sees a message sending, and keeps it", () => {
+        const event = ourMessage(EventStatus.SENDING, 0);
+        noteSendStart(event, 1000);
+        noteSendStart(event, 5000);
+        expect(sendStartedAt(event)).toBe(1000);
+        const encrypting = ourMessage(EventStatus.ENCRYPTING, 0);
+        noteSendStart(encrypting);
+        expect(sendStartedAt(encrypting)).toBeUndefined();
+    });
+
+    it("turns a message red that never even left, after a longer wait", () => {
+        expect(sendDisplayState(ourMessage(EventStatus.ENCRYPTING, SEND_SHOWN_FAILED_AFTER_MS + 1))).toBe("sending");
+        expect(sendDisplayState(ourMessage(EventStatus.QUEUED, SEND_NEVER_LEFT_AFTER_MS - 1000))).toBe("sending");
+        expect(sendDisplayState(ourMessage(EventStatus.QUEUED, SEND_NEVER_LEFT_AFTER_MS + 1))).toBe("failed");
+        expect(sendDisplayState(ourMessage(EventStatus.ENCRYPTING, SEND_NEVER_LEFT_AFTER_MS + 1))).toBe("failed");
     });
 
     it("is red straight away when the server refused it", () => {
@@ -189,6 +241,18 @@ describe("startSendRetryKeeper", () => {
         client.emit(ClientEvent.Sync, SyncState.Error, SyncState.Syncing);
         client.emit(ClientEvent.Sync, SyncState.Syncing, SyncState.Error);
         expect(client.resendEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it("notes when each message starts going out", () => {
+        const client = fakeClient([]);
+        const stop = startSendRetryKeeper(client, { everyMs: 1_000_000 });
+        const event = ourMessage(EventStatus.ENCRYPTING, 8000);
+        client.emit(RoomEvent.LocalEchoUpdated, event);
+        expect(sendStartedAt(event)).toBeUndefined();
+        event.setStatus(EventStatus.SENDING);
+        client.emit(RoomEvent.LocalEchoUpdated, event);
+        expect(Date.now() - sendStartedAt(event)!).toBeLessThan(1000);
+        stop();
     });
 
     it("keeps trying every so often while the server stays away", () => {
